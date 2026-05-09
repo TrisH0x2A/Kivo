@@ -4,11 +4,12 @@ use std::path::Path;
 use tempfile::TempDir;
 
 use super::{
-    build_export_value, fs_get_env_vars, fs_load_workspaces, fs_save_collection_config,
-    fs_save_env_vars, fs_save_workspaces, kivo_collection_export_value,
+    build_export_value, create_workspace_environment, delete_workspace_environment, fs_get_env_vars,
+    fs_load_workspaces, fs_save_collection_config,
+    fs_save_env_vars, fs_save_workspaces, get_workspace_environments, kivo_collection_export_value,
     load_collection_config_from_path, parse_collection_content, parse_env_file_ordered,
     sanitize_name, serialize_export_value,
-    write_env_file, AuthRecord, CollectionConfig, CollectionRecord, CollectionScripts, EnvVar,
+    set_active_workspace_environment, write_env_file, AuthRecord, CollectionConfig, CollectionRecord, CollectionScripts, EnvVar,
     ExportEnvOptions, KeyValueRow, OAuthConfig, RequestRecord, RequestTextOrJson, ResponseMeta,
     SavedResponse, WorkspaceRecord,
 };
@@ -615,8 +616,8 @@ mod fs_env_vars_tests {
                 value: "secret".to_string(),
             },
         ];
-        fs_save_env_vars(dir.path(), "ws", None, &vars).unwrap();
-        let result = fs_get_env_vars(dir.path(), "ws", None);
+        fs_save_env_vars(dir.path(), "ws", None, None, &vars).unwrap();
+        let result = fs_get_env_vars(dir.path(), "ws", None, None);
         assert_eq!(result.workspace.len(), 2);
         assert_eq!(result.workspace[0].key, "BASE_URL");
         assert!(result.collection.is_empty());
@@ -631,8 +632,8 @@ mod fs_env_vars_tests {
             key: "API_KEY".to_string(),
             value: "xyz".to_string(),
         }];
-        fs_save_env_vars(dir.path(), "ws", Some("api"), &vars).unwrap();
-        let result = fs_get_env_vars(dir.path(), "ws", Some("api"));
+        fs_save_env_vars(dir.path(), "ws", Some("api"), None, &vars).unwrap();
+        let result = fs_get_env_vars(dir.path(), "ws", Some("api"), None);
         assert_eq!(result.collection.len(), 1);
         assert_eq!(result.collection[0].key, "API_KEY");
     }
@@ -646,6 +647,7 @@ mod fs_env_vars_tests {
             dir.path(),
             "ws",
             None,
+            None,
             &[EnvVar {
                 key: "HOST".to_string(),
                 value: "global.example.com".to_string(),
@@ -657,20 +659,21 @@ mod fs_env_vars_tests {
             dir.path(),
             "ws",
             Some("api"),
+            None,
             &[EnvVar {
                 key: "HOST".to_string(),
                 value: "collection.example.com".to_string(),
             }],
         )
         .unwrap();
-        let result = fs_get_env_vars(dir.path(), "ws", Some("api"));
+        let result = fs_get_env_vars(dir.path(), "ws", Some("api"), None);
         assert_eq!(result.merged["HOST"], "collection.example.com");
     }
 
     #[test]
     fn save_env_vars_fails_for_nonexistent_workspace() {
         let dir = TempDir::new().unwrap();
-        let result = fs_save_env_vars(dir.path(), "ghost", None, &[]);
+        let result = fs_save_env_vars(dir.path(), "ghost", None, None, &[]);
         assert!(result.is_err());
     }
 
@@ -688,6 +691,62 @@ mod fs_env_vars_tests {
         fs::write(&col_env, "SECRET=abc\n").unwrap();
         fs_save_workspaces(dir.path(), &workspaces).unwrap();
         assert_eq!(fs::read_to_string(&col_env).unwrap(), "SECRET=abc\n");
+    }
+
+    #[test]
+    fn workspace_environment_lifecycle_and_active_switching() {
+        let dir = TempDir::new().unwrap();
+        fs_save_workspaces(dir.path(), &[ws("ws", vec![])]).unwrap();
+
+        let initial = get_workspace_environments(dir.path(), "ws").unwrap();
+        assert_eq!(initial.active_environment_id, "default");
+        assert!(initial.environments.iter().any(|env| env.id == "default"));
+
+        let created = create_workspace_environment(dir.path(), "ws", "Staging API").unwrap();
+        assert!(created.environments.iter().any(|env| env.id == "staging-api"));
+
+        let activated = set_active_workspace_environment(dir.path(), "ws", "staging-api").unwrap();
+        assert_eq!(activated.active_environment_id, "staging-api");
+
+        let deleted = delete_workspace_environment(dir.path(), "ws", "staging-api").unwrap();
+        assert_eq!(deleted.active_environment_id, "default");
+        assert!(!deleted.environments.iter().any(|env| env.id == "staging-api"));
+    }
+
+    #[test]
+    fn explicit_workspace_environment_id_reads_and_writes_separate_files() {
+        let dir = TempDir::new().unwrap();
+        fs_save_workspaces(dir.path(), &[ws("ws", vec![])]).unwrap();
+        create_workspace_environment(dir.path(), "ws", "Prod").unwrap();
+
+        fs_save_env_vars(
+            dir.path(),
+            "ws",
+            None,
+            Some("default"),
+            &[EnvVar {
+                key: "BASE_URL".to_string(),
+                value: "https://dev.example.com".to_string(),
+            }],
+        )
+        .unwrap();
+
+        fs_save_env_vars(
+            dir.path(),
+            "ws",
+            None,
+            Some("prod"),
+            &[EnvVar {
+                key: "BASE_URL".to_string(),
+                value: "https://prod.example.com".to_string(),
+            }],
+        )
+        .unwrap();
+
+        let default_vars = fs_get_env_vars(dir.path(), "ws", None, Some("default"));
+        let prod_vars = fs_get_env_vars(dir.path(), "ws", None, Some("prod"));
+        assert_eq!(default_vars.merged.get("BASE_URL"), Some(&"https://dev.example.com".to_string()));
+        assert_eq!(prod_vars.merged.get("BASE_URL"), Some(&"https://prod.example.com".to_string()));
     }
 }
 

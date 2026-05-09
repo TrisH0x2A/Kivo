@@ -15,12 +15,15 @@ use http::realtime::{
     realtime_connect_socketio, realtime_emit_socketio,
 };
 use storage::{
+    create_workspace_environment_cmd,
+    delete_workspace_environment_cmd,
     export_collection_file, export_request_file, export_response_file,
     get_app_config, get_app_settings, get_default_storage_path, get_env_vars,
+    get_workspace_environments_cmd,
     get_resolved_storage_path,
     get_collection_config, import_collection_file, import_request_file, load_app_state, open_config_directory, reveal_item, save_app_state,
     parse_grpc_proto_file, list_grpc_proto_files_in_directory,
-    save_collection_config, save_env_vars, set_app_settings, set_storage_path, switch_storage_path,
+    save_collection_config, save_env_vars, set_active_workspace_environment_cmd, set_app_settings, set_storage_path, switch_storage_path,
     validate_storage_path,
 };
 
@@ -54,6 +57,10 @@ fn main() {
             get_default_storage_path,
             get_env_vars,
             save_env_vars,
+            get_workspace_environments_cmd,
+            create_workspace_environment_cmd,
+            set_active_workspace_environment_cmd,
+            delete_workspace_environment_cmd,
             get_collection_config,
             save_collection_config,
             get_resolved_storage_path,

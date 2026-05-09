@@ -15,7 +15,8 @@ pub mod models;
 pub use models::{
     default_state, AppSettings, CollectionConfig, CollectionRecord, EnvVar, EnvVarsResult,
     ImportedCollectionResult, ImportedRequestsResult, PersistedAppState, RequestRecord,
-    StoragePathValidationResult, StorageSwitchPayload, WorkspaceFile,
+    StoragePathValidationResult, StorageSwitchPayload, WorkspaceEnvironmentsResult,
+    WorkspaceFile,
 };
 
 #[cfg(test)]
@@ -35,9 +36,10 @@ pub use export::{
 };
 
 pub use io::{
-    fs_get_env_vars, fs_load_workspaces, fs_save_collection_config, fs_save_env_vars,
-    fs_save_workspaces, get_collection_dir, load_collection_config_from_path, load_env_vars,
-    WORKSPACE_FILE_NAME,
+    create_workspace_environment, delete_workspace_environment, fs_get_env_vars,
+    fs_load_workspaces, fs_save_collection_config, fs_save_env_vars, fs_save_workspaces,
+    get_collection_dir, get_workspace_environments, load_collection_config_from_path,
+    load_env_vars, set_active_workspace_environment, WORKSPACE_FILE_NAME,
 };
 
 #[cfg(test)]
@@ -498,12 +500,14 @@ pub fn get_env_vars(
     app: AppHandle,
     workspace_name: String,
     collection_name: Option<String>,
+    workspace_environment_id: Option<String>,
 ) -> Result<EnvVarsResult, String> {
     let root = get_storage_root(&app)?;
     Ok(fs_get_env_vars(
         &root,
         &workspace_name,
         collection_name.as_deref(),
+        workspace_environment_id.as_deref(),
     ))
 }
 
@@ -512,10 +516,56 @@ pub fn save_env_vars(
     app: AppHandle,
     workspace_name: String,
     collection_name: Option<String>,
+    workspace_environment_id: Option<String>,
     vars: Vec<EnvVar>,
 ) -> Result<(), String> {
     let root = get_storage_root(&app)?;
-    fs_save_env_vars(&root, &workspace_name, collection_name.as_deref(), &vars)
+    fs_save_env_vars(
+        &root,
+        &workspace_name,
+        collection_name.as_deref(),
+        workspace_environment_id.as_deref(),
+        &vars,
+    )
+}
+
+#[tauri::command]
+pub fn get_workspace_environments_cmd(
+    app: AppHandle,
+    workspace_name: String,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let root = get_storage_root(&app)?;
+    get_workspace_environments(&root, &workspace_name)
+}
+
+#[tauri::command]
+pub fn create_workspace_environment_cmd(
+    app: AppHandle,
+    workspace_name: String,
+    name: String,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let root = get_storage_root(&app)?;
+    create_workspace_environment(&root, &workspace_name, &name)
+}
+
+#[tauri::command]
+pub fn set_active_workspace_environment_cmd(
+    app: AppHandle,
+    workspace_name: String,
+    environment_id: String,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let root = get_storage_root(&app)?;
+    set_active_workspace_environment(&root, &workspace_name, &environment_id)
+}
+
+#[tauri::command]
+pub fn delete_workspace_environment_cmd(
+    app: AppHandle,
+    workspace_name: String,
+    environment_id: String,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let root = get_storage_root(&app)?;
+    delete_workspace_environment(&root, &workspace_name, &environment_id)
 }
 
 #[tauri::command]

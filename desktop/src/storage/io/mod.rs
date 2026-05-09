@@ -1,6 +1,7 @@
 use crate::storage::models::{
     CollectionConfig, CollectionMeta, CollectionRecord, CollectionStateFile, EnvVar, EnvVarsResult,
-    RequestRecord, WorkspaceFile, WorkspaceInfo, WorkspaceRecord,
+    RequestRecord, WorkspaceEnvironment, WorkspaceEnvironmentsResult, WorkspaceFile, WorkspaceInfo,
+    WorkspaceRecord,
 };
 use std::collections::HashMap;
 use std::fs;
@@ -9,6 +10,232 @@ use std::path::{Component, Path, PathBuf};
 pub const WORKSPACE_FILE_NAME: &str = "workspace.json";
 pub const COLLECTION_CONFIG_FILE_NAME: &str = "collection.json";
 pub const COLLECTION_STATE_FILE_NAME: &str = ".kivo-collection-state.json";
+const WORKSPACE_ENV_META_FILE: &str = ".kivo-envs.json";
+const WORKSPACE_DEFAULT_ENV_ID: &str = "default";
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkspaceEnvironmentsFile {
+    #[serde(default = "default_workspace_env_id")]
+    active_environment_id: String,
+    #[serde(default = "default_workspace_environments")]
+    environments: Vec<WorkspaceEnvironment>,
+}
+
+fn default_workspace_env_id() -> String {
+    WORKSPACE_DEFAULT_ENV_ID.to_string()
+}
+
+fn default_workspace_environments() -> Vec<WorkspaceEnvironment> {
+    vec![WorkspaceEnvironment {
+        id: WORKSPACE_DEFAULT_ENV_ID.to_string(),
+        name: "Default".to_string(),
+    }]
+}
+
+fn normalize_env_id(input: &str) -> String {
+    let mut id = input
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| match ch {
+            'a'..='z' | '0'..='9' => ch,
+            _ => '-',
+        })
+        .collect::<String>();
+    while id.contains("--") {
+        id = id.replace("--", "-");
+    }
+    id = id.trim_matches('-').to_string();
+    if id.is_empty() {
+        WORKSPACE_DEFAULT_ENV_ID.to_string()
+    } else {
+        id
+    }
+}
+
+fn resolve_workspace_env_path(workspace_path: &Path, environment_id: Option<&str>) -> PathBuf {
+    if let Some(id) = environment_id {
+        return workspace_env_file_path(workspace_path, id);
+    }
+
+    let file = read_workspace_environments_file(workspace_path);
+    workspace_env_file_path(workspace_path, &file.active_environment_id)
+}
+
+fn workspace_env_meta_path(workspace_path: &Path) -> PathBuf {
+    workspace_path.join(WORKSPACE_ENV_META_FILE)
+}
+
+fn workspace_env_file_path(workspace_path: &Path, environment_id: &str) -> PathBuf {
+    if environment_id == WORKSPACE_DEFAULT_ENV_ID {
+        workspace_path.join(".env")
+    } else {
+        workspace_path.join(format!(".env.{}", normalize_env_id(environment_id)))
+    }
+}
+
+fn read_workspace_environments_file(workspace_path: &Path) -> WorkspaceEnvironmentsFile {
+    let path = workspace_env_meta_path(workspace_path);
+    let mut file = if let Ok(json) = fs::read_to_string(&path) {
+        serde_json::from_str::<WorkspaceEnvironmentsFile>(&json).unwrap_or_else(|_| WorkspaceEnvironmentsFile {
+            active_environment_id: default_workspace_env_id(),
+            environments: default_workspace_environments(),
+        })
+    } else {
+        WorkspaceEnvironmentsFile {
+            active_environment_id: default_workspace_env_id(),
+            environments: default_workspace_environments(),
+        }
+    };
+
+    if file.environments.is_empty() {
+        file.environments = default_workspace_environments();
+    }
+    if !file
+        .environments
+        .iter()
+        .any(|env| env.id == WORKSPACE_DEFAULT_ENV_ID)
+    {
+        file.environments.insert(
+            0,
+            WorkspaceEnvironment {
+                id: WORKSPACE_DEFAULT_ENV_ID.to_string(),
+                name: "Default".to_string(),
+            },
+        );
+    }
+    if !file
+        .environments
+        .iter()
+        .any(|env| env.id == file.active_environment_id)
+    {
+        file.active_environment_id = WORKSPACE_DEFAULT_ENV_ID.to_string();
+    }
+    file
+}
+
+fn write_workspace_environments_file(workspace_path: &Path, file: &WorkspaceEnvironmentsFile) -> Result<(), String> {
+    let path = workspace_env_meta_path(workspace_path);
+    let json = serde_json::to_string_pretty(file)
+        .map_err(|e| format!("Failed to serialize workspace environments metadata: {e}"))?;
+    fs::write(path, json).map_err(|e| format!("Failed to write workspace environments metadata: {e}"))
+}
+
+pub fn get_workspace_environments(root: &Path, workspace_name: &str) -> Result<WorkspaceEnvironmentsResult, String> {
+    let ws_path = root.join(workspace_name);
+    if !ws_path.exists() {
+        return Err(format!("Workspace '{}' does not exist", workspace_name));
+    }
+    let file = read_workspace_environments_file(&ws_path);
+    Ok(WorkspaceEnvironmentsResult {
+        active_environment_id: file.active_environment_id,
+        environments: file.environments,
+    })
+}
+
+pub fn create_workspace_environment(
+    root: &Path,
+    workspace_name: &str,
+    name: &str,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let ws_path = root.join(workspace_name);
+    if !ws_path.exists() {
+        return Err(format!("Workspace '{}' does not exist", workspace_name));
+    }
+
+    let trimmed_name = name.trim();
+    if trimmed_name.is_empty() {
+        return Err("Environment name cannot be empty".to_string());
+    }
+
+    let mut file = read_workspace_environments_file(&ws_path);
+    let base_id = normalize_env_id(trimmed_name);
+    let mut next_id = base_id.clone();
+    let mut suffix = 2u32;
+    while file.environments.iter().any(|env| env.id == next_id) {
+        next_id = format!("{}-{}", base_id, suffix);
+        suffix += 1;
+    }
+
+    file.environments.push(WorkspaceEnvironment {
+        id: next_id.clone(),
+        name: trimmed_name.to_string(),
+    });
+    write_workspace_environments_file(&ws_path, &file)?;
+
+    let env_file = workspace_env_file_path(&ws_path, &next_id);
+    if !env_file.exists() {
+        let _ = fs::write(env_file, "");
+    }
+
+    Ok(WorkspaceEnvironmentsResult {
+        active_environment_id: file.active_environment_id,
+        environments: file.environments,
+    })
+}
+
+pub fn set_active_workspace_environment(
+    root: &Path,
+    workspace_name: &str,
+    environment_id: &str,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let ws_path = root.join(workspace_name);
+    if !ws_path.exists() {
+        return Err(format!("Workspace '{}' does not exist", workspace_name));
+    }
+
+    let mut file = read_workspace_environments_file(&ws_path);
+    let wanted = normalize_env_id(environment_id);
+    if !file.environments.iter().any(|env| env.id == wanted) {
+        return Err(format!("Environment '{}' not found", environment_id));
+    }
+
+    file.active_environment_id = wanted;
+    write_workspace_environments_file(&ws_path, &file)?;
+    Ok(WorkspaceEnvironmentsResult {
+        active_environment_id: file.active_environment_id,
+        environments: file.environments,
+    })
+}
+
+pub fn delete_workspace_environment(
+    root: &Path,
+    workspace_name: &str,
+    environment_id: &str,
+) -> Result<WorkspaceEnvironmentsResult, String> {
+    let ws_path = root.join(workspace_name);
+    if !ws_path.exists() {
+        return Err(format!("Workspace '{}' does not exist", workspace_name));
+    }
+
+    let wanted = normalize_env_id(environment_id);
+    if wanted == WORKSPACE_DEFAULT_ENV_ID {
+        return Err("Default environment cannot be deleted".to_string());
+    }
+
+    let mut file = read_workspace_environments_file(&ws_path);
+    let before = file.environments.len();
+    file.environments.retain(|env| env.id != wanted);
+    if file.environments.len() == before {
+        return Err(format!("Environment '{}' not found", environment_id));
+    }
+
+    if file.active_environment_id == wanted {
+        file.active_environment_id = WORKSPACE_DEFAULT_ENV_ID.to_string();
+    }
+    write_workspace_environments_file(&ws_path, &file)?;
+
+    let env_file = workspace_env_file_path(&ws_path, &wanted);
+    if env_file.exists() {
+        let _ = fs::remove_file(env_file);
+    }
+
+    Ok(WorkspaceEnvironmentsResult {
+        active_environment_id: file.active_environment_id,
+        environments: file.environments,
+    })
+}
 
 pub fn parse_env_file_ordered(path: &Path) -> Vec<EnvVar> {
     let Ok(content) = fs::read_to_string(path) else {
@@ -202,7 +429,8 @@ pub fn load_env_vars(
     workspace_path: &Path,
     collection_path: Option<&Path>,
 ) -> HashMap<String, String> {
-    let mut vars = parse_env_file(&workspace_path.join(".env"));
+    let workspace_env_path = resolve_workspace_env_path(workspace_path, None);
+    let mut vars = parse_env_file(&workspace_env_path);
     if let Some(col_path) = collection_path {
         for (k, v) in parse_env_file(&col_path.join(".env")) {
             vars.insert(k, v);
@@ -416,9 +644,11 @@ pub fn fs_get_env_vars(
     root: &Path,
     workspace_name: &str,
     collection_name: Option<&str>,
+    workspace_environment_id: Option<&str>,
 ) -> EnvVarsResult {
     let ws_path = root.join(workspace_name);
-    let workspace_vars = parse_env_file_ordered(&ws_path.join(".env"));
+    let workspace_env_path = resolve_workspace_env_path(&ws_path, workspace_environment_id);
+    let workspace_vars = parse_env_file_ordered(&workspace_env_path);
     let collection_vars = match collection_name {
         Some(col) => {
             let col_path = get_collection_dir(root, workspace_name, col);
@@ -444,6 +674,7 @@ pub fn fs_save_env_vars(
     root: &Path,
     workspace_name: &str,
     collection_name: Option<&str>,
+    workspace_environment_id: Option<&str>,
     vars: &[EnvVar],
 ) -> Result<(), String> {
     let env_path = match collection_name {
@@ -460,7 +691,7 @@ pub fn fs_save_env_vars(
             if !ws_path.exists() {
                 return Err(format!("Workspace '{}' does not exist", workspace_name));
             }
-            ws_path.join(".env")
+            resolve_workspace_env_path(&ws_path, workspace_environment_id)
         }
     };
     write_env_file(&env_path, vars)

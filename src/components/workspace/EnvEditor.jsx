@@ -130,8 +130,14 @@ function EnvTable({ rows, onChange, onDelete, workspaceVarKeys = [] }) {
   );
 }
 
-export function EnvEditor({ workspaceName, collectionName, initialTab = "workspace", onSave: onSaveProp }) {
-  const { vars, isLoading, saveVars } = useEnv(workspaceName, collectionName);
+export function EnvEditor({
+  workspaceName,
+  collectionName,
+  workspaceEnvironmentId = null,
+  initialTab = "workspace",
+  onSave: onSaveProp,
+}) {
+  const { vars, isLoading, saveVars } = useEnv(workspaceName, collectionName, workspaceEnvironmentId);
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [workspaceDraft, setWorkspaceDraft] = useState([]);

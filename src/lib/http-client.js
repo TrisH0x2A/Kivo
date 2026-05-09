@@ -455,10 +455,11 @@ export async function saveAppState(payload) {
   return invoke("save_app_state", { payload: encryptedPayload });
 }
 
-export function getEnvVars(workspaceName, collectionName) {
+export function getEnvVars(workspaceName, collectionName, workspaceEnvironmentId = null) {
   return invoke("get_env_vars", {
     workspaceName,
     collectionName: collectionName || null,
+    workspaceEnvironmentId: workspaceEnvironmentId || null,
   });
 }
 
@@ -470,11 +471,39 @@ export function listGrpcProtoFilesInDirectory(dirPath) {
   return invoke("list_grpc_proto_files_in_directory", { dirPath });
 }
 
-export function saveEnvVars(workspaceName, collectionName, vars) {
+export function saveEnvVars(workspaceName, collectionName, vars, workspaceEnvironmentId = null) {
   return invoke("save_env_vars", {
     workspaceName,
     collectionName: collectionName || null,
+    workspaceEnvironmentId: workspaceEnvironmentId || null,
     vars,
+  });
+}
+
+export function getWorkspaceEnvironments(workspaceName) {
+  return invoke("get_workspace_environments_cmd", {
+    workspaceName,
+  });
+}
+
+export function createWorkspaceEnvironment(workspaceName, name) {
+  return invoke("create_workspace_environment_cmd", {
+    workspaceName,
+    name,
+  });
+}
+
+export function setActiveWorkspaceEnvironment(workspaceName, environmentId) {
+  return invoke("set_active_workspace_environment_cmd", {
+    workspaceName,
+    environmentId,
+  });
+}
+
+export function deleteWorkspaceEnvironment(workspaceName, environmentId) {
+  return invoke("delete_workspace_environment_cmd", {
+    workspaceName,
+    environmentId,
   });
 }
 

@@ -11,9 +11,11 @@ import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { EnvHighlightInput } from "@/components/ui/EnvHighlightInput.jsx";
 import { EnvEditor } from "@/components/workspace/EnvEditor.jsx";
+import { WorkspaceEnvironmentSelector } from "@/components/workspace/WorkspaceEnvironmentSelector.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { useCollectionConfig } from "@/hooks/use-collection-config.js";
 import { useEnv } from "@/hooks/use-env.js";
+import { useWorkspaceEnvironments } from "@/hooks/use-workspace-environments.js";
 import { cn } from "@/lib/utils.js";
 
 const TABS = [
@@ -421,8 +423,16 @@ export function CollectionSettingsPage({
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [isSaving, setIsSaving] = useState(false);
+  const {
+    workspaceEnvironments,
+    isWorkspaceEnvironmentsLoading,
+    createEnvironment,
+    setActiveEnvironment,
+    deleteEnvironment,
+  } = useWorkspaceEnvironments(workspace?.name);
+  const activeWorkspaceEnvironmentId = workspaceEnvironments?.activeEnvironmentId || "default";
 
-  const { vars: envVars } = useEnv(workspace?.name, collection?.name);
+  const { vars: envVars } = useEnv(workspace?.name, collection?.name, activeWorkspaceEnvironmentId);
   const { config, isDirty, updateConfig, save, reset } = useCollectionConfig(
     workspace?.name,
     collection?.name
@@ -519,10 +529,19 @@ export function CollectionSettingsPage({
                 URLs, headers, and payloads to interpolate them dynamically. Collection keys take priority.
               </p>
             </div>
+            <WorkspaceEnvironmentSelector
+              environments={workspaceEnvironments?.environments || []}
+              activeEnvironmentId={activeWorkspaceEnvironmentId}
+              isLoading={isWorkspaceEnvironmentsLoading}
+              onCreate={createEnvironment}
+              onSetActive={setActiveEnvironment}
+              onDelete={deleteEnvironment}
+            />
             <Card className="flex-1 min-h-0 border-border/20 bg-transparent shadow-sm overflow-hidden flex flex-col mt-2">
               <EnvEditor
                 workspaceName={workspace?.name}
                 collectionName={collection?.name}
+                workspaceEnvironmentId={activeWorkspaceEnvironmentId}
                 initialTab={initialEnvTab}
                 onSave={onEnvSave}
               />
