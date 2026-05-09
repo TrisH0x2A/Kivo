@@ -224,7 +224,7 @@ export function StreamResponsePanel({
   }
 
   return (
-    <Card className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden border-border/40 bg-card/40">
+    <Card className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-none border-border/40 bg-card/40">
       <header className="flex flex-col gap-2 border-b border-border/40 px-3 py-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
@@ -233,7 +233,7 @@ export function StreamResponsePanel({
           </span>
           <span
             className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium",
+              "inline-flex shrink-0 items-center gap-1 rounded-none border px-2 py-0.5 text-[11px] font-medium",
               pill.className,
             )}
           >
@@ -306,7 +306,7 @@ export function StreamResponsePanel({
               className="h-8 border-border/35 pl-8 text-[12px] focus-visible:border-primary focus-visible:ring-0"
             />
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-0.5 rounded-md border border-border/35 p-0.5">
+          <div className="flex shrink-0 flex-wrap items-center gap-0.5 rounded-none border border-border/35 p-0.5">
             <Filter className="ml-1 h-3.5 w-3.5 text-muted-foreground" />
             {DIRECTION_OPTIONS.map((opt) => (
               <button
@@ -314,7 +314,7 @@ export function StreamResponsePanel({
                 type="button"
                 onClick={() => setDirection(opt.id)}
                 className={cn(
-                  "h-7 rounded px-2 text-[11px] font-medium transition-colors",
+                  "h-7 rounded-none px-2 text-[11px] font-medium transition-colors",
                   direction === opt.id
                     ? "bg-primary/15 text-primary"
                     : "text-muted-foreground hover:text-foreground",
@@ -330,7 +330,7 @@ export function StreamResponsePanel({
         </div>
 
         {connectionState.error ? (
-          <div className="rounded-md border border-[hsl(var(--danger))]/30 bg-[hsl(var(--danger))]/5 px-3 py-1.5 text-[11px] text-[hsl(var(--danger))]">
+          <div className="rounded-none border border-[hsl(var(--danger))]/30 bg-[hsl(var(--danger))]/5 px-3 py-1.5 text-[11px] text-[hsl(var(--danger))]">
             {connectionState.error}
           </div>
         ) : null}
@@ -371,7 +371,7 @@ export function StreamResponsePanel({
           className="group relative h-1.5 shrink-0 cursor-row-resize border-y border-border/40 bg-border/20 transition-colors hover:bg-primary/30"
           title="Drag to resize — double click to reset"
         >
-          <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-muted-foreground/40 group-hover:bg-primary/60" />
+          <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-none bg-muted-foreground/40 group-hover:bg-primary/60" />
         </div>
 
         <div
@@ -416,7 +416,7 @@ function MessageRow({ message, active, onSelect }) {
       >
         <span
           className={cn(
-            "mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-border/40",
+            "mt-0.5 flex h-5 w-5 items-center justify-center rounded-none border border-border/40",
             tone,
           )}
         >
@@ -428,7 +428,7 @@ function MessageRow({ message, active, onSelect }) {
               {message.event || (message.direction === "out" ? "send" : "message")}
             </span>
             {message.kind && message.kind !== "text" && message.kind !== "event" ? (
-              <span className="rounded bg-muted/30 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+              <span className="rounded-none bg-muted/30 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
                 {message.kind}
               </span>
             ) : null}
@@ -503,7 +503,7 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
           type="button"
           onClick={() => onWrapChange(!wrap)}
           className={cn(
-            "flex h-6 items-center gap-1 rounded px-1.5 text-[10px] transition-colors",
+            "flex h-6 items-center gap-1 rounded-none px-1.5 text-[10px] transition-colors",
             wrap ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
           )}
           title={wrap ? "Disable word wrap" : "Enable word wrap"}
@@ -511,12 +511,12 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
           <WrapText className="h-3 w-3" />
           Wrap
         </button>
-        <div className="ml-1 flex items-center gap-0.5 rounded border border-border/40 p-0.5">
+        <div className="ml-1 flex items-center gap-0.5 rounded-none border border-border/40 p-0.5">
           <button
             type="button"
             onClick={() => onViewChange("json")}
             className={cn(
-              "flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium transition-colors",
+              "flex h-5 items-center gap-1 rounded-none px-1.5 text-[10px] font-medium transition-colors",
               view === "json"
                 ? "bg-primary/15 text-primary"
                 : "text-muted-foreground hover:text-foreground",
@@ -529,7 +529,7 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
             type="button"
             onClick={() => onViewChange("raw")}
             className={cn(
-              "flex h-5 items-center gap-1 rounded px-1.5 text-[10px] font-medium transition-colors",
+              "flex h-5 items-center gap-1 rounded-none px-1.5 text-[10px] font-medium transition-colors",
               view === "raw"
                 ? "bg-primary/15 text-primary"
                 : "text-muted-foreground hover:text-foreground",
@@ -543,7 +543,7 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
           type="button"
           onClick={copyPayload}
           disabled={!message}
-          className="flex h-6 items-center gap-1 rounded px-1.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+          className="flex h-6 items-center gap-1 rounded-none px-1.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
           title="Copy payload"
         >
           {copied ? (
@@ -607,7 +607,7 @@ function EmptyState({ mode, url, connecting, connected }) {
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center text-muted-foreground">
-      <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border/40">
+      <span className="flex h-9 w-9 items-center justify-center rounded-none border border-border/40">
         {connecting ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : connected ? (

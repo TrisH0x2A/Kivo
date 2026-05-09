@@ -70,7 +70,7 @@ export function WorkspaceEnvironmentSelector({
   }
 
   return (
-    <div className="rounded-md border border-border/20 bg-transparent p-3">
+    <div className="border border-border/20 bg-transparent p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Workspace Environment
@@ -82,7 +82,7 @@ export function WorkspaceEnvironmentSelector({
         {environments.map((env) => {
           const isActive = env.id === activeEnvironmentId;
           return (
-            <div key={env.id} className="inline-flex items-center rounded-md border border-border/30">
+            <div key={env.id} className="inline-flex items-center border border-border/30">
               <button
                 type="button"
                 disabled={isLoading || isCreating || Boolean(deletingId) || Boolean(switchingId) || isActive}
@@ -112,7 +112,7 @@ export function WorkspaceEnvironmentSelector({
           value={draftName}
           onChange={(event) => setDraftName(event.target.value)}
           placeholder="Add environment (e.g. staging)"
-          className="h-9 border-border/30 bg-transparent text-[12px]"
+          className="h-9 rounded-none border-border/30 bg-transparent text-[12px]"
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -123,7 +123,7 @@ export function WorkspaceEnvironmentSelector({
         <Button
           type="button"
           size="sm"
-          className="h-9 gap-1.5 px-3 text-[12px]"
+          className="h-9 rounded-none border border-primary/40 bg-primary/15 gap-1.5 px-3 text-[12px] font-semibold text-primary hover:bg-primary/25"
           onClick={handleCreate}
           disabled={isLoading || isCreating || Boolean(switchingId) || Boolean(deletingId) || !draftName.trim()}
         >
