@@ -14,7 +14,7 @@ tauri-build = { version = "2.5.6", features = [] }
 [dependencies]
 base64 = "0.22.1"
 chrono = { version = "0.4", features = ["clock"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate", "zstd"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
