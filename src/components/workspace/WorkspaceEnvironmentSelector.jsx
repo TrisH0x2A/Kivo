@@ -38,6 +38,9 @@ export function WorkspaceEnvironmentSelector({
     }
   }
 
+  const isAddDisabled =
+    isLoading || isCreating || Boolean(switchingId) || Boolean(deletingId) || !draftName.trim();
+
   async function handleSetActive(environment) {
     if (!onSetActive || !environment?.id) return;
     if (environment.id === activeEnvironmentId) return;
@@ -87,9 +90,9 @@ export function WorkspaceEnvironmentSelector({
                 type="button"
                 disabled={isLoading || isCreating || Boolean(deletingId) || Boolean(switchingId) || isActive}
                 onClick={() => handleSetActive(env)}
-                className={`px-2.5 py-1.5 text-[12px] ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/40"}`}
+                className={`max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-1.5 text-[12px] ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/40"}`}
               >
-                {switchingId === env.id ? "Switching..." : env.name}
+                {env.name}
               </button>
               {env.id !== "default" ? (
                 <button
@@ -107,7 +110,7 @@ export function WorkspaceEnvironmentSelector({
         })}
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="grid grid-cols-[minmax(0,1fr)_98px] items-center gap-2">
         <Input
           value={draftName}
           onChange={(event) => setDraftName(event.target.value)}
@@ -123,9 +126,13 @@ export function WorkspaceEnvironmentSelector({
         <Button
           type="button"
           size="sm"
-          className="h-9 rounded-none border border-primary/40 bg-primary/15 gap-1.5 px-3 text-[12px] font-semibold text-primary hover:bg-primary/25"
+          className={`h-9 w-full rounded-none justify-center gap-2 px-3 text-[12px] ${
+            isAddDisabled
+              ? "border border-border/35 bg-transparent font-medium text-muted-foreground"
+              : "border border-primary/40 bg-primary text-primary-foreground font-semibold shadow-md transition-transform active:scale-95"
+          }`}
           onClick={handleCreate}
-          disabled={isLoading || isCreating || Boolean(switchingId) || Boolean(deletingId) || !draftName.trim()}
+          disabled={isAddDisabled}
         >
           <Plus className="h-3.5 w-3.5" /> {isCreating ? "Adding..." : "Add"}
         </Button>

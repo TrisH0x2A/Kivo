@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Eye, EyeOff, Save, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
@@ -34,7 +34,7 @@ function validateRows(rows) {
   return issues;
 }
 
-function EnvTable({ rows, onChange, onDelete, workspaceVarKeys = [] }) {
+function EnvTable({ rows, onChange, workspaceVarKeys = [] }) {
   function updateRow(id, field, value) {
     onChange(rows.map((r) => (r.id === id ? { ...r, [field]: value } : r)));
   }
@@ -42,7 +42,6 @@ function EnvTable({ rows, onChange, onDelete, workspaceVarKeys = [] }) {
   function removeRow(id) {
     const nextRows = rows.filter((r) => r.id !== id);
     onChange(nextRows);
-    onDelete?.(nextRows);
   }
 
   function addRow() {
@@ -142,41 +141,45 @@ export function EnvEditor({
   const [activeTab, setActiveTab] = useState(initialTab);
   const [workspaceDraft, setWorkspaceDraft] = useState([]);
   const [collectionDraft, setCollectionDraft] = useState([]);
+  const [baselineWorkspace, setBaselineWorkspace] = useState([]);
+  const [baselineCollection, setBaselineCollection] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
-  const [autosaveMessage, setAutosaveMessage] = useState("");
+  const hasHydratedRef = useRef(false);
 
   const isDirty = useMemo(() => {
-    if (!vars) return false;
+    if (!hasHydratedRef.current) return false;
 
     const cleanWorkspace = workspaceDraft.filter((r) => r.key.trim() || r.value.trim());
-    const origWorkspace = vars.workspace || [];
+    const origWorkspace = baselineWorkspace || [];
     if (cleanWorkspace.length !== origWorkspace.length) return true;
     for (let i = 0; i < cleanWorkspace.length; i += 1) {
       if (cleanWorkspace[i].key !== origWorkspace[i].key || cleanWorkspace[i].value !== origWorkspace[i].value) return true;
     }
 
     const cleanCollection = collectionDraft.filter((r) => r.key.trim() || r.value.trim());
-    const origCollection = vars.collection || [];
+    const origCollection = baselineCollection || [];
     if (cleanCollection.length !== origCollection.length) return true;
     for (let i = 0; i < cleanCollection.length; i += 1) {
       if (cleanCollection[i].key !== origCollection[i].key || cleanCollection[i].value !== origCollection[i].value) return true;
     }
 
     return false;
-  }, [workspaceDraft, collectionDraft, vars]);
+  }, [workspaceDraft, collectionDraft, baselineWorkspace, baselineCollection]);
 
   const workspaceIssues = useMemo(() => validateRows(workspaceDraft), [workspaceDraft]);
   const collectionIssues = useMemo(() => validateRows(collectionDraft), [collectionDraft]);
   const activeIssues = activeTab === "workspace" ? workspaceIssues : collectionIssues;
 
-  useEffect(() => {
-    setWorkspaceDraft(rowsFromVars(vars.workspace));
-  }, [vars.workspace]);
-
-  useEffect(() => {
-    setCollectionDraft(rowsFromVars(vars.collection));
-  }, [vars.collection]);
+  useLayoutEffect(() => {
+    const nextWorkspace = vars.workspace || [];
+    const nextCollection = vars.collection || [];
+    setWorkspaceDraft(rowsFromVars(nextWorkspace));
+    setCollectionDraft(rowsFromVars(nextCollection));
+    setBaselineWorkspace(nextWorkspace);
+    setBaselineCollection(nextCollection);
+    hasHydratedRef.current = true;
+  }, [vars.workspace, vars.collection]);
 
   useEffect(() => {
     setActiveTab(initialTab);
@@ -197,31 +200,15 @@ export function EnvEditor({
       }
       onSaveProp?.();
       setSavedFeedback(true);
-      setAutosaveMessage("Autosaved");
       window.setTimeout(() => setSavedFeedback(false), 1800);
-      window.setTimeout(() => setAutosaveMessage(""), 1800);
     } finally {
       setIsSaving(false);
     }
   }
 
-  useEffect(() => {
-    if (!isDirty || isSaving || activeIssues.length > 0) {
-      return undefined;
-    }
-
-    const timer = window.setTimeout(() => {
-      handleSave().catch((error) => {
-        console.error("Env autosave failed", error);
-      });
-    }, 800);
-
-    return () => window.clearTimeout(timer);
-  }, [activeIssues.length, activeTab, collectionDraft, isDirty, isSaving, workspaceDraft]);
-
   const workspaceKeys = vars.workspace.map((v) => v.key);
 
-  if (isLoading) {
+  if (isLoading && !hasHydratedRef.current) {
     return (
       <div className="flex h-40 items-center justify-center text-[12px] text-muted-foreground animate-pulse">
         Loading variables...
@@ -269,13 +256,11 @@ export function EnvEditor({
           <EnvTable
             rows={workspaceDraft}
             onChange={setWorkspaceDraft}
-            onDelete={(nextRows) => handleSave({ workspace: nextRows, collection: collectionDraft })}
           />
         ) : (
           <EnvTable
             rows={collectionDraft}
             onChange={setCollectionDraft}
-            onDelete={(nextRows) => handleSave({ workspace: workspaceDraft, collection: nextRows })}
             workspaceVarKeys={workspaceKeys}
           />
         )}
@@ -292,7 +277,6 @@ export function EnvEditor({
               Unsaved changes
             </div>
           ) : null}
-          {!isDirty && autosaveMessage ? <div className="text-[12px] font-medium text-success">{autosaveMessage}</div> : null}
         </div>
         <div className="flex items-center gap-3">
           <Button
