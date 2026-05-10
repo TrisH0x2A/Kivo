@@ -2143,6 +2143,7 @@ export function RequestPane({
   const missingVars = useMemo(() => {
     if (!envVars) return [];
     const merged = envVars.merged ?? {};
+    const mergedKeySet = new Set(Object.keys(merged).map((key) => String(key).trim().toLowerCase()));
     const auth = debouncedState.auth ?? {};
     const oauthRows = auth.oauth2?.extraTokenParams ?? [];
     const allText = [
@@ -2178,7 +2179,10 @@ export function RequestPane({
       .map((m) => m[1].trim())
       .filter(Boolean);
 
-    return [...new Set(placeholders)].filter((key) => !(key in merged) && !isDynamicTemplateVariable(key));
+    return [...new Set(placeholders)].filter((key) => {
+      const normalized = String(key).trim().toLowerCase();
+      return !mergedKeySet.has(normalized) && !isDynamicTemplateVariable(key);
+    });
   }, [debouncedState, envVars]);
 
   function handleFormatBody() {

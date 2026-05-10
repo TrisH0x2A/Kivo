@@ -11,6 +11,13 @@ fn resolve_dynamic_variable(name: &str) -> Option<String> {
 }
 
 pub fn resolve_template_variables(input: &str, vars: &HashMap<String, String>) -> String {
+    let mut normalized_vars: HashMap<String, &String> = HashMap::new();
+    for (key, value) in vars {
+        normalized_vars
+            .entry(key.trim().to_ascii_lowercase())
+            .or_insert(value);
+    }
+
     let mut out = String::with_capacity(input.len());
     let mut cursor = 0usize;
 
@@ -29,6 +36,8 @@ pub fn resolve_template_variables(input: &str, vars: &HashMap<String, String>) -
         let key = raw_key.trim();
 
         if let Some(value) = vars.get(key) {
+            out.push_str(value);
+        } else if let Some(value) = normalized_vars.get(&key.to_ascii_lowercase()) {
             out.push_str(value);
         } else if let Some(value) = resolve_dynamic_variable(key) {
             out.push_str(&value);
@@ -70,5 +79,14 @@ mod tests {
     fn unknown_placeholders_are_preserved() {
         let out = resolve_template_variables("{{MISSING}}/{{$unknown}}", &HashMap::new());
         assert_eq!(out, "{{MISSING}}/{{$unknown}}");
+    }
+
+    #[test]
+    fn resolves_env_keys_case_insensitively() {
+        let mut vars = HashMap::new();
+        vars.insert("base_url".to_string(), "postman-echo.com".to_string());
+
+        let out = resolve_template_variables("https://{{BASE_URL}}/get", &vars);
+        assert_eq!(out, "https://postman-echo.com/get");
     }
 }

@@ -28,12 +28,24 @@ function resolveDynamicVariable(key) {
 
 export function resolveTemplateVariables(value, mergedEnv = {}, options = {}) {
   const preserveUnknown = options.preserveUnknown ?? false;
+  const normalizedEnv = Object.entries(mergedEnv ?? {}).reduce((acc, [key, entryValue]) => {
+    const normalizedKey = String(key ?? "").trim().toLowerCase();
+    if (normalizedKey && !(normalizedKey in acc)) {
+      acc[normalizedKey] = entryValue;
+    }
+    return acc;
+  }, {});
 
   return String(value ?? "").replace(/\{\{([^}]+)\}\}/g, (full, rawKey) => {
     const key = String(rawKey ?? "").trim();
 
     if (Object.prototype.hasOwnProperty.call(mergedEnv, key)) {
       return String(mergedEnv[key] ?? "");
+    }
+
+    const normalizedKey = key.toLowerCase();
+    if (Object.prototype.hasOwnProperty.call(normalizedEnv, normalizedKey)) {
+      return String(normalizedEnv[normalizedKey] ?? "");
     }
 
     const dynamicValue = resolveDynamicVariable(key);
