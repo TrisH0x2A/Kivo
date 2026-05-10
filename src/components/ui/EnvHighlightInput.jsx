@@ -69,12 +69,11 @@ export function EnvHighlightInput({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [suggestionFilter, setSuggestionFilter] = useState("");
+  const dynamicKeys = useMemo(() => DYNAMIC_TEMPLATE_VARIABLES.map((item) => item.key), []);
 
   const allEnvKeys = useMemo(() => {
     const merged = envVars?.merged ?? {};
-    const envKeys = Object.keys(merged);
-    const dynamicKeys = DYNAMIC_TEMPLATE_VARIABLES.map((item) => item.key);
-    return [...dynamicKeys, ...envKeys];
+    return Object.keys(merged);
   }, [envVars]);
 
   const dynamicPreviewMap = useMemo(() => {
@@ -84,11 +83,17 @@ export function EnvHighlightInput({
     }, {});
   }, []);
 
+  const suggestionMode = useMemo(() => {
+    const token = String(suggestionFilter ?? "").trimStart();
+    return token.startsWith("$") ? "dynamic" : "env";
+  }, [suggestionFilter]);
+
   const filteredKeys = useMemo(() => {
+    const sourceKeys = suggestionMode === "dynamic" ? dynamicKeys : allEnvKeys;
     if (!suggestionFilter) return allEnvKeys;
     const lower = suggestionFilter.toLowerCase();
-    return allEnvKeys.filter((k) => k.toLowerCase().includes(lower));
-  }, [allEnvKeys, suggestionFilter]);
+    return sourceKeys.filter((k) => k.toLowerCase().includes(lower));
+  }, [allEnvKeys, dynamicKeys, suggestionFilter, suggestionMode]);
 
   useEffect(() => {
     setSelectedIdx(0);
@@ -248,11 +253,11 @@ export function EnvHighlightInput({
       {showSuggestions && filteredKeys.length > 0 && (
         <div
           ref={dropdownRef}
-          className="absolute left-0 top-[calc(100%+4px)] z-[500] min-w-[260px] max-w-full overflow-hidden rounded-md border border-border/40 bg-background shadow-2xl"
-          style={{ maxHeight: 220, overflowY: "auto" }}
+          className="editor-suggestion-scroll absolute left-0 top-[calc(100%+4px)] z-[500] min-w-[260px] max-w-full overflow-y-auto overflow-x-hidden rounded-none border border-border/40 bg-background shadow-2xl"
+          style={{ maxHeight: 220 }}
         >
           <div className="flex items-center justify-between border-b border-border/20 bg-background px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            <span>Variables</span>
+            <span>{suggestionMode === "dynamic" ? "Dynamic Variables" : "Environment Variables"}</span>
             <span className="opacity-50 font-normal">↑↓ to navigate</span>
           </div>
           {filteredKeys.map((key, idx) => (
