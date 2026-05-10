@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { DYNAMIC_TEMPLATE_VARIABLES, isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { cn } from "@/lib/utils";
 
 function renderHighlighted(text, envVars) {
@@ -18,7 +19,7 @@ function renderHighlighted(text, envVars) {
 
     const varName = match[1].trim();
     const merged = envVars?.merged ?? {};
-    const isResolved = varName in merged;
+    const isResolved = varName in merged || isDynamicTemplateVariable(varName);
 
     parts.push(
       <span
@@ -71,8 +72,17 @@ export function EnvHighlightInput({
 
   const allEnvKeys = useMemo(() => {
     const merged = envVars?.merged ?? {};
-    return Object.keys(merged);
+    const envKeys = Object.keys(merged);
+    const dynamicKeys = DYNAMIC_TEMPLATE_VARIABLES.map((item) => item.key);
+    return [...dynamicKeys, ...envKeys];
   }, [envVars]);
+
+  const dynamicPreviewMap = useMemo(() => {
+    return DYNAMIC_TEMPLATE_VARIABLES.reduce((acc, item) => {
+      acc[item.key] = item.preview;
+      return acc;
+    }, {});
+  }, []);
 
   const filteredKeys = useMemo(() => {
     if (!suggestionFilter) return allEnvKeys;
@@ -242,7 +252,7 @@ export function EnvHighlightInput({
           style={{ maxHeight: 220, overflowY: "auto" }}
         >
           <div className="flex items-center justify-between border-b border-border/20 bg-background px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-            <span>Environment Variables</span>
+            <span>Variables</span>
             <span className="opacity-50 font-normal">↑↓ to navigate</span>
           </div>
           {filteredKeys.map((key, idx) => (
@@ -273,7 +283,7 @@ export function EnvHighlightInput({
               <div
                 className="h-2 w-2 rounded-full shrink-0"
                 style={
-                  (envVars?.merged && key in envVars.merged)
+                  ((envVars?.merged && key in envVars.merged) || isDynamicTemplateVariable(key))
                     ? {
                       backgroundColor: "hsl(var(--env-resolved))",
                       boxShadow: "0 0 0 2px hsl(var(--env-resolved) / 0.16)",
@@ -289,7 +299,7 @@ export function EnvHighlightInput({
                 className="truncate text-right text-[10px] italic"
                 style={{ color: "hsl(var(--env-suggestion-value))" }}
               >
-                {envVars?.merged?.[key] ?? "undefined"}
+                {dynamicPreviewMap[key] ?? envVars?.merged?.[key] ?? "undefined"}
               </span>
             </button>
           ))}

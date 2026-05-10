@@ -1,3 +1,8 @@
+export const DYNAMIC_TEMPLATE_VARIABLES = [
+  { key: "$uuid", preview: "auto UUID v4" },
+  { key: "$timestamp", preview: "unix seconds" },
+];
+
 export function isDynamicTemplateVariable(key) {
   return key === "$timestamp" || key === "$uuid";
 }
