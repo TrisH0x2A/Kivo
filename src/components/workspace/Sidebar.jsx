@@ -639,8 +639,10 @@ function FolderSettingsModal({
               type="button"
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "rounded px-3 py-1.5 text-[12px] transition-colors",
-                activeTab === tab ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent/35 hover:text-foreground"
+                "border border-transparent px-3 py-1.5 text-[12px] transition-colors",
+                activeTab === tab
+                  ? "border-primary/45 bg-primary/12 text-primary"
+                  : "text-muted-foreground hover:border-border/35 hover:bg-accent/35 hover:text-foreground"
               )}
             >
               {tab}
@@ -697,15 +699,17 @@ function FolderSettingsModal({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border/20 bg-accent/30 p-1 w-fit">
+              <div className="flex w-fit flex-wrap items-center gap-2 border border-border/35 bg-background/20 p-1">
                 {AUTH_MODES.map((mode) => (
                   <button
                     key={mode.value}
                     type="button"
                     onClick={() => setDraft((prev) => ({ ...prev, defaultAuth: { ...auth, type: mode.value } }))}
                     className={cn(
-                      "px-3 py-1.5 rounded-md text-[12px] font-medium transition-all",
-                      auth.type === mode.value ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      "border border-transparent px-3 py-1.5 text-[12px] font-medium transition-colors",
+                      auth.type === mode.value
+                        ? "border-primary/45 bg-primary/12 text-primary"
+                        : "text-muted-foreground hover:border-border/35 hover:bg-accent/45 hover:text-foreground"
                     )}
                   >
                     {mode.label}
@@ -741,8 +745,10 @@ function FolderSettingsModal({
                         type="button"
                         onClick={() => setDraft((prev) => ({ ...prev, defaultAuth: { ...auth, apiKeyIn: position } }))}
                         className={cn(
-                          "px-3 py-1.5 rounded-md text-[12px]",
-                          (auth.apiKeyIn ?? "header") === position ? "bg-primary text-primary-foreground" : "bg-accent/30 text-muted-foreground"
+                          "border border-transparent px-3 py-1.5 text-[12px] transition-colors",
+                          (auth.apiKeyIn ?? "header") === position
+                            ? "border-primary/45 bg-primary/12 text-primary"
+                            : "bg-accent/30 text-muted-foreground hover:border-border/35"
                         )}
                       >
                         {position === "header" ? "Header" : "Query"}
@@ -1817,7 +1823,7 @@ export function RequestsView({
       <div className="relative mb-4">
         <button
           onClick={() => setIsWorkspaceSwitcherOpen(!isWorkspaceSwitcherOpen)}
-          className="flex w-full items-center justify-between gap-2 px-1 py-1.5 text-left transition-colors hover:bg-accent/35 rounded"
+          className="flex w-full items-center justify-between gap-2 border border-transparent px-2 py-1.5 text-left transition-colors hover:border-border/35 hover:bg-accent/35"
         >
           <div className="flex items-center gap-2 min-w-0">
             <SquareKanban className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1829,7 +1835,7 @@ export function RequestsView({
         </button>
 
         {isWorkspaceSwitcherOpen && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 border border-border/60 bg-popover p-1 shadow-xl rounded-md">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 border border-border/60 bg-popover p-1 shadow-xl">
             {workspaces.map((w) => (
               <button
                 key={w.name}
@@ -1838,8 +1844,8 @@ export function RequestsView({
                   setIsWorkspaceSwitcherOpen(false);
                 }}
                 className={cn(
-                  "flex w-full items-center px-3 py-2 text-left text-[12px] transition-colors rounded hover:bg-accent/45",
-                  w.name === activeWorkspaceName ? "bg-accent text-foreground" : "text-foreground/80"
+                  "flex w-full items-center border border-transparent px-3 py-2 text-left text-[12px] transition-colors hover:border-border/35 hover:bg-accent/45",
+                  w.name === activeWorkspaceName ? "border-border/35 bg-accent text-foreground" : "text-foreground/80"
                 )}
               >
                 {w.name}
@@ -1852,7 +1858,7 @@ export function RequestsView({
                 setShowWorkspaceForm(true);
                 setIsWorkspaceSwitcherOpen(false);
               }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-muted-foreground hover:bg-accent/45 rounded"
+              className="flex w-full items-center gap-2 border border-transparent px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:border-border/35 hover:bg-accent/45"
             >
               <Plus className="h-3.5 w-3.5" /> Create Workspace
             </button>
@@ -1893,19 +1899,26 @@ export function RequestsView({
             <div className="relative flex items-center gap-1" ref={sidebarOptionsRef}>
               <button
                 onClick={() => setIsSearchVisible(!isSearchVisible)}
-                className={cn("p-1 text-muted-foreground hover:bg-accent hover:text-foreground rounded transition-colors", isSearchVisible && "bg-accent text-foreground")}
+                className={cn(
+                  "border border-transparent p-1 text-muted-foreground transition-colors hover:border-border/35 hover:bg-accent hover:text-foreground",
+                  isSearchVisible && "border-border/35 bg-accent text-foreground"
+                )}
                 title="Search"
               >
                 <Search className="h-4 w-4" />
               </button>
               <button
                 onClick={() => setIsCreatingCollection(true)}
-                className="p-1 text-muted-foreground hover:bg-accent hover:text-foreground rounded transition-colors"
+                className="border border-transparent p-1 text-muted-foreground transition-colors hover:border-border/35 hover:bg-accent hover:text-foreground"
                 title="Create collection"
               >
                 <Plus className="h-4 w-4" />
               </button>
-              <button onClick={() => setSidebarOptionsOpen((prev) => !prev)} className="p-1 text-muted-foreground hover:bg-accent hover:text-foreground rounded transition-colors" title="Options">
+              <button
+                onClick={() => setSidebarOptionsOpen((prev) => !prev)}
+                className="border border-transparent p-1 text-muted-foreground transition-colors hover:border-border/35 hover:bg-accent hover:text-foreground"
+                title="Options"
+              >
                 <MoreVertical className="h-4 w-4" />
               </button>
               {sidebarOptionsOpen && (
@@ -1956,7 +1969,7 @@ export function RequestsView({
       <div className="flex-1 thin-scrollbar overflow-auto pr-1">
         {!activeWorkspace ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4 space-y-4 opacity-80">
-            <div className="p-3 bg-accent/20 rounded-full">
+            <div className="border border-border/35 bg-accent/20 p-3">
               <SquareKanban className="h-8 w-8 text-muted-foreground" />
             </div>
             <div className="space-y-1">

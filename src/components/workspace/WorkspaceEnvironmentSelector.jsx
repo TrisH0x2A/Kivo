@@ -73,24 +73,24 @@ export function WorkspaceEnvironmentSelector({
   }
 
   return (
-    <div className="border border-border/20 bg-transparent p-3">
+    <div className="border border-border/45 bg-card/35 p-3">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Workspace Environment
         </span>
-        <span className="text-[11px] text-muted-foreground">Active: {activeName}</span>
+        <span className="border border-border/35 bg-background/25 px-2 py-0.5 text-[11px] text-muted-foreground">Active: {activeName}</span>
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2">
         {environments.map((env) => {
           const isActive = env.id === activeEnvironmentId;
           return (
-            <div key={env.id} className="inline-flex items-center border border-border/30">
+            <div key={env.id} className="inline-flex min-h-8 items-center border border-border/40 bg-background/20">
               <button
                 type="button"
                 disabled={isLoading || isCreating || Boolean(deletingId) || Boolean(switchingId) || isActive}
                 onClick={() => handleSetActive(env)}
-                className={`max-w-[140px] overflow-hidden text-ellipsis whitespace-nowrap px-2.5 py-1.5 text-[12px] ${isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent/40"}`}
+                className={`max-w-[160px] overflow-hidden text-ellipsis whitespace-nowrap border-r border-border/25 px-2.5 py-1.5 text-[12px] transition-colors ${isActive ? "bg-primary/12 text-primary" : "text-foreground hover:bg-accent/40"}`}
               >
                 {env.name}
               </button>
@@ -99,7 +99,7 @@ export function WorkspaceEnvironmentSelector({
                   type="button"
                   disabled={isLoading || isCreating || Boolean(switchingId) || deletingId === env.id}
                   onClick={() => handleDelete(env.id)}
-                  className="border-l border-border/20 px-2 py-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                  className="border-l border-border/30 px-2 py-1.5 text-muted-foreground transition-colors hover:bg-red-500/10 hover:text-red-500"
                   title="Delete environment"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -115,7 +115,7 @@ export function WorkspaceEnvironmentSelector({
           value={draftName}
           onChange={(event) => setDraftName(event.target.value)}
           placeholder="Add environment (e.g. staging)"
-          className="h-9 rounded-none border-border/30 bg-transparent text-[12px]"
+          className="h-9 rounded-none border-border/45 bg-background/20 text-[12px]"
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -126,10 +126,10 @@ export function WorkspaceEnvironmentSelector({
         <Button
           type="button"
           size="sm"
-          className={`h-9 w-full rounded-none justify-center gap-2 px-3 text-[12px] ${
+          className={`h-9 w-full justify-center gap-2 px-3 text-[12px] ${
             isAddDisabled
-              ? "border border-border/35 bg-transparent font-medium text-muted-foreground"
-              : "border border-primary/40 bg-primary text-primary-foreground font-semibold shadow-md transition-transform active:scale-95"
+              ? "border border-border/45 bg-background/20 font-medium text-muted-foreground"
+              : "border border-primary/55 bg-primary text-primary-foreground font-semibold"
           }`}
           onClick={handleCreate}
           disabled={isAddDisabled}
