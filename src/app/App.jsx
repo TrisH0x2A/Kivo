@@ -1,17 +1,12 @@
 /* @refresh reset */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
-import { Sidebar } from "@/components/workspace/Sidebar.jsx";
 import { RequestTabs } from "@/components/workspace/RequestTabs.jsx";
 import { SidebarResizer } from "@/components/workspace/SidebarResizer.jsx";
-import { SetupWizard } from "@/components/workspace/SetupWizard.jsx";
 import { Updater } from "@/components/Updater.jsx";
-import { WorkspaceView } from "@/components/workspace/WorkspaceView.jsx";
 import { WorkspaceModal } from "@/components/workspace/WorkspaceModal.jsx";
-import { CollectionSettingsPage } from "@/components/workspace/CollectionSettingsPage.jsx";
-import { AppSettingsPage } from "@/components/workspace/AppSettingsPage.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { useTheme } from "@/hooks/use-theme.js";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store.js";
@@ -42,6 +37,20 @@ import {
   Zap,
 } from "lucide-react";
 import { getThemeMeta } from "@/lib/themes.js";
+
+const SetupWizard = lazy(() => import("@/components/workspace/SetupWizard.jsx").then((module) => ({ default: module.SetupWizard })));
+const Sidebar = lazy(() => import("@/components/workspace/Sidebar.jsx").then((module) => ({ default: module.Sidebar })));
+const WorkspaceView = lazy(() => import("@/components/workspace/WorkspaceView.jsx").then((module) => ({ default: module.WorkspaceView })));
+const CollectionSettingsPage = lazy(() => import("@/components/workspace/CollectionSettingsPage.jsx").then((module) => ({ default: module.CollectionSettingsPage })));
+const AppSettingsPage = lazy(() => import("@/components/workspace/AppSettingsPage.jsx").then((module) => ({ default: module.AppSettingsPage })));
+
+function WorkspaceFallback() {
+  return (
+    <div className="flex h-full items-center justify-center bg-background text-[12px] text-muted-foreground">
+      Loading...
+    </div>
+  );
+}
 
 const THEME_ICON_MAP = {
   sun: SunMedium,
@@ -358,7 +367,11 @@ export default function App() {
   }
 
   if (!isSetupComplete) {
-    return <SetupWizard onComplete={checkSetup} />;
+    return (
+      <Suspense fallback={<WorkspaceFallback />}>
+        <SetupWizard onComplete={checkSetup} />
+      </Suspense>
+    );
   }
 
   const sidebarWidth = store.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : store.sidebarWidth;
@@ -406,44 +419,46 @@ export default function App() {
       )}
       <div className="flex h-full min-h-0 overflow-hidden border border-border/30 bg-card/35">
         <div style={{ width: `${sidebarWidth}px` }} className="min-h-0 shrink-0 overflow-hidden">
-          <Sidebar
-            iconSrc="/icon.ico"
-            sidebarTab={store.sidebarTab}
-            collapsed={store.sidebarCollapsed}
-            workspaces={store.workspaces}
-            activeWorkspaceName={store.activeWorkspaceName}
-            activeCollectionName={store.activeCollectionName}
-            activeRequestName={store.activeRequestName}
-            onSidebarTabChange={handleSidebarTabChangeWithView}
-            onSelectWorkspace={selectWorkspace}
-            onSelectCollection={(wName, cName) => {
-              selectCollection(wName, cName);
-              openCollectionSettings("Overview");
-            }}
-            onOpenCollectionSettings={() => openCollectionSettings("Overview")}
-            onOpenAppSettings={openAppSettings}
-            onSelectRequest={handleSelectRequest}
-            onCreateWorkspace={createWorkspaceRecord}
-            onRenameWorkspace={renameWorkspaceRecord}
-            onDeleteWorkspace={deleteWorkspaceRecord}
-            onCreateCollection={createCollectionRecord}
-            onRenameCollection={renameCollectionRecord}
-            onDeleteCollection={deleteCollectionRecord}
-            onDuplicateCollection={duplicateCollectionRecord}
-            onImportCollection={importCollectionRecord}
-            onCreateFolder={createFolderRecord}
-            onRenameFolder={renameFolderRecord}
-            onDeleteFolder={deleteFolderRecord}
-            onUpdateFolderSettings={updateFolderSettingsRecord}
-            onCreateRequest={createRequestRecord}
-            onRenameRequest={renameRequestRecord}
-            onDeleteRequest={deleteRequestRecord}
-            onDuplicateRequest={duplicateRequestRecord}
-            onImportRequests={importRequestRecords}
-            onPasteRequest={pasteRequestRecord}
-            onPasteFolder={pasteFolderRecord}
-            onTogglePinRequest={togglePinRequestRecord}
-          />
+          <Suspense fallback={<WorkspaceFallback />}>
+            <Sidebar
+              iconSrc="/icon.ico"
+              sidebarTab={store.sidebarTab}
+              collapsed={store.sidebarCollapsed}
+              workspaces={store.workspaces}
+              activeWorkspaceName={store.activeWorkspaceName}
+              activeCollectionName={store.activeCollectionName}
+              activeRequestName={store.activeRequestName}
+              onSidebarTabChange={handleSidebarTabChangeWithView}
+              onSelectWorkspace={selectWorkspace}
+              onSelectCollection={(wName, cName) => {
+                selectCollection(wName, cName);
+                openCollectionSettings("Overview");
+              }}
+              onOpenCollectionSettings={() => openCollectionSettings("Overview")}
+              onOpenAppSettings={openAppSettings}
+              onSelectRequest={handleSelectRequest}
+              onCreateWorkspace={createWorkspaceRecord}
+              onRenameWorkspace={renameWorkspaceRecord}
+              onDeleteWorkspace={deleteWorkspaceRecord}
+              onCreateCollection={createCollectionRecord}
+              onRenameCollection={renameCollectionRecord}
+              onDeleteCollection={deleteCollectionRecord}
+              onDuplicateCollection={duplicateCollectionRecord}
+              onImportCollection={importCollectionRecord}
+              onCreateFolder={createFolderRecord}
+              onRenameFolder={renameFolderRecord}
+              onDeleteFolder={deleteFolderRecord}
+              onUpdateFolderSettings={updateFolderSettingsRecord}
+              onCreateRequest={createRequestRecord}
+              onRenameRequest={renameRequestRecord}
+              onDeleteRequest={deleteRequestRecord}
+              onDuplicateRequest={duplicateRequestRecord}
+              onImportRequests={importRequestRecords}
+              onPasteRequest={pasteRequestRecord}
+              onPasteFolder={pasteFolderRecord}
+              onTogglePinRequest={togglePinRequestRecord}
+            />
+          </Suspense>
         </div>
 
         <SidebarResizer
@@ -456,16 +471,20 @@ export default function App() {
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {showAppSettings ? (
-            <AppSettingsPage
-              initialTab={appSettingsTab}
-              storagePath={storagePath}
-              theme={theme}
-              onThemeChange={setTheme}
-              onStoragePathChanged={(nextPath) => {
-                setResolvedPath(nextPath);
-                window.location.reload();
-              }}
-            />
+            <Suspense fallback={<WorkspaceFallback />}>
+              <AppSettingsPage
+                initialTab={appSettingsTab}
+                storagePath={storagePath}
+                theme={theme}
+                onThemeChange={setTheme}
+                onStoragePathChanged={(nextPath) => {
+                  setResolvedPath(nextPath);
+                  window.location.reload();
+                }}
+                requestHistory={store.requestHistory || []}
+                onClearHistory={() => updateStore((current) => ({ ...current, requestHistory: [] }))}
+              />
+            </Suspense>
           ) : showNoWorkspaceState ? (
             <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
               <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
@@ -548,15 +567,17 @@ export default function App() {
               </div>
 
               <div className="flex-1 min-h-0 overflow-hidden">
-                <CollectionSettingsPage
-                  key={`${activeWorkspace?.name}-${activeCollection?.name}-${settingsConfig.tab}-${settingsConfig.envTab}`}
-                  workspace={activeWorkspace}
-                  collection={activeCollection}
-                  storagePath={storagePath}
-                  initialTab={settingsConfig.tab}
-                  initialEnvTab={settingsConfig.envTab}
-                  onEnvSave={refreshEnvVars}
-                />
+                <Suspense fallback={<WorkspaceFallback />}>
+                  <CollectionSettingsPage
+                    key={`${activeWorkspace?.name}-${activeCollection?.name}-${settingsConfig.tab}-${settingsConfig.envTab}`}
+                    workspace={activeWorkspace}
+                    collection={activeCollection}
+                    storagePath={storagePath}
+                    initialTab={settingsConfig.tab}
+                    initialEnvTab={settingsConfig.envTab}
+                    onEnvSave={refreshEnvVars}
+                  />
+                </Suspense>
               </div>
             </>
           ) : showWorkspaceView ? (
@@ -626,26 +647,28 @@ export default function App() {
               </div>
 
               <div className="min-h-0 flex-1 overflow-hidden bg-background/20">
-                <WorkspaceView
-                  request={activeRequest}
-                  isSending={isSending}
-                  sendStartedAt={sendStartedAt}
-                  onSend={handleSend}
-                  wsState={activeWebSocketState}
-                  onWebSocketConnect={connectActiveWebSocket}
-                  onWebSocketDisconnect={disconnectActiveWebSocket}
-                  onWebSocketSend={sendActiveWebSocketMessage}
-                  streamMessages={activeStreamMessages}
-                  onClearStreamMessages={clearActiveStreamMessages}
-                  onCancelSend={cancelSend}
-                  onFieldChange={handleRequestFieldChange}
-                  onUpdateActiveRequest={updateActiveRequest}
-                  onClearResponse={() => updateActiveRequest({ lastResponse: null })}
-                  response={response}
-                  envVars={envVars}
-                  workspaceName={activeWorkspace?.name}
-                  collectionName={activeCollection?.name}
-                />
+                <Suspense fallback={<WorkspaceFallback />}>
+                  <WorkspaceView
+                    request={activeRequest}
+                    isSending={isSending}
+                    sendStartedAt={sendStartedAt}
+                    onSend={handleSend}
+                    wsState={activeWebSocketState}
+                    onWebSocketConnect={connectActiveWebSocket}
+                    onWebSocketDisconnect={disconnectActiveWebSocket}
+                    onWebSocketSend={sendActiveWebSocketMessage}
+                    streamMessages={activeStreamMessages}
+                    onClearStreamMessages={clearActiveStreamMessages}
+                    onCancelSend={cancelSend}
+                    onFieldChange={handleRequestFieldChange}
+                    onUpdateActiveRequest={updateActiveRequest}
+                    onClearResponse={() => updateActiveRequest({ lastResponse: null })}
+                    response={response}
+                    envVars={envVars}
+                    workspaceName={activeWorkspace?.name}
+                    collectionName={activeCollection?.name}
+                  />
+                </Suspense>
               </div>
             </>
           ) : null}

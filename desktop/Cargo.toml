@@ -14,7 +14,7 @@ tauri-build = { version = "2.5.6", features = [] }
 [dependencies]
 base64 = "0.22.1"
 chrono = { version = "0.4", features = ["clock"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "gzip", "brotli", "deflate", "zstd"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart", "gzip", "brotli", "deflate", "zstd"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
@@ -30,6 +30,7 @@ tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
 tokio = { version = "1", features = ["full"] }
 tonic = { version = "0.12", features = ["transport"] }
+tonic-reflection = "0.12"
 httparse = "1.8"
 tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "logging", "std", "tls12"] }

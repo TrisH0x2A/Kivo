@@ -95,6 +95,13 @@ function serializeBodyByType(request, method, resolveValue = (value) => String(v
   }
 
   if (bodyType === "form-data") {
+    const hasFileRows = getEnabledRows(request?.bodyRows).some((row) => row.fieldType === "file" && String(row.filePath || row.value || "").trim());
+    if (hasFileRows) {
+      return {
+        body: "",
+        contentType: ""
+      };
+    }
     const boundary = `----KivoBoundary${Math.random().toString(16).slice(2)}`;
     const body = getEnabledRows(request?.bodyRows)
       .map((row) => [
@@ -322,6 +329,15 @@ export function buildRequestPayload(request, workspaceName, collectionName) {
     headers,
     body: bodyType === "file" ? null : (hasBody ? body : null),
     bodyFilePath: bodyFilePath || null,
+    bodyRows: Array.isArray(request?.bodyRows)
+      ? request.bodyRows.map((row) => ({
+        key: String(row?.key ?? ""),
+        value: String(row?.value ?? ""),
+        enabled: row?.enabled !== false,
+        fieldType: String(row?.fieldType ?? "text"),
+        filePath: String(row?.filePath ?? "")
+      }))
+      : [],
     workspaceName: workspaceName || "",
     collectionName: collectionName || "",
     authType: auth.type ?? "none",
@@ -335,6 +351,12 @@ export function buildRequestPayload(request, workspaceName, collectionName) {
       apiKeyValue: auth.apiKeyValue ?? "",
       oauth2: auth.type === "oauth2" ? auth.oauth2 ?? null : null,
     },
+    proxyMode: request?.proxyMode ?? "inherit",
+    proxyHttp: request?.proxyHttp ?? "",
+    proxyHttps: request?.proxyHttps ?? "",
+    noProxy: request?.noProxy ?? "",
+    clientCertificatePath: request?.clientCertificatePath ?? "",
+    clientKeyPath: request?.clientKeyPath ?? "",
   };
 }
 

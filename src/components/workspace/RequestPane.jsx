@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { formatGraphqlText, formatJsonText } from "@/lib/formatters.js";
 import { buildUrlWithParams, getMethodTone, requestBodyModes } from "@/lib/http-ui.js";
-import { listGrpcProtoFilesInDirectory, parseGrpcProtoFile } from "@/lib/http-client.js";
+import { listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer } from "@/lib/http-client.js";
 import { isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
@@ -306,6 +306,33 @@ function WebSocketSettingsPanel({ state, onChange }) {
                 }}
                 className="h-10 border-border/40 bg-transparent max-w-[220px]"
               />
+            </div>
+
+            <div className="grid gap-2 border-t border-border/20 pt-3">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Proxy Override</label>
+              <SelectMenu
+                value={state.proxyMode || "inherit"}
+                options={[
+                  { value: "inherit", label: "Use app proxy settings" },
+                  { value: "off", label: "Disable proxy" },
+                  { value: "custom", label: "Custom proxy" },
+                ]}
+                onChange={(value) => onChange("proxyMode", value)}
+                className="max-w-[260px]"
+              />
+              {state.proxyMode === "custom" ? (
+                <div className="grid gap-2 lg:grid-cols-3">
+                  <Input value={state.proxyHttp || ""} onChange={(event) => onChange("proxyHttp", event.target.value)} placeholder="HTTP proxy" className="h-9 border-border/40 bg-transparent" />
+                  <Input value={state.proxyHttps || ""} onChange={(event) => onChange("proxyHttps", event.target.value)} placeholder="HTTPS proxy" className="h-9 border-border/40 bg-transparent" />
+                  <Input value={state.noProxy || ""} onChange={(event) => onChange("noProxy", event.target.value)} placeholder="No proxy hosts" className="h-9 border-border/40 bg-transparent" />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2 border-t border-border/20 pt-3">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Client Certificate Override</label>
+              <Input value={state.clientCertificatePath || ""} onChange={(event) => onChange("clientCertificatePath", event.target.value)} placeholder="Client certificate PEM path" className="h-9 border-border/40 bg-transparent" />
+              <Input value={state.clientKeyPath || ""} onChange={(event) => onChange("clientKeyPath", event.target.value)} placeholder="Client private key PEM path" className="h-9 border-border/40 bg-transparent" />
             </div>
           </div>
         </div>
@@ -1352,7 +1379,8 @@ function TableEditor({
   addLabel,
   keyLabel = "name",
   valueLabel = "value",
-  disabled = false
+  disabled = false,
+  allowFileRows = false
 }) {
   function updateRow(index, field, value) {
     onChange(rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
@@ -1360,6 +1388,18 @@ function TableEditor({
 
   function addRow() {
     onChange([...rows, createRow()]);
+  }
+
+  async function chooseRowFile(index) {
+    try {
+      const selected = await open({ directory: false, multiple: false });
+      if (typeof selected === "string") {
+        onChange(rows.map((row, i) => (
+          i === index ? { ...row, fieldType: "file", filePath: selected, value: selected } : row
+        )));
+      }
+    } catch {
+    }
   }
 
   function removeRow(index) {
@@ -1481,21 +1521,52 @@ function TableEditor({
         </div>
       ) : (
         <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-          <div className="grid grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_36px] border-b border-border/20 px-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:text-[11px]">
+          <div className={cn("grid border-b border-border/20 px-1 text-[10px] uppercase tracking-[0.16em] text-muted-foreground lg:text-[11px]", allowFileRows ? "grid-cols-[32px_minmax(0,1fr)_84px_minmax(0,1fr)_36px]" : "grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_36px]")}>
             <div className="px-2 py-2"></div>
             <div className="px-2 py-2">{keyLabel}</div>
+            {allowFileRows ? <div className="px-2 py-2">Kind</div> : null}
             <div className="px-2 py-2">{valueLabel}</div>
             <div className="px-2 py-2"></div>
           </div>
           <div className="thin-scrollbar min-h-0 overflow-auto">
             {rows.length > 0 ? (
               rows.map((row, index) => (
-                <div key={row.id || `row-${index}`} className="grid grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_36px] border-b border-border/10 px-1">
+                <div key={row.id || `row-${index}`} className={cn("grid border-b border-border/10 px-1", allowFileRows ? "grid-cols-[32px_minmax(0,1fr)_84px_minmax(0,1fr)_36px]" : "grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_36px]")}>
                   <label className="flex items-center justify-center">
                     <input disabled={disabled} type="checkbox" checked={row.enabled ?? true} onChange={(event) => updateRow(index, "enabled", event.target.checked)} />
                   </label>
                   <Input disabled={disabled} className="h-10 border-0 bg-transparent text-[12px] focus-visible:ring-0 lg:text-[14px]" value={row.key} onChange={(event) => updateRow(index, "key", event.target.value)} placeholder={keyLabel} />
-                  <Input disabled={disabled} className="h-10 border-0 bg-transparent text-[12px] focus-visible:ring-0 lg:text-[14px]" value={row.value} onChange={(event) => updateRow(index, "value", event.target.value)} placeholder={valueLabel} />
+                  {allowFileRows ? (
+                    <button
+                      type="button"
+                      disabled={disabled}
+                      className="my-1 border border-border/25 px-2 text-[10px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+                      onClick={() => updateRow(index, "fieldType", row.fieldType === "file" ? "text" : "file")}
+                    >
+                      {row.fieldType === "file" ? "File" : "Text"}
+                    </button>
+                  ) : null}
+                  <div className="flex min-w-0 items-center">
+                    <Input
+                      disabled={disabled}
+                      className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[12px] focus-visible:ring-0 lg:text-[14px]"
+                      value={row.fieldType === "file" ? (row.filePath || row.value || "") : row.value}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        if (row.fieldType === "file") {
+                          onChange(rows.map((entry, i) => (i === index ? { ...entry, filePath: value, value } : entry)));
+                        } else {
+                          updateRow(index, "value", value);
+                        }
+                      }}
+                      placeholder={row.fieldType === "file" ? "File path" : valueLabel}
+                    />
+                    {allowFileRows && row.fieldType === "file" ? (
+                      <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => chooseRowFile(index)} disabled={disabled}>
+                        <FilePlus2 className="h-3.5 w-3.5" />
+                      </Button>
+                    ) : null}
+                  </div>
                   <button type="button" disabled={disabled} className="flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-40" onClick={() => removeRow(index)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -1832,6 +1903,7 @@ export function RequestPane({
   const [isGrpcProtoPickerOpen, setIsGrpcProtoPickerOpen] = useState(false);
   const [showReflectionTooltip, setShowReflectionTooltip] = useState(false);
   const [grpcBodyNotice, setGrpcBodyNotice] = useState("");
+  const [grpcReflectionStatus, setGrpcReflectionStatus] = useState("");
   const [showSendErrorModal, setShowSendErrorModal] = useState(false);
   const [sendErrorTitle, setSendErrorTitle] = useState("");
   const [sendErrorTrace, setSendErrorTrace] = useState("");
@@ -2397,8 +2469,34 @@ export function RequestPane({
     setGrpcBodyNotice("");
   }
 
-  function handleGrpcReflectionRefresh() {
+  async function handleGrpcReflectionRefresh() {
     if (!hasValidGrpcUrl) return;
+    setGrpcReflectionStatus("Loading server reflection...");
+    setIsGrpcMethodsLoading(true);
+    setGrpcMethodError("");
+    try {
+      const reflected = await reflectGrpcServer({
+        url: state.url,
+        timeoutMs: Number.isFinite(state.timeoutMs) ? state.timeoutMs : 0
+      });
+      const descriptorPath = String(reflected?.descriptorFilePath || "").trim();
+      const methods = Array.isArray(reflected?.methods) ? reflected.methods : [];
+      if (!descriptorPath || methods.length === 0) {
+        throw new Error("Reflection returned no methods.");
+      }
+      setGrpcMethods(methods);
+      onChange("grpcProtoFilePath", descriptorPath);
+      onChange("grpcDirectProtoFiles", Array.from(new Set([...grpcDirectProtoFiles, descriptorPath])));
+      onChange("grpcMethodPath", methods[0]?.value || "");
+      onChange("grpcStreamingMode", methods[0]?.streamingMode || "unary");
+      setGrpcReflectionStatus(`Loaded ${methods.length} reflected method${methods.length === 1 ? "" : "s"}.`);
+    } catch (error) {
+      const message = String(error || "Server reflection failed.");
+      setGrpcMethodError(message);
+      setGrpcReflectionStatus(message);
+    } finally {
+      setIsGrpcMethodsLoading(false);
+    }
   }
 
   return (
@@ -2569,6 +2667,12 @@ export function RequestPane({
         </div>
       ) : null}
 
+      {isGrpcRequest && grpcReflectionStatus ? (
+        <div className="border-b border-border/15 px-3 py-1.5 text-[11px] text-muted-foreground">
+          {grpcReflectionStatus}
+        </div>
+      ) : null}
+
       {missingVars.length > 0 && (
         <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/[0.08] px-3 py-1.5 text-[11px] text-amber-500 dark:text-amber-400">
           <span className="shrink-0">âš </span>
@@ -2676,6 +2780,7 @@ export function RequestPane({
                 title={state.bodyType === "form-data" ? "Multipart Form" : "Form URL Encoded"}
                 addLabel="Add"
                 disabled={bodyDisabled}
+                allowFileRows={state.bodyType === "form-data"}
               />
             ) : null}
 

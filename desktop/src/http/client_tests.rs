@@ -412,6 +412,7 @@ async fn build_http_client_does_not_follow_redirects_when_disabled() {
         false,
         5,
         true,
+        None,
     )
     .expect("client");
 
@@ -435,6 +436,7 @@ async fn build_http_client_follows_redirects_when_enabled() {
         true,
         5,
         true,
+        None,
     )
     .expect("client");
 

@@ -5,7 +5,7 @@ mod storage;
 
 use http::client::{
     cancel_http_request, cancel_oauth_exchange, clear_cookie_jar, delete_cookie_jar_entry,
-    get_cookie_jar, oauth_exchange_token, send_grpc_request, send_http_request,
+    get_cookie_jar, oauth_exchange_token, reflect_grpc_server, send_grpc_request, send_http_request,
     upsert_cookie_jar_entry,
     wait_for_oauth_callback,
 };
@@ -36,6 +36,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             send_http_request,
             send_grpc_request,
+            reflect_grpc_server,
             cancel_http_request,
             get_cookie_jar,
             delete_cookie_jar_entry,

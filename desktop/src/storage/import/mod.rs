@@ -31,6 +31,12 @@ fn empty_request(name: String, method: String, url: String) -> RequestRecord {
         max_redirects: 5,
         timeout_ms: 0,
         use_cookie_jar: true,
+        proxy_mode: String::new(),
+        proxy_http: String::new(),
+        proxy_https: String::new(),
+        no_proxy: String::new(),
+        client_certificate_path: String::new(),
+        client_key_path: String::new(),
         folder_path: String::new(),
         script_pre_request: String::new(),
         script_after_response: String::new(),
@@ -64,6 +70,8 @@ fn split_url_query(raw_url: &str) -> (String, Vec<KeyValueRow>) {
             key: key.to_string(),
             value: value.to_string(),
             enabled: true,
+            field_type: String::new(),
+            file_path: String::new(),
         });
     }
     (base.to_string(), rows)
@@ -90,6 +98,8 @@ fn parse_headers_array(value: Option<&Value>) -> Vec<KeyValueRow> {
                     .get("disabled")
                     .and_then(|v| v.as_bool())
                     .map_or(true, |v| !v),
+                field_type: String::new(),
+                file_path: String::new(),
             });
         }
     }
@@ -107,6 +117,8 @@ fn parse_headers_object(value: Option<&Value>) -> Vec<KeyValueRow> {
                 key: key.to_string(),
                 value: value.as_str().unwrap_or("").to_string(),
                 enabled: true,
+                field_type: String::new(),
+                file_path: String::new(),
             });
         }
     }
@@ -268,6 +280,8 @@ fn import_postman_items(
                                     .get("disabled")
                                     .and_then(|v| v.as_bool())
                                     .map_or(true, |v| !v),
+                                field_type: String::new(),
+                                file_path: String::new(),
                             })
                             .collect::<Vec<_>>()
                     })
@@ -480,6 +494,8 @@ fn import_openapi_like(value: &Value, format: &str) -> CollectionRecord {
                                 key,
                                 value: String::new(),
                                 enabled: true,
+                                field_type: String::new(),
+                                file_path: String::new(),
                             });
                         }
                     }

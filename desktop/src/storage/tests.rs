@@ -49,6 +49,12 @@ fn make_request(name: &str) -> RequestRecord {
         max_redirects: 5,
         timeout_ms: 0,
         use_cookie_jar: true,
+        proxy_mode: String::new(),
+        proxy_http: String::new(),
+        proxy_https: String::new(),
+        no_proxy: String::new(),
+        client_certificate_path: String::new(),
+        client_key_path: String::new(),
         folder_path: String::new(),
         script_pre_request: String::new(),
         script_after_response: String::new(),
@@ -367,6 +373,9 @@ fn make_request_with_response(name: &str) -> RequestRecord {
         cookies: vec!["session=abc".to_string()],
         body: r#"{"ok":true}"#.to_string(),
         raw_body: r#"{"ok":true}"#.to_string(),
+        body_base64: String::new(),
+        is_binary: false,
+        content_type: "application/json".to_string(),
         is_json: true,
         meta: ResponseMeta {
             url: "https://example.com".to_string(),
@@ -853,6 +862,8 @@ mod collection_config_tests {
                 key: "X-Api-Key".to_string(),
                 value: "secret".to_string(),
                 enabled: true,
+                field_type: String::new(),
+                file_path: String::new(),
             }],
             scripts: CollectionScripts {
                 pre_request: "console.log('pre')".to_string(),
@@ -1220,11 +1231,15 @@ mod complex_scenario_tests {
             key: "v".to_string(),
             value: "2".to_string(),
             enabled: true,
+            field_type: String::new(),
+            file_path: String::new(),
         }];
         req.headers = vec![KeyValueRow {
             key: "Content-Type".to_string(),
             value: "application/json".to_string(),
             enabled: true,
+            field_type: String::new(),
+            file_path: String::new(),
         }];
         req.auth = AuthRecord {
             auth_type: "bearer".to_string(),

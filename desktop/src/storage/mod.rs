@@ -2,6 +2,10 @@ use std::fs;
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
+use prost::Message;
+use prost_reflect::DescriptorPool;
+use prost_types::FileDescriptorSet;
+use base64::Engine;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
@@ -711,6 +715,36 @@ pub fn import_request_file(file_path: String) -> Result<ImportedRequestsResult, 
 
 #[tauri::command]
 pub fn parse_grpc_proto_file(file_path: String) -> Result<Vec<GrpcMethodOption>, String> {
+    let path = PathBuf::from(file_path.trim());
+    if path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "fds" | "bin" | "pb"))
+        .unwrap_or(false)
+    {
+        let bytes = fs::read(&path).map_err(|e| format!("Failed to read descriptor set: {e}"))?;
+        let descriptor_set = FileDescriptorSet::decode(bytes.as_slice())
+            .map_err(|e| format!("Failed to decode descriptor set: {e}"))?;
+        let pool = DescriptorPool::from_file_descriptor_set(descriptor_set)
+            .map_err(|e| format!("Failed to load descriptor set: {e}"))?;
+        let mut methods = Vec::new();
+        for service in pool.services() {
+            for method in service.methods() {
+                let (streaming_mode, badge) = match (method.is_client_streaming(), method.is_server_streaming()) {
+                    (false, false) => ("unary", "U"),
+                    (false, true) => ("server_stream", "SS"),
+                    (true, false) => ("client_stream", "CS"),
+                    (true, true) => ("bidi", "BI"),
+                };
+                methods.push(GrpcMethodOption {
+                    value: format!("{}/{}", service.full_name(), method.name()),
+                    label: format!("{} · {}", badge, method.name()),
+                    streaming_mode: streaming_mode.to_string(),
+                });
+            }
+        }
+        return Ok(methods);
+    }
     let content =
         fs::read_to_string(&file_path).map_err(|e| format!("Failed to read proto file: {e}"))?;
     Ok(parse_grpc_methods(&content))
@@ -762,6 +796,18 @@ pub fn export_request_file(
 
 #[tauri::command]
 pub fn export_response_file(file_path: String, response: serde_json::Value) -> Result<(), String> {
+    if response
+        .get("isBinary")
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+    {
+        if let Some(body_base64) = response.get("bodyBase64").and_then(|value| value.as_str()) {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(body_base64)
+                .map_err(|e| format!("Failed to decode binary response body: {e}"))?;
+            return fs::write(&file_path, bytes).map_err(|e| format!("Failed to write response file: {e}"));
+        }
+    }
     let content = serde_json::to_string_pretty(&response)
         .map_err(|e| format!("Failed to serialize response JSON: {e}"))?;
     fs::write(&file_path, content).map_err(|e| format!("Failed to write response file: {e}"))

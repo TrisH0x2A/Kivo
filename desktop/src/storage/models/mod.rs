@@ -117,6 +117,16 @@ pub struct AppSettings {
     #[serde(default)]
     pub no_proxy: String,
     #[serde(default)]
+    pub proxy_username: String,
+    #[serde(default)]
+    pub proxy_password: String,
+    #[serde(default)]
+    pub use_client_certificate: bool,
+    #[serde(default)]
+    pub client_certificate_path: String,
+    #[serde(default)]
+    pub client_key_path: String,
+    #[serde(default)]
     pub keybindings: HashMap<String, String>,
 }
 
@@ -138,6 +148,11 @@ impl Default for AppSettings {
             proxy_http: String::new(),
             proxy_https: String::new(),
             no_proxy: String::new(),
+            proxy_username: String::new(),
+            proxy_password: String::new(),
+            use_client_certificate: false,
+            client_certificate_path: String::new(),
+            client_key_path: String::new(),
             keybindings: HashMap::new(),
         }
     }
@@ -163,8 +178,43 @@ pub struct PersistedAppState {
     pub app_settings: AppSettings,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub request_runtime_state: HashMap<String, RequestRuntimeState>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub request_history: Vec<RequestHistoryEntry>,
     #[serde(default)]
     pub workspaces: Vec<WorkspaceRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct RequestHistoryEntry {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub workspace_name: String,
+    #[serde(default)]
+    pub collection_name: String,
+    #[serde(default)]
+    pub request_name: String,
+    #[serde(default)]
+    pub request_mode: String,
+    #[serde(default)]
+    pub method: String,
+    #[serde(default)]
+    pub url: String,
+    #[serde(default)]
+    pub status: u16,
+    #[serde(default)]
+    pub status_text: String,
+    #[serde(default)]
+    pub duration: String,
+    #[serde(default)]
+    pub size: String,
+    #[serde(default)]
+    pub ok: bool,
+    #[serde(default)]
+    pub error: String,
+    #[serde(default)]
+    pub sent_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -329,6 +379,18 @@ pub struct RequestRecord {
     #[serde(default = "default_true")]
     pub use_cookie_jar: bool,
     #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub proxy_mode: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub proxy_http: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub proxy_https: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub no_proxy: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub client_certificate_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub client_key_path: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub folder_path: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub script_pre_request: String,
@@ -369,6 +431,10 @@ pub struct KeyValueRow {
     pub value: String,
     #[serde(default)]
     pub enabled: bool,
+    #[serde(default, rename = "fieldType", skip_serializing_if = "String::is_empty")]
+    pub field_type: String,
+    #[serde(default, rename = "filePath", skip_serializing_if = "String::is_empty")]
+    pub file_path: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -531,6 +597,12 @@ pub struct SavedResponse {
     pub body: String,
     #[serde(default)]
     pub raw_body: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub body_base64: String,
+    #[serde(default)]
+    pub is_binary: bool,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub content_type: String,
     #[serde(default)]
     pub is_json: bool,
     #[serde(default)]
@@ -657,6 +729,7 @@ pub fn default_state() -> PersistedAppState {
         sidebar_width: default_sidebar_width(),
         app_settings: AppSettings::default(),
         request_runtime_state: HashMap::new(),
+        request_history: vec![],
         workspaces: vec![],
     }
 }

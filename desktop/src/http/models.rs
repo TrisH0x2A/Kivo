@@ -84,6 +84,8 @@ pub struct RequestPayload {
     pub body: Option<String>,
     #[serde(default)]
     pub body_file_path: Option<String>,
+    #[serde(default)]
+    pub body_rows: Vec<FormBodyRowPayload>,
 
     #[serde(default)]
     pub request_id: String,
@@ -117,6 +119,34 @@ pub struct RequestPayload {
 
     #[serde(default)]
     pub auth_payload: Option<AuthPayload>,
+
+    #[serde(default)]
+    pub proxy_mode: Option<String>,
+    #[serde(default)]
+    pub proxy_http: Option<String>,
+    #[serde(default)]
+    pub proxy_https: Option<String>,
+    #[serde(default)]
+    pub no_proxy: Option<String>,
+    #[serde(default)]
+    pub client_certificate_path: Option<String>,
+    #[serde(default)]
+    pub client_key_path: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct FormBodyRowPayload {
+    #[serde(default)]
+    pub key: String,
+    #[serde(default)]
+    pub value: String,
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub field_type: String,
+    #[serde(default)]
+    pub file_path: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -187,6 +217,12 @@ pub struct ResponsePayload {
     pub headers: HashMap<String, String>,
     pub cookies: Vec<String>,
     pub body: String,
+    #[serde(default)]
+    pub body_base64: String,
+    #[serde(default)]
+    pub is_binary: bool,
+    #[serde(default)]
+    pub content_type: String,
     pub duration_ms: u128,
 }
 

@@ -27,7 +27,7 @@ const EMPTY_COOKIE_DRAFT = {
   collectionName: "",
 };
 
-const SETTINGS_TABS = ["Storage", "Theme", "Security", "Keybindings", "Proxy", "Cookie Jar", "Updates", "Resources"];
+const SETTINGS_TABS = ["Storage", "Theme", "Security", "Keybindings", "Proxy", "Cookie Jar", "History", "Updates", "Resources"];
 
 const DEFAULT_APP_SETTINGS = {
   clearOAuthSessionOnStart: false,
@@ -45,6 +45,11 @@ const DEFAULT_APP_SETTINGS = {
   proxyHttp: "",
   proxyHttps: "",
   noProxy: "",
+  proxyUsername: "",
+  proxyPassword: "",
+  useClientCertificate: false,
+  clientCertificatePath: "",
+  clientKeyPath: "",
   keybindings: createDefaultKeybindings(),
 };
 
@@ -68,6 +73,11 @@ function normalizeAppSettingsInput(settings) {
     proxyHttp: String(source.proxyHttp ?? DEFAULT_APP_SETTINGS.proxyHttp),
     proxyHttps: String(source.proxyHttps ?? DEFAULT_APP_SETTINGS.proxyHttps),
     noProxy: String(source.noProxy ?? DEFAULT_APP_SETTINGS.noProxy),
+    proxyUsername: String(source.proxyUsername ?? DEFAULT_APP_SETTINGS.proxyUsername),
+    proxyPassword: String(source.proxyPassword ?? DEFAULT_APP_SETTINGS.proxyPassword),
+    useClientCertificate: Boolean(source.useClientCertificate ?? DEFAULT_APP_SETTINGS.useClientCertificate),
+    clientCertificatePath: String(source.clientCertificatePath ?? DEFAULT_APP_SETTINGS.clientCertificatePath),
+    clientKeyPath: String(source.clientKeyPath ?? DEFAULT_APP_SETTINGS.clientKeyPath),
     keybindings: normalizeKeybindingMap(source.keybindings ?? DEFAULT_APP_SETTINGS.keybindings),
   };
 }
@@ -89,7 +99,7 @@ function resolveKivoStoragePath(base) {
   return `${baseWithoutTrailing}${sep}Kivo`;
 }
 
-export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab = "Storage", theme = "dark", onThemeChange }) {
+export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab = "Storage", theme = "dark", onThemeChange, requestHistory = [], onClearHistory }) {
   const [pathInput, setPathInput] = useState(storagePath ?? "");
   const [mode, setMode] = useState("copy");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -886,6 +896,29 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 />
               </div>
             </div>
+            <div className="grid gap-2 lg:grid-cols-2">
+              <div className="grid gap-1">
+                <div className="text-muted-foreground">Proxy username</div>
+                <Input
+                  value={appSettings.proxyUsername}
+                  onChange={(event) => setSettingsState((prev) => ({ ...prev, proxyUsername: event.target.value }))}
+                  onBlur={(event) => updateSettingsPatch({ proxyUsername: event.target.value.trim() })}
+                  placeholder="Optional"
+                  className="h-9 border-border/35 bg-background/35 text-[12px]"
+                />
+              </div>
+              <div className="grid gap-1">
+                <div className="text-muted-foreground">Proxy password</div>
+                <Input
+                  type="password"
+                  value={appSettings.proxyPassword}
+                  onChange={(event) => setSettingsState((prev) => ({ ...prev, proxyPassword: event.target.value }))}
+                  onBlur={(event) => updateSettingsPatch({ proxyPassword: event.target.value })}
+                  placeholder="Optional"
+                  className="h-9 border-border/35 bg-background/35 text-[12px]"
+                />
+              </div>
+            </div>
           </div>
         </Card>
       ) : null}
@@ -965,6 +998,35 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
               )}
             </div>
           </div>
+          </Card>
+      ) : null}
+
+        {activeSettingsTab === "History" ? (
+          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+            <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
+              <h3 className="text-[14px] font-semibold">Request History</h3>
+              <Button type="button" variant="secondary" size="sm" className="h-8 border border-border/40 bg-background/35" onClick={onClearHistory}>
+                Clear
+              </Button>
+            </div>
+            <div className="thin-scrollbar max-h-[520px] overflow-auto border border-border/20">
+              {requestHistory.length === 0 ? (
+                <div className="p-4 text-[12px] text-muted-foreground">No requests sent yet.</div>
+              ) : (
+                requestHistory.map((entry) => (
+                  <div key={entry.id || `${entry.sentAt}-${entry.url}`} className="grid grid-cols-[88px_minmax(0,1fr)_92px_120px] gap-3 border-b border-border/10 px-3 py-2 text-[12px]">
+                    <div className={entry.ok ? "text-emerald-400" : "text-red-400"}>{entry.status || "ERR"}</div>
+                    <div className="min-w-0">
+                      <div className="truncate text-foreground">{entry.method} {entry.url}</div>
+                      <div className="truncate text-[11px] text-muted-foreground">{entry.workspaceName} / {entry.collectionName} / {entry.requestName}</div>
+                      {entry.error ? <div className="truncate text-[11px] text-red-400">{entry.error}</div> : null}
+                    </div>
+                    <div className="text-muted-foreground">{entry.duration || "-"}</div>
+                    <div className="text-right text-muted-foreground">{entry.sentAt ? new Date(entry.sentAt).toLocaleString() : "-"}</div>
+                  </div>
+                ))
+              )}
+            </div>
           </Card>
         ) : null}
 
@@ -1064,6 +1126,33 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 />
                 Keep default CA certificates
               </label>
+
+              <label className="inline-flex items-center gap-2 pt-2 text-foreground">
+                <input
+                  type="checkbox"
+                  className="accent-primary"
+                  checked={appSettings.useClientCertificate}
+                  onChange={(event) => updateSettingsPatch({ useClientCertificate: event.target.checked })}
+                />
+                Use client certificate for mTLS
+              </label>
+
+              <div className="grid gap-2 pl-6 lg:grid-cols-2">
+                <Input
+                  value={appSettings.clientCertificatePath}
+                  onChange={(event) => setSettingsState((prev) => ({ ...prev, clientCertificatePath: event.target.value }))}
+                  onBlur={(event) => updateSettingsPatch({ clientCertificatePath: event.target.value.trim() })}
+                  placeholder="Client certificate PEM path"
+                  className="h-8 border-border/35 bg-background/35 text-[12px]"
+                />
+                <Input
+                  value={appSettings.clientKeyPath}
+                  onChange={(event) => setSettingsState((prev) => ({ ...prev, clientKeyPath: event.target.value }))}
+                  onBlur={(event) => updateSettingsPatch({ clientKeyPath: event.target.value.trim() })}
+                  placeholder="Client private key PEM path"
+                  className="h-8 border-border/35 bg-background/35 text-[12px]"
+                />
+              </div>
             </div>
           </Card>
           </>

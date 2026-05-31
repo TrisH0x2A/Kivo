@@ -13,8 +13,10 @@ use base64::Engine;
 use bytes::Buf;
 use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use prost::Message;
+use prost_types::FileDescriptorSet;
 use prost_reflect::{DescriptorPool, DynamicMessage, MethodDescriptor, ReflectMessage};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
+use reqwest::multipart;
 use serde_json::Value;
 use tauri::{AppHandle, Manager};
 use tokio::sync::watch;
@@ -24,14 +26,14 @@ use tonic::transport::Endpoint;
 use tonic::{Request, Status};
 
 use super::models::{
-    CookieJarEntry, GrpcRequestPayload, OAuthCallbackWaitPayload, OAuthCallbackWaitResult,
+    CookieJarEntry, FormBodyRowPayload, GrpcRequestPayload, OAuthCallbackWaitPayload, OAuthCallbackWaitResult,
     OAuthTokenExchangePayload, OAuthTokenExchangeResult, RequestPayload, ResponsePayload,
     UpsertCookieJarEntryPayload,
 };
 use crate::http::dynamic_vars::resolve_template_variables;
 use crate::storage::{
     get_app_config, get_collection_dir, get_storage_root, load_collection_config_from_path,
-    load_env_vars, AppSettings,
+    load_env_vars, AppSettings, GrpcMethodOption,
 };
 
 const DEFAULT_USER_AGENT: &str = concat!("kivo/", env!("CARGO_PKG_VERSION"));
@@ -263,6 +265,29 @@ fn load_custom_ca_cert(path: &str) -> Result<reqwest::Certificate, String> {
         .map_err(|err| format!("Invalid CA certificate file: {err}"))
 }
 
+fn load_client_identity(cert_path: &str, key_path: &str) -> Result<reqwest::Identity, String> {
+    let cert = fs::read(cert_path).map_err(|err| format!("Failed to read client certificate: {err}"))?;
+    let key = fs::read(key_path).map_err(|err| format!("Failed to read client key: {err}"))?;
+    let mut pem = Vec::with_capacity(cert.len() + key.len() + 1);
+    pem.extend_from_slice(&cert);
+    if !pem.ends_with(b"\n") {
+        pem.push(b'\n');
+    }
+    pem.extend_from_slice(&key);
+    reqwest::Identity::from_pem(&pem)
+        .map_err(|err| format!("Invalid client certificate/key pair: {err}"))
+}
+
+#[derive(Default)]
+struct RequestNetworkOptions {
+    proxy_mode: String,
+    proxy_http: String,
+    proxy_https: String,
+    no_proxy: String,
+    client_certificate_path: String,
+    client_key_path: String,
+}
+
 fn build_http_client(
     settings: &AppSettings,
     request_url: &str,
@@ -270,6 +295,7 @@ fn build_http_client(
     follow_redirects: bool,
     max_redirects: u32,
     validate_certs: bool,
+    request_network: Option<&RequestNetworkOptions>,
 ) -> Result<reqwest::Client, String> {
     let redirect_policy = if follow_redirects {
         reqwest::redirect::Policy::limited(max_redirects.clamp(1, 50) as usize)
@@ -294,17 +320,60 @@ fn build_http_client(
         builder = builder.add_root_certificate(cert);
     }
 
-    if settings.proxy_enabled {
-        let no_proxy_list = parse_no_proxy_list(&settings.no_proxy);
+    let request_cert = request_network
+        .and_then(|network| (!network.client_certificate_path.trim().is_empty()).then_some(network.client_certificate_path.trim()));
+    let request_key = request_network
+        .and_then(|network| (!network.client_key_path.trim().is_empty()).then_some(network.client_key_path.trim()));
+    let settings_cert = (settings.use_client_certificate && !settings.client_certificate_path.trim().is_empty())
+        .then_some(settings.client_certificate_path.trim());
+    let settings_key = (settings.use_client_certificate && !settings.client_key_path.trim().is_empty())
+        .then_some(settings.client_key_path.trim());
+    if let (Some(cert), Some(key)) = (request_cert.or(settings_cert), request_key.or(settings_key)) {
+        builder = builder.identity(load_client_identity(cert, key)?);
+    }
+
+    let request_proxy_mode = request_network
+        .map(|network| network.proxy_mode.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    let proxy_enabled = match request_proxy_mode.as_str() {
+        "off" | "none" => false,
+        "custom" => true,
+        _ => settings.proxy_enabled,
+    };
+
+    if proxy_enabled {
+        let using_custom = request_proxy_mode == "custom";
+        let proxy_http = if using_custom {
+            request_network.map(|network| network.proxy_http.as_str()).unwrap_or("")
+        } else {
+            settings.proxy_http.as_str()
+        };
+        let proxy_https = if using_custom {
+            request_network.map(|network| network.proxy_https.as_str()).unwrap_or("")
+        } else {
+            settings.proxy_https.as_str()
+        };
+        let no_proxy = if using_custom {
+            request_network.map(|network| network.no_proxy.as_str()).unwrap_or("")
+        } else {
+            settings.no_proxy.as_str()
+        };
+        let no_proxy_list = parse_no_proxy_list(no_proxy);
         if !host_bypasses_proxy(request_url, &no_proxy_list) {
-            if !settings.proxy_http.trim().is_empty() {
-                let proxy = reqwest::Proxy::http(settings.proxy_http.trim())
+            if !proxy_http.trim().is_empty() {
+                let mut proxy = reqwest::Proxy::http(proxy_http.trim())
                     .map_err(|err| format!("Invalid HTTP proxy URL: {err}"))?;
+                if !settings.proxy_username.trim().is_empty() {
+                    proxy = proxy.basic_auth(settings.proxy_username.trim(), settings.proxy_password.trim());
+                }
                 builder = builder.proxy(proxy);
             }
-            if !settings.proxy_https.trim().is_empty() {
-                let proxy = reqwest::Proxy::https(settings.proxy_https.trim())
+            if !proxy_https.trim().is_empty() {
+                let mut proxy = reqwest::Proxy::https(proxy_https.trim())
                     .map_err(|err| format!("Invalid HTTPS proxy URL: {err}"))?;
+                if !settings.proxy_username.trim().is_empty() {
+                    proxy = proxy.basic_auth(settings.proxy_username.trim(), settings.proxy_password.trim());
+                }
                 builder = builder.proxy(proxy);
             }
         }
@@ -779,6 +848,32 @@ fn build_headers(headers: &HashMap<String, String>, disable_user_agent: bool) ->
     Ok(header_map)
 }
 
+async fn build_multipart_form(rows: &[FormBodyRowPayload]) -> Result<multipart::Form, String> {
+    let mut form = multipart::Form::new();
+    for row in rows {
+        if !row.enabled || row.key.trim().is_empty() {
+            continue;
+        }
+        let key = row.key.trim().to_string();
+        if row.field_type.trim().eq_ignore_ascii_case("file") {
+            if row.file_path.trim().is_empty() {
+                continue;
+            }
+            let bytes = fs::read(row.file_path.trim())
+                .map_err(|err| format!("Failed to read multipart file '{}': {err}", row.file_path.trim()))?;
+            let file_name = PathBuf::from(row.file_path.trim())
+                .file_name()
+                .map(|name| name.to_string_lossy().to_string())
+                .unwrap_or_else(|| "upload.bin".to_string());
+            let part = multipart::Part::bytes(bytes).file_name(file_name);
+            form = form.part(key, part);
+        } else {
+            form = form.text(key, row.value.clone());
+        }
+    }
+    Ok(form)
+}
+
 fn cookie_store_path(app: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app
         .path()
@@ -1110,6 +1205,20 @@ fn compile_descriptor_pool(proto_file_path: &str) -> Result<DescriptorPool, Stri
         return Err("Selected proto file does not exist.".to_string());
     }
 
+    if proto_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "bin" | "fds" | "pb"))
+        .unwrap_or(false)
+    {
+        let bytes = fs::read(&proto_path)
+            .map_err(|err| format!("Failed to read descriptor set: {err}"))?;
+        let descriptor_set = FileDescriptorSet::decode(bytes.as_slice())
+            .map_err(|err| format!("Failed to decode descriptor set: {err}"))?;
+        return DescriptorPool::from_file_descriptor_set(descriptor_set)
+            .map_err(|err| format!("Failed to load descriptor pool: {err}"));
+    }
+
     let include_dir = proto_path
         .parent()
         .map(PathBuf::from)
@@ -1120,6 +1229,167 @@ fn compile_descriptor_pool(proto_file_path: &str) -> Result<DescriptorPool, Stri
 
     DescriptorPool::from_file_descriptor_set(descriptor_set)
         .map_err(|err| format!("Failed to load descriptor pool: {err}"))
+}
+
+fn grpc_methods_from_descriptor_pool(pool: &DescriptorPool) -> Vec<GrpcMethodOption> {
+    let mut methods = Vec::new();
+    for service in pool.services() {
+        for method in service.methods() {
+            let streaming_mode = match (method.is_client_streaming(), method.is_server_streaming()) {
+                (false, false) => "unary",
+                (false, true) => "server_stream",
+                (true, false) => "client_stream",
+                (true, true) => "bidi",
+            };
+            let badge = match streaming_mode {
+                "unary" => "U",
+                "server_stream" => "SS",
+                "client_stream" => "CS",
+                "bidi" => "BI",
+                _ => "U",
+            };
+            methods.push(GrpcMethodOption {
+                value: format!("{}/{}", service.full_name(), method.name()),
+                label: format!("{} · {}", badge, method.name()),
+                streaming_mode: streaming_mode.to_string(),
+            });
+        }
+    }
+    methods
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrpcReflectionPayload {
+    pub url: String,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GrpcReflectionResult {
+    pub descriptor_file_path: String,
+    pub methods: Vec<GrpcMethodOption>,
+}
+
+#[tauri::command]
+pub async fn reflect_grpc_server(
+    app: AppHandle,
+    payload: GrpcReflectionPayload,
+) -> Result<GrpcReflectionResult, String> {
+    use tonic_reflection::pb::v1alpha::server_reflection_client::ServerReflectionClient;
+    use tonic_reflection::pb::v1alpha::server_reflection_request::MessageRequest;
+    use tonic_reflection::pb::v1alpha::server_reflection_response::MessageResponse;
+    use tonic_reflection::pb::v1alpha::ServerReflectionRequest;
+
+    let target = normalize_grpc_target(&payload.url)?;
+    let timeout_ms = payload.timeout_ms.unwrap_or(20_000).clamp(1_000, 120_000);
+    let endpoint = Endpoint::from_shared(target.clone())
+        .map_err(|err| format!("Invalid gRPC endpoint: {err}"))?
+        .timeout(Duration::from_millis(timeout_ms))
+        .connect_timeout(Duration::from_millis(timeout_ms.min(10_000)));
+    let channel = endpoint
+        .connect()
+        .await
+        .map_err(|err| format!("Failed to connect to gRPC server: {err}"))?;
+    let mut client = ServerReflectionClient::new(channel);
+
+    let request_stream = futures_util::stream::iter(vec![ServerReflectionRequest {
+        host: String::new(),
+        message_request: Some(MessageRequest::ListServices(String::new())),
+    }]);
+    let response = client
+        .server_reflection_info(request_stream)
+        .await
+        .map_err(|err| format!("gRPC reflection request failed: {err}"))?;
+    let mut stream = response.into_inner();
+    let list_response = timeout(Duration::from_millis(timeout_ms), stream.message())
+        .await
+        .map_err(|_| "gRPC reflection list-services request timed out.".to_string())?
+        .map_err(|err| format!("Failed to read reflection response: {err}"))?
+        .ok_or_else(|| "gRPC reflection returned no list-services response.".to_string())?;
+
+    let services = match list_response.message_response {
+        Some(MessageResponse::ListServicesResponse(list)) => list.service,
+        Some(MessageResponse::ErrorResponse(err)) => {
+            return Err(format!("gRPC reflection failed ({}): {}", err.error_code, err.error_message));
+        }
+        _ => return Err("gRPC reflection server returned an unexpected response.".to_string()),
+    };
+
+    let mut descriptor_files = Vec::new();
+    for service in services {
+        let service_name = service.name;
+        if service_name == "grpc.reflection.v1alpha.ServerReflection"
+            || service_name == "grpc.reflection.v1.ServerReflection"
+        {
+            continue;
+        }
+        let request_stream = futures_util::stream::iter(vec![ServerReflectionRequest {
+            host: String::new(),
+            message_request: Some(MessageRequest::FileContainingSymbol(service_name)),
+        }]);
+        let response = client
+            .server_reflection_info(request_stream)
+            .await
+            .map_err(|err| format!("gRPC reflection descriptor request failed: {err}"))?;
+        let mut stream = response.into_inner();
+        let descriptor_response = timeout(Duration::from_millis(timeout_ms), stream.message())
+            .await
+            .map_err(|_| "gRPC reflection descriptor request timed out.".to_string())?
+            .map_err(|err| format!("Failed to read reflection descriptor response: {err}"))?
+            .ok_or_else(|| "gRPC reflection returned no descriptor response.".to_string())?;
+        match descriptor_response.message_response {
+            Some(MessageResponse::FileDescriptorResponse(file_response)) => {
+                for raw in file_response.file_descriptor_proto {
+                    let file = prost_types::FileDescriptorProto::decode(raw.as_slice())
+                        .map_err(|err| format!("Failed to decode reflected descriptor: {err}"))?;
+                    if !descriptor_files.iter().any(|existing: &prost_types::FileDescriptorProto| existing.name == file.name) {
+                        descriptor_files.push(file);
+                    }
+                }
+            }
+            Some(MessageResponse::ErrorResponse(_)) => {}
+            _ => {}
+        }
+    }
+
+    if descriptor_files.is_empty() {
+        return Err("gRPC reflection did not return any service descriptors.".to_string());
+    }
+
+    let descriptor_set = FileDescriptorSet { file: descriptor_files };
+    let pool = DescriptorPool::from_file_descriptor_set(descriptor_set.clone())
+        .map_err(|err| format!("Failed to load reflected descriptors: {err}"))?;
+    let methods = grpc_methods_from_descriptor_pool(&pool);
+    if methods.is_empty() {
+        return Err("gRPC reflection succeeded, but no RPC methods were found.".to_string());
+    }
+
+    let reflection_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|err| format!("Failed to resolve app data directory: {err}"))?
+        .join("reflected-grpc");
+    fs::create_dir_all(&reflection_dir)
+        .map_err(|err| format!("Failed to create reflection cache directory: {err}"))?;
+    let file_name = format!(
+        "reflection-{}.fds",
+        chrono::Utc::now().timestamp_millis()
+    );
+    let descriptor_file_path = reflection_dir.join(file_name);
+    let mut bytes = Vec::new();
+    descriptor_set
+        .encode(&mut bytes)
+        .map_err(|err| format!("Failed to encode reflected descriptors: {err}"))?;
+    fs::write(&descriptor_file_path, bytes)
+        .map_err(|err| format!("Failed to write reflection descriptor cache: {err}"))?;
+
+    Ok(GrpcReflectionResult {
+        descriptor_file_path: descriptor_file_path.to_string_lossy().to_string(),
+        methods,
+    })
 }
 
 fn find_grpc_method_descriptor(
@@ -1344,6 +1614,9 @@ pub async fn send_grpc_request(
         headers,
         cookies: vec![],
         body,
+        body_base64: String::new(),
+        is_binary: false,
+        content_type: "application/json".to_string(),
         duration_ms: started_at.elapsed().as_millis(),
     })
 }
@@ -1391,6 +1664,7 @@ pub async fn oauth_exchange_token(
         true,
         10,
         app_settings.validate_certificates_during_authentication,
+        None,
     )?;
 
     let client_id = resolve_payload_value(&oauth.client_id, &env_vars);
@@ -1641,6 +1915,16 @@ pub async fn send_http_request(
         );
     }
 
+    let has_multipart_file_rows = payload.body_rows.iter().any(|row| {
+        row.enabled
+            && row.field_type.trim().eq_ignore_ascii_case("file")
+            && !row.key.trim().is_empty()
+            && !row.file_path.trim().is_empty()
+    });
+    if has_multipart_file_rows {
+        merged_headers.retain(|key, _| !key.trim().eq_ignore_ascii_case("content-type"));
+    }
+
     let has_auth_header = merged_headers
         .keys()
         .any(|k| k.to_lowercase() == "authorization");
@@ -1739,6 +2023,14 @@ pub async fn send_http_request(
     };
     let effective_follow_redirects = payload.follow_redirects.unwrap_or(true);
     let effective_max_redirects = payload.max_redirects.unwrap_or(5);
+    let request_network = RequestNetworkOptions {
+        proxy_mode: payload.proxy_mode.clone().unwrap_or_default(),
+        proxy_http: payload.proxy_http.clone().unwrap_or_default(),
+        proxy_https: payload.proxy_https.clone().unwrap_or_default(),
+        no_proxy: payload.no_proxy.clone().unwrap_or_default(),
+        client_certificate_path: payload.client_certificate_path.clone().unwrap_or_default(),
+        client_key_path: payload.client_key_path.clone().unwrap_or_default(),
+    };
     let client = build_http_client(
         &app_settings,
         &url,
@@ -1746,6 +2038,7 @@ pub async fn send_http_request(
         effective_follow_redirects,
         effective_max_redirects,
         app_settings.ssl_tls_certificate_verification,
+        Some(&request_network),
     )?;
 
     let method_str = payload.method.to_uppercase();
@@ -1775,7 +2068,9 @@ pub async fn send_http_request(
         }
     }
 
-    if let Some(path) = resolved_body_file_path {
+    if has_multipart_file_rows {
+        request = request.multipart(build_multipart_form(&payload.body_rows).await?);
+    } else if let Some(path) = resolved_body_file_path {
         if !path.trim().is_empty() {
             let bytes = fs::read(&path).map_err(|err| format!("Failed to read body file: {err}"))?;
             request = request.body(bytes);
@@ -1817,7 +2112,23 @@ pub async fn send_http_request(
             )
         })
         .collect::<HashMap<_, _>>();
-    let body = response.text().await.map_err(|err| err.to_string())?;
+    let content_type = headers
+        .iter()
+        .find(|(key, _)| key.eq_ignore_ascii_case("content-type"))
+        .map(|(_, value)| value.clone())
+        .unwrap_or_default();
+    let bytes = response.bytes().await.map_err(|err| err.to_string())?;
+    let body_base64 = BASE64_STANDARD.encode(&bytes);
+    let body = String::from_utf8(bytes.to_vec()).unwrap_or_default();
+    let lower_content_type = content_type.to_ascii_lowercase();
+    let is_textual = lower_content_type.starts_with("text/")
+        || lower_content_type.contains("json")
+        || lower_content_type.contains("xml")
+        || lower_content_type.contains("yaml")
+        || lower_content_type.contains("javascript")
+        || lower_content_type.contains("html")
+        || lower_content_type.is_empty();
+    let is_binary = !is_textual || (body.is_empty() && !body_base64.is_empty());
 
     Ok(ResponsePayload {
         status: status.as_u16(),
@@ -1825,6 +2136,9 @@ pub async fn send_http_request(
         headers,
         cookies: set_cookie_values,
         body,
+        body_base64,
+        is_binary,
+        content_type,
         duration_ms,
     })
 }

@@ -75,6 +75,7 @@ export function ResponsePane({
   const contentType = Object.entries(response.headers).find(([k]) => k.toLowerCase() === 'content-type')?.[1]?.toLowerCase() || "";
   const isHtml = contentType.includes("text/html");
   const isJson = response.isJson;
+  const isBinary = Boolean(response.isBinary);
   const responseBodyLanguage = detectResponseLanguage(contentType, response.body || response.rawBody, isJson);
 
   let bodyViews = ["Raw"];
@@ -179,6 +180,9 @@ export function ResponsePane({
       cookies: response.cookies,
       body: response.body,
       rawBody: response.rawBody,
+      bodyBase64: response.bodyBase64 || "",
+      isBinary,
+      contentType: response.contentType || contentType || "",
       isJson: response.isJson,
       meta: response.meta,
       savedAt: response.savedAt,
@@ -195,8 +199,10 @@ export function ResponsePane({
   async function handleSaveResponseFile() {
     try {
       const selected = await save({
-        defaultPath: "response.json",
-        filters: [{ name: "JSON", extensions: ["json"] }],
+        defaultPath: isBinary ? "response.bin" : "response.json",
+        filters: isBinary
+          ? [{ name: "Binary", extensions: ["bin"] }, { name: "All Files", extensions: ["*"] }]
+          : [{ name: "JSON", extensions: ["json"] }],
       });
       if (!selected || typeof selected !== "string") {
         return;
@@ -321,7 +327,13 @@ export function ResponsePane({
                 ))}
               </div>
             </div>
-            {currentView === "Tree" && parsedJson !== null ? (
+            {isBinary ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 border border-border/10 bg-transparent p-6 text-center text-muted-foreground">
+                <Download className="h-8 w-8 text-primary/70" />
+                <div className="text-[13px] font-medium text-foreground">Binary response</div>
+                <div className="max-w-sm text-[12px]">Preview is unavailable for this content type. Save the response to inspect the original bytes.</div>
+              </div>
+            ) : currentView === "Tree" && parsedJson !== null ? (
               <div className="thin-scrollbar h-full overflow-auto rounded border border-border/10 bg-transparent p-4 shadow-inner">
                 {(Array.isArray(displayJson) ? displayJson.length > 0 : Object.keys(displayJson || {}).length > 0) ? (
                   <div className="flex flex-col gap-0">

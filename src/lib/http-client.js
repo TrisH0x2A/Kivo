@@ -193,6 +193,10 @@ export function sendGrpcRequest(payload) {
   return invoke("send_grpc_request", { payload });
 }
 
+export function reflectGrpcServer(payload) {
+  return invoke("reflect_grpc_server", { payload });
+}
+
 function sanitizeLastResponseForSave(lastResponse) {
   if (!lastResponse || typeof lastResponse !== "object") {
     return null;
@@ -223,6 +227,9 @@ function sanitizeLastResponseForSave(lastResponse) {
     cookies,
     body: String(lastResponse.body ?? ""),
     rawBody: String(lastResponse.rawBody ?? ""),
+    bodyBase64: String(lastResponse.bodyBase64 ?? ""),
+    isBinary: Boolean(lastResponse.isBinary),
+    contentType: String(lastResponse.contentType ?? ""),
     isJson: Boolean(lastResponse.isJson),
     meta,
     savedAt: String(lastResponse.savedAt ?? ""),
@@ -255,6 +262,12 @@ function sanitizeRequestForSave(request, options = {}) {
     maxRedirects: Number.isFinite(request?.maxRedirects) ? Number(request.maxRedirects) : 5,
     timeoutMs: Number.isFinite(request?.timeoutMs) ? Number(request.timeoutMs) : 0,
     useCookieJar: request?.useCookieJar ?? true,
+    proxyMode: String(request?.proxyMode ?? "inherit"),
+    proxyHttp: String(request?.proxyHttp ?? ""),
+    proxyHttps: String(request?.proxyHttps ?? ""),
+    noProxy: String(request?.noProxy ?? ""),
+    clientCertificatePath: String(request?.clientCertificatePath ?? ""),
+    clientKeyPath: String(request?.clientKeyPath ?? ""),
     folderPath: String(request?.folderPath ?? ""),
     scriptPreRequest: String(request?.scriptPreRequest ?? ""),
     scriptAfterResponse: String(request?.scriptAfterResponse ?? ""),
@@ -442,6 +455,7 @@ export async function saveAppState(payload) {
   const persistLastResponse = Boolean(payload?.appSettings?.storeLastResponseByDefault);
   const cleanPayload = {
     ...payload,
+    requestHistory: Array.isArray(payload.requestHistory) ? payload.requestHistory.slice(0, 500) : [],
     workspaces: payload.workspaces?.map((workspace) => ({
       ...workspace,
       collections: workspace.collections?.map((collection) => ({

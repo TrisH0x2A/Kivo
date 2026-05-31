@@ -782,6 +782,31 @@ export function useWorkspaceStore() {
     setStore((current) => normalizeStore(typeof updater === "function" ? updater(current) : updater));
   }
 
+  function recordRequestHistory({ request, workspaceName, collectionName, response: savedResponse, url, error = "" }) {
+    const sentAt = new Date().toISOString();
+    const status = Number(savedResponse?.status || 0);
+    const entry = {
+      id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      workspaceName: String(workspaceName || ""),
+      collectionName: String(collectionName || ""),
+      requestName: String(request?.name || ""),
+      requestMode: String(request?.requestMode || REQUEST_MODES.HTTP),
+      method: String(request?.requestMode === REQUEST_MODES.GRPC ? request?.grpcMethodPath || "gRPC" : request?.method || ""),
+      url: String(url || request?.url || ""),
+      status,
+      statusText: String(savedResponse?.statusText || ""),
+      duration: String(savedResponse?.duration || ""),
+      size: String(savedResponse?.size || ""),
+      ok: status >= 200 && status < 400 && !error,
+      error: String(error || ""),
+      sentAt,
+    };
+    updateStore((current) => ({
+      ...current,
+      requestHistory: [entry, ...(current.requestHistory || [])].slice(0, 500),
+    }));
+  }
+
   function handleSidebarTabChange(sidebarTab) {
     updateStore((current) => ({
       ...current,
@@ -2423,6 +2448,13 @@ export function useWorkspaceStore() {
             };
           })
         }));
+        recordRequestHistory({
+          request: activeRequest,
+          workspaceName: activeWorkspace?.name ?? "",
+          collectionName: activeCollection?.name ?? "",
+          response: savedResponse,
+          url: resolvedUrl,
+        });
       } catch (error) {
         if (activeHttpRequestIdRef.current !== requestId) {
           return;
@@ -2447,6 +2479,19 @@ export function useWorkspaceStore() {
           },
           savedAt
         }));
+        recordRequestHistory({
+          request: activeRequest,
+          workspaceName: activeWorkspace?.name ?? "",
+          collectionName: activeCollection?.name ?? "",
+          response: {
+            status: 500,
+            statusText: "Request failed",
+            duration: "-",
+            size: "0 B",
+          },
+          url: resolvedUrl,
+          error: message,
+        });
       } finally {
         if (activeHttpRequestIdRef.current === requestId) {
           activeHttpRequestIdRef.current = "";
@@ -2680,10 +2725,13 @@ export function useWorkspaceStore() {
         return;
       }
 
-      const rawBody = result.body || "";
-      const formattedBody = formatResponseBody(rawBody);
-      const bodySize = new TextEncoder().encode(rawBody).length;
-      const responseIsJson = isJsonText(rawBody);
+      const isBinary = Boolean(result?.isBinary);
+      const rawBody = isBinary ? "" : (result.body || "");
+      const formattedBody = isBinary ? "Binary response body. Use Save response to export the original bytes." : formatResponseBody(rawBody);
+      const bodySize = result?.bodyBase64
+        ? Math.floor((String(result.bodyBase64).length * 3) / 4)
+        : new TextEncoder().encode(rawBody).length;
+      const responseIsJson = !isBinary && isJsonText(rawBody);
       const savedAt = formatSavedAt();
       const savedResponse = {
         status: result.status,
@@ -2695,6 +2743,9 @@ export function useWorkspaceStore() {
         cookies: Array.isArray(result.cookies) ? result.cookies : parseCookies(result.headers),
         body: formattedBody,
         rawBody,
+        bodyBase64: String(result?.bodyBase64 || ""),
+        isBinary,
+        contentType: String(result?.contentType || ""),
         isJson: responseIsJson,
         meta: {
           url: finalUrl,
@@ -2728,6 +2779,13 @@ export function useWorkspaceStore() {
           };
         })
       }));
+      recordRequestHistory({
+        request: scriptedRequest,
+        workspaceName: activeWorkspaceName,
+        collectionName: activeCollectionName,
+        response: savedResponse,
+        url: finalUrl,
+      });
 
       await runAfterResponseScript(savedResponse);
     } catch (error) {
@@ -2776,6 +2834,14 @@ export function useWorkspaceStore() {
           };
         })
       }));
+      recordRequestHistory({
+        request: activeRequest,
+        workspaceName: activeWorkspaceName,
+        collectionName: activeCollectionName,
+        response: savedResponse,
+        url: finalUrl,
+        error: message,
+      });
 
       await runAfterResponseScript(savedResponse);
     } finally {

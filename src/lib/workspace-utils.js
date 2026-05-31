@@ -75,6 +75,27 @@ export function normalizeStore(store) {
       }),
     };
   });
+  const requestHistory = Array.isArray(nextStore.requestHistory)
+    ? nextStore.requestHistory
+      .map((entry) => ({
+        id: String(entry?.id || ""),
+        workspaceName: String(entry?.workspaceName || ""),
+        collectionName: String(entry?.collectionName || ""),
+        requestName: String(entry?.requestName || ""),
+        requestMode: String(entry?.requestMode || "http"),
+        method: String(entry?.method || ""),
+        url: String(entry?.url || ""),
+        status: Number.isFinite(entry?.status) ? Number(entry.status) : 0,
+        statusText: String(entry?.statusText || ""),
+        duration: String(entry?.duration || ""),
+        size: String(entry?.size || ""),
+        ok: Boolean(entry?.ok),
+        error: String(entry?.error || ""),
+        sentAt: String(entry?.sentAt || "")
+      }))
+      .filter((entry) => entry.id || entry.sentAt)
+      .slice(0, 500)
+    : [];
 
   return {
     version: 1,
@@ -90,6 +111,7 @@ export function normalizeStore(store) {
     activeCollectionName: activeCollection?.name ?? "",
     activeRequestName: activeRequest?.name ?? "",
     sidebarWidth: clampSidebarWidth(Number(nextStore.sidebarWidth || fallback.sidebarWidth)),
-    workspaces: normalizedWorkspaces
+    workspaces: normalizedWorkspaces,
+    requestHistory
   };
 }

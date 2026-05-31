@@ -38,6 +38,11 @@ export function createDefaultAppSettings() {
     proxyHttp: "",
     proxyHttps: "",
     noProxy: "",
+    proxyUsername: "",
+    proxyPassword: "",
+    useClientCertificate: false,
+    clientCertificatePath: "",
+    clientKeyPath: "",
     keybindings: createDefaultKeybindings(),
   };
 }
@@ -137,7 +142,7 @@ export function formatSavedAt() {
 }
 
 export function createRow() {
-  return { key: "", value: "", enabled: true };
+  return { key: "", value: "", enabled: true, fieldType: "text", filePath: "" };
 }
 
 export function createEmptyResponse() {
@@ -206,6 +211,12 @@ export function createRequest(name = "New Request", mode = REQUEST_MODES.HTTP) {
     maxRedirects: 5,
     timeoutMs: 0,
     useCookieJar: true,
+    proxyMode: "inherit",
+    proxyHttp: "",
+    proxyHttps: "",
+    noProxy: "",
+    clientCertificatePath: "",
+    clientKeyPath: "",
     webSocketKeepAliveIntervalMs: Number.isFinite(template.webSocketKeepAliveIntervalMs)
       ? Number(template.webSocketKeepAliveIntervalMs)
       : 0,
@@ -262,7 +273,8 @@ export function createDefaultStore() {
     sidebarTab: "requests",
     sidebarCollapsed: false,
     sidebarWidth: 260,
-    workspaces: []
+    workspaces: [],
+    requestHistory: []
   };
 }
 
@@ -394,7 +406,15 @@ export function normalizeRequestRecord(request) {
     queryParams: Array.isArray(request?.queryParams) ? request.queryParams : [],
     headers: withDefaultUserAgent(Array.isArray(request?.headers) ? request.headers : []),
     body: normalizedBody,
-    bodyRows: Array.isArray(request?.bodyRows) ? request.bodyRows : [],
+    bodyRows: Array.isArray(request?.bodyRows)
+      ? request.bodyRows.map((row) => ({
+        key: String(row?.key ?? ""),
+        value: String(row?.value ?? ""),
+        enabled: row?.enabled ?? true,
+        fieldType: row?.fieldType === "file" ? "file" : "text",
+        filePath: String(row?.filePath ?? ""),
+      }))
+      : [],
     bodyFilePath: typeof request?.bodyFilePath === "string" ? request.bodyFilePath : "",
     graphqlVariables: normalizedGraphqlVariables,
     grpcProtoFilePath: typeof request?.grpcProtoFilePath === "string" ? request.grpcProtoFilePath : "",
@@ -421,6 +441,12 @@ export function normalizeRequestRecord(request) {
     maxRedirects: Number.isFinite(request?.maxRedirects) ? Number(request.maxRedirects) : 5,
     timeoutMs: Number.isFinite(request?.timeoutMs) ? Number(request.timeoutMs) : 0,
     useCookieJar: request?.useCookieJar ?? true,
+    proxyMode: typeof request?.proxyMode === "string" ? request.proxyMode : "inherit",
+    proxyHttp: typeof request?.proxyHttp === "string" ? request.proxyHttp : "",
+    proxyHttps: typeof request?.proxyHttps === "string" ? request.proxyHttps : "",
+    noProxy: typeof request?.noProxy === "string" ? request.noProxy : "",
+    clientCertificatePath: typeof request?.clientCertificatePath === "string" ? request.clientCertificatePath : "",
+    clientKeyPath: typeof request?.clientKeyPath === "string" ? request.clientKeyPath : "",
     webSocketKeepAliveIntervalMs: Number.isFinite(request?.webSocketKeepAliveIntervalMs)
       ? Number(request.webSocketKeepAliveIntervalMs)
       : 0,
