@@ -77,14 +77,14 @@ function EnvChip({ globalCount, collectionCount, onClick }) {
       type="button"
       onClick={onClick}
       title={`Workspace Globals: ${globalCount}\nCollection Variables: ${collectionCount}`}
-      className="group flex h-7 items-center gap-2 rounded-md border border-border/40 bg-accent/30 px-2 text-[10px] font-semibold text-muted-foreground transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-foreground shadow-sm"
+      className="group flex h-7 items-center gap-2 border border-border/40 bg-accent/30 px-2 text-[10px] font-semibold text-muted-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
     >
       <span className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
         <Globe className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors" />
         <span className="uppercase tracking-[0.1em]">ENV</span>
       </span>
       {total > 0 && (
-        <span className="flex h-4 min-w-[16px] items-center justify-center rounded-[3px] bg-primary/20 text-[9px] font-bold text-primary">
+        <span className="flex h-4 min-w-[16px] items-center justify-center border border-primary/25 bg-primary/20 text-[9px] font-bold text-primary">
           {total}
         </span>
       )}
@@ -417,7 +417,7 @@ export default function App() {
           onCancel={() => setShowWorkspaceModal(false)}
         />
       )}
-      <div className="flex h-full min-h-0 overflow-hidden border border-border/30 bg-card/35">
+      <div className="kivo-app-shell flex h-full min-h-0 overflow-hidden border border-border/40">
         <div style={{ width: `${sidebarWidth}px` }} className="min-h-0 shrink-0 overflow-hidden">
           <Suspense fallback={<WorkspaceFallback />}>
             <Sidebar
@@ -487,7 +487,7 @@ export default function App() {
             </Suspense>
           ) : showNoWorkspaceState ? (
             <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center border border-primary/30 bg-primary/10">
                 <SquareKanban className="h-8 w-8 text-primary" />
               </div>
               <div className="max-w-md space-y-2">
@@ -501,7 +501,7 @@ export default function App() {
             </div>
           ) : showNoCollectionsState ? (
             <div className="flex flex-1 flex-col items-center justify-center p-6 text-center">
-              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center border border-primary/30 bg-primary/10">
                 <Layers className="h-8 w-8 text-primary" />
               </div>
               <div className="max-w-md space-y-2">
@@ -517,7 +517,7 @@ export default function App() {
 
             <>
               { }
-              <div data-tauri-drag-region className="flex shrink-0 items-center justify-between border-b border-border/25 bg-background/40 px-5 py-3 backdrop-blur-md">
+              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b border-border/25 px-5 py-3 backdrop-blur-md">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="text-[17px] font-semibold tracking-tight text-foreground truncate">
                     {activeCollection?.name ?? "Collection"}
@@ -538,7 +538,7 @@ export default function App() {
                 <div className="flex items-center gap-2 ml-4">
                   <button
                     type="button"
-                    className="flex cursor-pointer items-center gap-1.5 rounded-full bg-accent/30 px-3 py-1.5 text-muted-foreground transition-all hover:bg-accent/50 hover:text-foreground"
+                    className="kivo-command flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-muted-foreground transition-all hover:text-foreground"
                     onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
                   >
                     <Github className="h-[16px] w-[16px]" />
@@ -548,7 +548,7 @@ export default function App() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                     onClick={toggleTheme}
                     title={`Switch theme (current: ${activeThemeMeta.label})`}
                   >
@@ -557,7 +557,7 @@ export default function App() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                     onClick={() => openCollectionSettings("Overview")}
                     title="Collection Settings"
                   >
@@ -583,7 +583,7 @@ export default function App() {
           ) : showWorkspaceView ? (
 
             <>
-              <div data-tauri-drag-region className="flex shrink-0 items-center justify-between border-b border-border/25 bg-background/40 px-5 py-3.5 backdrop-blur-md">
+              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b border-border/25 px-5 py-3.5 backdrop-blur-md">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-3">
                     <div className="text-[18px] font-semibold tracking-tight text-foreground">
@@ -606,7 +606,7 @@ export default function App() {
                 <div className="flex items-center gap-2 ml-4">
                   <button
                     type="button"
-                    className="flex cursor-pointer items-center gap-1.5 rounded-full bg-accent/30 px-3 py-1.5 text-muted-foreground transition-all hover:bg-accent/50 hover:text-foreground"
+                    className="kivo-command flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-muted-foreground transition-all hover:text-foreground"
                     onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
                   >
                     <Github className="h-[16px] w-[16px]" />
@@ -616,7 +616,7 @@ export default function App() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                     onClick={toggleTheme}
                     title={`Switch theme (current: ${activeThemeMeta.label})`}
                   >
@@ -625,7 +625,7 @@ export default function App() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
                     onClick={() => openCollectionSettings("Overview")}
                     title="Collection Settings"
                   >

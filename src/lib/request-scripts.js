@@ -1,3 +1,5 @@
+import { validateScriptSource } from "@/lib/script-sandbox.js";
+
 function stringifyLogPart(value) {
   if (typeof value === "string") return value;
   if (typeof value === "number" || typeof value === "boolean") return String(value);
@@ -131,6 +133,20 @@ export async function runRequestScript({
     };
   }
 
+  const validationError = validateScriptSource(source);
+  if (validationError) {
+    return {
+      ok: false,
+      request: requestDraft,
+      logs,
+      tests,
+      context: {
+        vars: Object.fromEntries(varsStore.entries()),
+      },
+      error: validationError,
+    };
+  }
+
   const requestApi = {
     get method() {
       return requestDraft.method;
@@ -241,14 +257,36 @@ export async function runRequestScript({
       const timeout = Number(ms);
       const delay = Number.isFinite(timeout) && timeout > 0 ? timeout : 0;
       return new Promise((resolve) => {
-        window.setTimeout(resolve, delay);
+        setTimeout(resolve, delay);
       });
     },
   };
 
   try {
     const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    const execute = new AsyncFunction("kivo", `"use strict";\n${source}`);
+    const execute = new AsyncFunction(
+      "kivo",
+      "window",
+      "document",
+      "globalThis",
+      "self",
+      "localStorage",
+      "sessionStorage",
+      "indexedDB",
+      "caches",
+      "navigator",
+      "location",
+      "fetch",
+      "XMLHttpRequest",
+      "WebSocket",
+      "EventSource",
+      "Worker",
+      "SharedWorker",
+      "importScripts",
+      "eval",
+      "Function",
+      `"use strict";\n${source}`
+    );
     await execute(kivo);
     return {
       ok: true,

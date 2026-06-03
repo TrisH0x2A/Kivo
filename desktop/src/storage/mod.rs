@@ -16,6 +16,7 @@ pub mod export;
 pub mod import;
 pub mod io;
 pub mod models;
+pub mod secrets;
 
 pub use models::{
     default_state, AppSettings, CollectionConfig, CollectionRecord, EnvVar, EnvVarsResult,
@@ -47,6 +48,8 @@ pub use io::{
     get_collection_dir, get_workspace_environments, load_collection_config_from_path,
     load_env_vars, set_active_workspace_environment, WORKSPACE_FILE_NAME,
 };
+
+pub use secrets::get_or_create_auth_secret_seed;
 
 #[cfg(test)]
 pub use io::{parse_env_file_ordered, sanitize_name, write_env_file};
@@ -270,7 +273,10 @@ pub fn get_app_config(app: AppHandle) -> Result<PersistedAppState, String> {
         return Ok(default_state());
     }
     let contents = fs::read_to_string(&path).map_err(|e| format!("Failed to read state: {e}"))?;
-    serde_json::from_str(&contents).map_err(|e| format!("Failed to parse state: {e}"))
+    let mut state: PersistedAppState =
+        serde_json::from_str(&contents).map_err(|e| format!("Failed to parse state: {e}"))?;
+    secrets::decrypt_app_settings_for_runtime(&app, &mut state.app_settings);
+    Ok(state)
 }
 
 #[tauri::command]

@@ -15,6 +15,7 @@
     "build": "node scripts/tauri-runner.mjs build",
     "frontend:dev": "vite --host 127.0.0.1 --port 1420",
     "frontend:build": "vite build",
+    "frontend:test": "node --test test/*.test.mjs",
     "tauri": "node scripts/tauri-runner.mjs"
   },
   "devDependencies": {

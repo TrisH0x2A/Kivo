@@ -606,7 +606,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
   }
 
   return (
-    <div className="thin-scrollbar flex h-full min-h-0 flex-col overflow-y-auto overflow-x-hidden bg-[hsl(var(--sidebar))]/98 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.08),transparent_38%)] p-6 lg:p-7 [&_button]:!rounded-none [&_input]:!rounded-none [&_input]:!bg-transparent">
+    <div className="thin-scrollbar flex h-full min-h-0 flex-col overflow-y-auto overflow-x-hidden bg-[hsl(var(--sidebar))]/98 p-6 lg:p-7 [&_button]:!rounded-none [&_input]:!rounded-none [&_input]:!bg-transparent">
       <div className="mb-6 flex items-start gap-4">
         <div className="flex items-center gap-3">
         <div className="flex h-11 w-11 items-center justify-center border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/10">

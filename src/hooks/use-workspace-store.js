@@ -40,6 +40,7 @@ import { formatResponseBody, isJsonText } from "@/lib/formatters.js";
 import { normalizeUrl } from "@/lib/http-ui.js";
 import { normalizeAuthState } from "@/lib/oauth.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
+import { redactHistoryUrl } from "@/lib/history-utils.js";
 
 const SIDEBAR_COLLAPSED_WIDTH = 52;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -792,7 +793,7 @@ export function useWorkspaceStore() {
       requestName: String(request?.name || ""),
       requestMode: String(request?.requestMode || REQUEST_MODES.HTTP),
       method: String(request?.requestMode === REQUEST_MODES.GRPC ? request?.grpcMethodPath || "gRPC" : request?.method || ""),
-      url: String(url || request?.url || ""),
+      url: redactHistoryUrl(url || request?.url || ""),
       status,
       statusText: String(savedResponse?.statusText || ""),
       duration: String(savedResponse?.duration || ""),

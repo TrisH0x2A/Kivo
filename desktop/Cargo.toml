@@ -13,6 +13,7 @@ tauri-build = { version = "2.5.6", features = [] }
 
 [dependencies]
 base64 = "0.22.1"
+aes-gcm = "0.10"
 chrono = { version = "0.4", features = ["clock"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart", "gzip", "brotli", "deflate", "zstd"] }
 serde = { version = "1", features = ["derive"] }
@@ -22,7 +23,9 @@ bytes = "1"
 prost = "0.13"
 prost-types = "0.13"
 prost-reflect = { version = "0.14", features = ["serde"] }
+pbkdf2 = "0.12"
 protox = "0.7"
+sha2 = "0.10"
 tauri = { version = "2.10.3", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2.2.5"

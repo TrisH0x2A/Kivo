@@ -1,17 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
-const AUTH_ENCRYPTION_KEY_ID = "kivo.auth.enc.key.v1";
 const AUTH_ENCRYPTION_PREFIX = "enc:v1:";
 const AUTH_SENSITIVE_KEYS = new Set([
   "token",
   "password",
+  "proxyPassword",
   "apiKeyValue",
   "clientSecret",
   "accessToken",
   "refreshToken",
   "authorizationCode",
   "codeVerifier",
+  "clientCertificatePath",
+  "clientKeyPath",
+  "customCaCertificatePath",
 ]);
 
 const textEncoder = new TextEncoder();
@@ -38,14 +41,9 @@ function base64Decode(value) {
 
 async function getAuthCryptoKey() {
   try {
-    if (!window?.crypto?.subtle || !window?.localStorage) return null;
-    let seed = window.localStorage.getItem(AUTH_ENCRYPTION_KEY_ID);
-    if (!seed) {
-      const random = new Uint8Array(32);
-      window.crypto.getRandomValues(random);
-      seed = base64Encode(random);
-      window.localStorage.setItem(AUTH_ENCRYPTION_KEY_ID, seed);
-    }
+    if (!window?.crypto?.subtle) return null;
+    const seed = await invoke("get_or_create_auth_secret_seed");
+    if (!seed) return null;
 
     const keyMaterial = await window.crypto.subtle.importKey(
       "raw",
@@ -165,6 +163,9 @@ async function transformStateAuth(payload, mode) {
 
   return {
     ...payload,
+    appSettings: payload.appSettings
+      ? await transformAuthNode(payload.appSettings, key, mode)
+      : payload.appSettings,
     workspaces: Array.isArray(payload.workspaces)
       ? await Promise.all(payload.workspaces.map(async (workspace) => ({
         ...workspace,
@@ -368,12 +369,17 @@ export async function loadAppState() {
   return transformStateAuth(state, "decrypt");
 }
 
-export function getAppSettings() {
-  return invoke("get_app_settings");
+export async function getAppSettings() {
+  const key = await getAuthCryptoKey();
+  const settings = await invoke("get_app_settings");
+  return transformAuthNode(settings, key, "decrypt");
 }
 
-export function setAppSettings(settings) {
-  return invoke("set_app_settings", { settings });
+export async function setAppSettings(settings) {
+  const key = await getAuthCryptoKey();
+  const encryptedSettings = await transformAuthNode(settings, key, "encrypt");
+  return invoke("set_app_settings", { settings: encryptedSettings })
+    .then((saved) => transformAuthNode(saved, key, "decrypt"));
 }
 
 function sanitizeAuthForSave(auth) {

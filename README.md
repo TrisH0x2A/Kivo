@@ -18,24 +18,25 @@
 
 ## Overview
 
-Kivo is a lightweight cross-platform HTTP client designed for developers who value speed and simplicity. It provides a clean, distraction-free environment for testing APIs and managing request collections without the bloat of traditional tools.
+Kivo is a fast, local-first API client for developers who want a capable desktop workflow without losing control of their data. It supports everyday HTTP work as well as GraphQL, gRPC, realtime streams, scripting, load testing, collection runs, and rich import/export flows.
 
 ## Features
 
-- **Cross-Platform Support**: Native builds for Windows (MSI/NSIS), macOS (Silicon/Intel DMG), and Linux (DEB/RPM)
-- **Multi-Scope Environments**: Manage global workspace variables and collection-specific overrides
-- **Hierarchical Structure**: Organize your API requests into workspaces and nested collections
-- **Modernized Settings**: Completely redesigned Overview, Headers, and Auth pages for a premium experience
-- **Setup Wizard**: Seamless onboarding experience to bootstrap your application configuration
-- **Tabbed Interface**: Work on multiple requests simultaneously with a robust tab management system
-- **Sidebar Search**: Quickly filter through your collections and requests with real-time search
-- **Advanced Request Interaction**: Comprehensive context menus for cloning, renaming, and copy-pasting requests
-- **Self-Updating**: Built-in background auto-updater with signature verification guarantees you're always on the latest version.
-- **Security**: Local-first data storage ensuring your request data stays on your machine
+- **Cross-Platform Support**: Native builds for Windows (MSI/NSIS), macOS (Silicon/Intel DMG), and Linux (DEB/RPM).
+- **Protocol Coverage**: HTTP, GraphQL, gRPC with proto files or server reflection, WebSocket, SSE, and Socket.IO.
+- **Multipart & Binary Workflows**: Multipart file fields, raw file uploads, binary response preservation, and response export.
+- **Collection Runner**: Run HTTP/GraphQL requests in order with folder scoping, retries, script assertions, and result summaries.
+- **Multi-Scope Environments**: Manage workspace variables, collection overrides, and active workspace environments.
+- **Hierarchical Collections**: Organize requests into workspaces, collections, folders, and pinned request tabs.
+- **Request History**: Persist recent request runs with sensitive query values redacted.
+- **Advanced Network Controls**: Redirect settings, timeouts, cookie jar, proxy overrides, proxy auth, custom CA, and mTLS client certificate paths.
+- **Security**: Local-first data storage, encrypted sensitive auth/app-settings fields, and hardened request script execution.
+- **Import / Export**: Kivo full-fidelity exports plus Postman, OpenAPI 3, Swagger 2, and Bruno-compatible flows for supported request types.
 - **JSON Response Query Engine**: Filter and search JSON response bodies using text search, conditional expressions (`userid > 3`), compound queries (`age > 20 && status == active`), and logical operators. See the [engine documentation](docs/json-query-engine.md) for details.
-- **Expanded Auth Support**: Comprehensive support for Basic Auth, API Key (Header/Query), and environment-aware token management with inheritance.
-- **Environment Autocomplete**: Real-time `{{variable}}` suggestions with arrow-key navigation for a faster workflow.
-- **Request Scripts Panel**: Pre-request and after-response JavaScript editors with line numbers, syntax highlighting, snippet insertion, and last-run diagnostics (status, tests, logs, and script vars).
+- **Expanded Auth Support**: Basic Auth, Bearer, API Key, OAuth 2.0 flows, token refresh, and environment-aware inheritance.
+- **Request Scripts Panel**: Pre-request and after-response JavaScript editors with snippets, logs, tests, and script vars.
+- **Load Testing**: Run local load tests with latency, throughput, and status summaries.
+- **Modern Desktop UI**: Keyboard shortcuts, theme packs, square-edged panels, settings management, and a built-in updater.
 
 ## Download Kivo (v0.4.1)
 

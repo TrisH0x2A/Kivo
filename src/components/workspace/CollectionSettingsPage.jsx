@@ -13,6 +13,7 @@ import { EnvHighlightInput } from "@/components/ui/EnvHighlightInput.jsx";
 import { EnvEditor } from "@/components/workspace/EnvEditor.jsx";
 import { WorkspaceEnvironmentSelector } from "@/components/workspace/WorkspaceEnvironmentSelector.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
+import { CollectionRunner } from "@/components/workspace/CollectionRunner.jsx";
 import { useCollectionConfig } from "@/hooks/use-collection-config.js";
 import { useEnv } from "@/hooks/use-env.js";
 import { useWorkspaceEnvironments } from "@/hooks/use-workspace-environments.js";
@@ -23,6 +24,7 @@ const TABS = [
   { id: "Headers", label: "Headers" },
   { id: "Environments", label: "Environments" },
   { id: "Auth", label: "Auth" },
+  { id: "Runner", label: "Runner" },
 ];
 
 function createHeaderRow() {
@@ -561,6 +563,10 @@ export function CollectionSettingsPage({
             onReset={reset}
             envVars={envVars}
           />
+        )}
+
+        {activeTab === "Runner" && (
+          <CollectionRunner workspace={workspace} collection={collection} />
         )}
       </div>
     </div>
