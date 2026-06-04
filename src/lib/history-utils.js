@@ -37,3 +37,19 @@ export function redactHistoryUrl(value) {
     return raw.replace(/([?&][^=]*(?:token|secret|password|apikey|api_key|key|authorization|auth)[^=]*=)[^&]*/gi, "$1[redacted]");
   }
 }
+
+export function filterRequestHistory(requestHistory = [], query = "") {
+  const normalized = String(query || "").trim().toLowerCase();
+  if (!normalized) {
+    return requestHistory;
+  }
+  return requestHistory.filter((entry) => [
+    entry?.method,
+    entry?.url,
+    entry?.workspaceName,
+    entry?.collectionName,
+    entry?.requestName,
+    entry?.status,
+    entry?.error,
+  ].some((value) => String(value ?? "").toLowerCase().includes(normalized)));
+}
