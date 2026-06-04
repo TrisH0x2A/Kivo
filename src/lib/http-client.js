@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { redactHistoryUrl } from "@/lib/history-utils.js";
 
 const AUTH_ENCRYPTION_PREFIX = "enc:v1:";
 const AUTH_SENSITIVE_KEYS = new Set([
@@ -213,7 +214,7 @@ function sanitizeLastResponseForSave(lastResponse) {
 
   const meta = lastResponse.meta && typeof lastResponse.meta === "object"
     ? {
-      url: String(lastResponse.meta.url ?? "-"),
+      url: redactHistoryUrl(lastResponse.meta.url ?? "-"),
       method: String(lastResponse.meta.method ?? "-"),
     }
     : { url: "-", method: "-" };

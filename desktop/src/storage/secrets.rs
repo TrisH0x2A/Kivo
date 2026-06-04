@@ -13,6 +13,104 @@ use super::AppSettings;
 const AUTH_ENCRYPTION_PREFIX: &str = "enc:v1:";
 const AUTH_ENCRYPTION_SALT: &[u8] = b"kivo-auth-encryption-salt-v1";
 const AUTH_ENCRYPTION_ITERATIONS: u32 = 100_000;
+const PROTECTED_SEED_PREFIX: &str = "dpapi:v1:";
+
+#[cfg(windows)]
+fn protect_seed(seed: &str) -> Result<String, String> {
+    use std::ptr;
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Cryptography::{
+        CryptProtectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+    };
+
+    let mut input = seed.as_bytes().to_vec();
+    let in_blob = CRYPT_INTEGER_BLOB {
+        cbData: input.len() as u32,
+        pbData: input.as_mut_ptr(),
+    };
+    let mut out_blob = CRYPT_INTEGER_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+
+    let ok = unsafe {
+        CryptProtectData(
+            &in_blob,
+            ptr::null(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut out_blob,
+        )
+    };
+    if ok == 0 {
+        return Err("Failed to protect auth secret seed with Windows DPAPI.".to_string());
+    }
+
+    let bytes = unsafe { std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize) };
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    unsafe {
+        LocalFree(out_blob.pbData.cast());
+    }
+    Ok(format!("{PROTECTED_SEED_PREFIX}{encoded}"))
+}
+
+#[cfg(windows)]
+fn unprotect_seed(value: &str) -> Result<String, String> {
+    use std::ptr;
+    use windows_sys::Win32::Foundation::LocalFree;
+    use windows_sys::Win32::Security::Cryptography::{
+        CryptUnprotectData, CRYPTPROTECT_UI_FORBIDDEN, CRYPT_INTEGER_BLOB,
+    };
+
+    let payload = value
+        .strip_prefix(PROTECTED_SEED_PREFIX)
+        .ok_or_else(|| "Auth secret seed is not DPAPI protected.".to_string())?;
+    let mut cipher = base64::engine::general_purpose::STANDARD
+        .decode(payload)
+        .map_err(|e| format!("Failed to decode protected auth secret seed: {e}"))?;
+    let in_blob = CRYPT_INTEGER_BLOB {
+        cbData: cipher.len() as u32,
+        pbData: cipher.as_mut_ptr(),
+    };
+    let mut out_blob = CRYPT_INTEGER_BLOB {
+        cbData: 0,
+        pbData: ptr::null_mut(),
+    };
+
+    let ok = unsafe {
+        CryptUnprotectData(
+            &in_blob,
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
+            CRYPTPROTECT_UI_FORBIDDEN,
+            &mut out_blob,
+        )
+    };
+    if ok == 0 {
+        return Err("Failed to unprotect auth secret seed with Windows DPAPI.".to_string());
+    }
+
+    let bytes = unsafe { std::slice::from_raw_parts(out_blob.pbData, out_blob.cbData as usize) };
+    let seed = String::from_utf8(bytes.to_vec()).unwrap_or_default();
+    unsafe {
+        LocalFree(out_blob.pbData.cast());
+    }
+    Ok(seed)
+}
+
+#[cfg(not(windows))]
+fn protect_seed(seed: &str) -> Result<String, String> {
+    Ok(seed.to_string())
+}
+
+#[cfg(not(windows))]
+fn unprotect_seed(value: &str) -> Result<String, String> {
+    Ok(value.to_string())
+}
 
 #[tauri::command]
 pub fn get_or_create_auth_secret_seed(app: AppHandle) -> Result<String, String> {
@@ -29,12 +127,21 @@ pub fn get_or_create_auth_secret_seed(app: AppHandle) -> Result<String, String> 
             .map_err(|e| format!("Failed to read auth secret seed: {e}"))?;
         let trimmed = seed.trim();
         if !trimmed.is_empty() {
+            if trimmed.starts_with(PROTECTED_SEED_PREFIX) {
+                return unprotect_seed(trimmed);
+            }
+
+            let protected = protect_seed(trimmed)?;
+            if protected != trimmed {
+                fs::write(&secret_path, protected)
+                    .map_err(|e| format!("Failed to migrate auth secret seed: {e}"))?;
+            }
             return Ok(trimmed.to_string());
         }
     }
 
     let seed = format!("{}{}{}", Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
-    fs::write(&secret_path, &seed)
+    fs::write(&secret_path, protect_seed(&seed)?)
         .map_err(|e| format!("Failed to persist auth secret seed: {e}"))?;
     Ok(seed)
 }
