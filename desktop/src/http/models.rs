@@ -66,6 +66,22 @@ pub struct OAuthPayload {
 #[serde(rename_all = "camelCase")]
 pub struct AuthPayload {
     #[serde(default)]
+    pub token: String,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: String,
+    #[serde(default)]
+    pub jwt_token: String,
+    #[serde(default)]
+    pub digest_realm: String,
+    #[serde(default)]
+    pub digest_nonce: String,
+    #[serde(default)]
+    pub digest_qop: String,
+    #[serde(default)]
+    pub digest_algorithm: String,
+    #[serde(default)]
     pub api_key_in: String,
     #[serde(default)]
     pub api_key_name: String,

@@ -2381,6 +2381,7 @@ dependencies = [
  "bytes",
  "chrono",
  "futures-util",
+ "hex",
  "httparse",
  "num_cpus",
  "pbkdf2",

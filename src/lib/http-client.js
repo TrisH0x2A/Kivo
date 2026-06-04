@@ -6,6 +6,7 @@ const AUTH_ENCRYPTION_PREFIX = "enc:v1:";
 const AUTH_SENSITIVE_KEYS = new Set([
   "token",
   "password",
+  "jwtToken",
   "proxyPassword",
   "apiKeyValue",
   "clientSecret",
@@ -397,11 +398,30 @@ function sanitizeAuthForSave(auth) {
     };
   }
 
+  if (authType === "jwt") {
+    return {
+      type: "jwt",
+      jwtToken: String(auth?.jwtToken ?? auth?.token ?? "")
+    };
+  }
+
   if (authType === "basic") {
     return {
       type: "basic",
       username: String(auth?.username ?? ""),
       password: String(auth?.password ?? "")
+    };
+  }
+
+  if (authType === "digest") {
+    return {
+      type: "digest",
+      username: String(auth?.username ?? ""),
+      password: String(auth?.password ?? ""),
+      digestRealm: String(auth?.digestRealm ?? ""),
+      digestNonce: String(auth?.digestNonce ?? ""),
+      digestQop: String(auth?.digestQop ?? "auth"),
+      digestAlgorithm: String(auth?.digestAlgorithm ?? "SHA-256")
     };
   }
 

@@ -554,6 +554,20 @@ pub struct AuthRecord {
     pub username: String,
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub password: String,
+    #[serde(default, rename = "jwtToken", skip_serializing_if = "String::is_empty")]
+    pub jwt_token: String,
+    #[serde(default, rename = "digestRealm", skip_serializing_if = "String::is_empty")]
+    pub digest_realm: String,
+    #[serde(default, rename = "digestNonce", skip_serializing_if = "String::is_empty")]
+    pub digest_nonce: String,
+    #[serde(default, rename = "digestQop", skip_serializing_if = "String::is_empty")]
+    pub digest_qop: String,
+    #[serde(
+        default,
+        rename = "digestAlgorithm",
+        skip_serializing_if = "String::is_empty"
+    )]
+    pub digest_algorithm: String,
     #[serde(
         default,
         rename = "apiKeyName",
@@ -698,6 +712,11 @@ pub fn default_auth_record() -> AuthRecord {
         token: String::new(),
         username: String::new(),
         password: String::new(),
+        jwt_token: String::new(),
+        digest_realm: String::new(),
+        digest_nonce: String::new(),
+        digest_qop: "auth".to_string(),
+        digest_algorithm: "SHA-256".to_string(),
         api_key_name: String::new(),
         api_key_value: String::new(),
         api_key_in: "header".to_string(),
@@ -711,6 +730,11 @@ pub fn default_inherit_auth_record() -> AuthRecord {
         token: String::new(),
         username: String::new(),
         password: String::new(),
+        jwt_token: String::new(),
+        digest_realm: String::new(),
+        digest_nonce: String::new(),
+        digest_qop: "auth".to_string(),
+        digest_algorithm: "SHA-256".to_string(),
         api_key_name: String::new(),
         api_key_value: String::new(),
         api_key_in: "header".to_string(),

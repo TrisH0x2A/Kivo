@@ -165,6 +165,10 @@ export function serializeHeaders(rows = [], auth = { type: "none", token: "" }, 
     headers.Authorization = `Bearer ${resolveValue(auth.token).trim()}`;
   }
 
+  if (auth?.type === "jwt" && resolveValue(auth.jwtToken || auth.token).trim()) {
+    headers.Authorization = `Bearer ${resolveValue(auth.jwtToken || auth.token).trim()}`;
+  }
+
   if (auth?.type === "basic" && (auth.username || auth.password)) {
     const encoded = btoa(`${resolveValue(auth.username)}:${resolveValue(auth.password)}`);
     headers.Authorization = `Basic ${encoded}`;
@@ -349,6 +353,14 @@ export function buildRequestPayload(request, workspaceName, collectionName) {
       apiKeyIn: auth.apiKeyIn ?? "header",
       apiKeyName: auth.apiKeyName ?? "",
       apiKeyValue: auth.apiKeyValue ?? "",
+      token: auth.token ?? "",
+      username: auth.username ?? "",
+      password: auth.password ?? "",
+      jwtToken: auth.jwtToken ?? "",
+      digestRealm: auth.digestRealm ?? "",
+      digestNonce: auth.digestNonce ?? "",
+      digestQop: auth.digestQop ?? "auth",
+      digestAlgorithm: auth.digestAlgorithm ?? "SHA-256",
       oauth2: auth.type === "oauth2" ? auth.oauth2 ?? null : null,
     },
     proxyMode: request?.proxyMode ?? "inherit",

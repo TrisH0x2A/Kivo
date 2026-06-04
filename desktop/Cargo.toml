@@ -26,6 +26,7 @@ prost-reflect = { version = "0.14", features = ["serde"] }
 pbkdf2 = "0.12"
 protox = "0.7"
 sha2 = "0.10"
+hex = "0.4"
 tauri = { version = "2.10.3", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2.2.5"

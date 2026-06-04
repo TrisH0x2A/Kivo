@@ -18,6 +18,7 @@ use prost_reflect::{DescriptorPool, DynamicMessage, MethodDescriptor, ReflectMes
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
 use reqwest::multipart;
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager};
 use tokio::sync::watch;
 use tokio::time::timeout;
@@ -38,6 +39,7 @@ use crate::storage::{
 
 const DEFAULT_USER_AGENT: &str = concat!("kivo/", env!("CARGO_PKG_VERSION"));
 const COOKIE_STORE_FILE_NAME: &str = "cookies.json";
+const DIGEST_NONCE_COUNT: &str = "00000001";
 
 #[cfg(test)]
 #[path = "client_tests.rs"]
@@ -809,6 +811,74 @@ pub async fn cancel_http_request(request_id: String) -> Result<bool, String> {
 
 fn resolve_variables(input: &str, vars: &HashMap<String, String>) -> String {
     resolve_template_variables(input, vars)
+}
+
+fn sha256_hex(value: &str) -> String {
+    hex::encode(Sha256::digest(value.as_bytes()))
+}
+
+fn digest_uri(url: &str) -> String {
+    reqwest::Url::parse(url)
+        .map(|parsed| {
+            let mut uri = parsed.path().to_string();
+            if uri.is_empty() {
+                uri.push('/');
+            }
+            if let Some(query) = parsed.query() {
+                uri.push('?');
+                uri.push_str(query);
+            }
+            uri
+        })
+        .unwrap_or_else(|_| "/".to_string())
+}
+
+fn build_digest_auth_header(
+    username: &str,
+    password: &str,
+    realm: &str,
+    nonce: &str,
+    qop: &str,
+    method: &str,
+    url: &str,
+) -> Option<String> {
+    let username = username.trim();
+    let realm = realm.trim();
+    let nonce = nonce.trim();
+    if username.is_empty() || realm.is_empty() || nonce.is_empty() {
+        return None;
+    }
+
+    let uri = digest_uri(url);
+    let cnonce = sha256_hex(&format!("{username}:{nonce}:{uri}"))
+        .chars()
+        .take(16)
+        .collect::<String>();
+    let ha1 = sha256_hex(&format!("{username}:{realm}:{password}"));
+    let ha2 = sha256_hex(&format!("{}:{}", method.to_uppercase(), uri));
+    let qop = qop.trim();
+    let response = if qop.is_empty() {
+        sha256_hex(&format!("{ha1}:{nonce}:{ha2}"))
+    } else {
+        sha256_hex(&format!(
+            "{ha1}:{nonce}:{DIGEST_NONCE_COUNT}:{cnonce}:{qop}:{ha2}"
+        ))
+    };
+
+    let mut parts = vec![
+        format!("username=\"{username}\""),
+        format!("realm=\"{realm}\""),
+        format!("nonce=\"{nonce}\""),
+        format!("uri=\"{uri}\""),
+        "algorithm=\"SHA-256\"".to_string(),
+        format!("response=\"{response}\""),
+    ];
+    if !qop.is_empty() {
+        parts.push(format!("qop={qop}"));
+        parts.push(format!("nc={DIGEST_NONCE_COUNT}"));
+        parts.push(format!("cnonce=\"{cnonce}\""));
+    }
+    Some(format!("Digest {}", parts.join(", ")))
 }
 
 fn normalize_url(raw: &str) -> Result<String, String> {
@@ -1939,6 +2009,18 @@ pub async fn send_http_request(
                     format!("Bearer {}", resolved),
                 );
             }
+            "jwt" if !auth.jwt_token.is_empty() || !auth.token.is_empty() => {
+                let token = if auth.jwt_token.trim().is_empty() {
+                    &auth.token
+                } else {
+                    &auth.jwt_token
+                };
+                let resolved = resolve_variables(token, &env_vars);
+                merged_headers.insert(
+                    "Authorization".to_string(),
+                    format!("Bearer {}", resolved),
+                );
+            }
             "basic" if !auth.username.is_empty() || !auth.password.is_empty() => {
                 let u = resolve_variables(&auth.username, &env_vars);
                 let p = resolve_variables(&auth.password, &env_vars);
@@ -1982,6 +2064,73 @@ pub async fn send_http_request(
         .map(|path| resolve_variables(path, &env_vars));
 
     let mut url = normalize_url(&resolved_url)?;
+
+    if !merged_headers
+        .keys()
+        .any(|k| k.to_lowercase() == "authorization")
+    {
+        if payload.auth_type == "inherit" {
+            let auth = &col_config.default_auth;
+            if auth.auth_type == "digest" {
+                let username = resolve_variables(&auth.username, &env_vars);
+                let password = resolve_variables(&auth.password, &env_vars);
+                let realm = resolve_variables(&auth.digest_realm, &env_vars);
+                let nonce = resolve_variables(&auth.digest_nonce, &env_vars);
+                let qop = if auth.digest_qop.trim().is_empty() {
+                    "auth".to_string()
+                } else {
+                    resolve_variables(&auth.digest_qop, &env_vars)
+                };
+                if let Some(header) = build_digest_auth_header(
+                    &username,
+                    &password,
+                    &realm,
+                    &nonce,
+                    &qop,
+                    &payload.method,
+                    &url,
+                ) {
+                    merged_headers.insert("Authorization".to_string(), header);
+                }
+            }
+        } else if payload.auth_type == "digest" {
+            if let Some(ref auth) = payload.auth_payload {
+                let username = resolve_variables(&auth.username, &env_vars);
+                let password = resolve_variables(&auth.password, &env_vars);
+                let realm = resolve_variables(&auth.digest_realm, &env_vars);
+                let nonce = resolve_variables(&auth.digest_nonce, &env_vars);
+                let qop = if auth.digest_qop.trim().is_empty() {
+                    "auth".to_string()
+                } else {
+                    resolve_variables(&auth.digest_qop, &env_vars)
+                };
+                if let Some(header) = build_digest_auth_header(
+                    &username,
+                    &password,
+                    &realm,
+                    &nonce,
+                    &qop,
+                    &payload.method,
+                    &url,
+                ) {
+                    merged_headers.insert("Authorization".to_string(), header);
+                }
+            }
+        } else if payload.auth_type == "jwt" {
+            if let Some(ref auth) = payload.auth_payload {
+                let token = if auth.jwt_token.trim().is_empty() {
+                    &auth.token
+                } else {
+                    &auth.jwt_token
+                };
+                let resolved = resolve_variables(token, &env_vars);
+                if !resolved.trim().is_empty() {
+                    merged_headers
+                        .insert("Authorization".to_string(), format!("Bearer {}", resolved));
+                }
+            }
+        }
+    }
 
     let should_inject_apikey_query = if payload.auth_type == "inherit" {
         col_config.default_auth.auth_type == "apikey"

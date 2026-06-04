@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { BookOpen, Cookie, ExternalLink, FileText, FolderOpen, Github, HardDrive, Heart, Keyboard, Lightbulb, Palette, Plus, RefreshCw, Settings2, ShieldCheck, Siren, Star, Trash2, X } from "lucide-react";
+import { BookOpen, Cookie, Copy, Download, ExternalLink, FileText, FolderOpen, Github, HardDrive, Heart, Keyboard, Lightbulb, Palette, Plus, RefreshCw, Search, Settings2, ShieldCheck, Siren, Star, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -111,6 +111,8 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
   const [cookieFilter, setCookieFilter] = useState("");
   const [isCookieLoading, setIsCookieLoading] = useState(false);
   const [cookieDraft, setCookieDraft] = useState(EMPTY_COOKIE_DRAFT);
+  const [historySearch, setHistorySearch] = useState("");
+  const [historyCopied, setHistoryCopied] = useState(false);
   const [isCookieEditorOpen, setIsCookieEditorOpen] = useState(false);
   const [isSavingCookie, setIsSavingCookie] = useState(false);
   const [activeSettingsTab, setActiveSettingsTab] = useState("Storage");
@@ -400,6 +402,22 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
         || collection.includes(query);
     });
   }, [cookieEntries, cookieFilter]);
+
+  const filteredHistory = useMemo(() => {
+    const query = historySearch.trim().toLowerCase();
+    if (!query) {
+      return requestHistory;
+    }
+    return requestHistory.filter((entry) => [
+      entry?.method,
+      entry?.url,
+      entry?.workspaceName,
+      entry?.collectionName,
+      entry?.requestName,
+      entry?.status,
+      entry?.error,
+    ].some((value) => String(value ?? "").toLowerCase().includes(query)));
+  }, [historySearch, requestHistory]);
 
   const keybindingSections = useMemo(() => {
     return KEYBINDING_ACTIONS.reduce((acc, action) => {
@@ -1003,17 +1021,65 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
         {activeSettingsTab === "History" ? (
           <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
-            <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
-              <h3 className="text-[14px] font-semibold">Request History</h3>
-              <Button type="button" variant="secondary" size="sm" className="h-8 border border-border/40 bg-background/35" onClick={onClearHistory}>
-                Clear
-              </Button>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-foreground">
+              <div>
+                <h3 className="text-[14px] font-semibold">Request History</h3>
+                <div className="text-[11px] text-muted-foreground">{filteredHistory.length} of {requestHistory.length} runs</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={historySearch}
+                    onChange={(event) => setHistorySearch(event.target.value)}
+                    placeholder="Search history"
+                    className="h-8 w-48 border-border/40 bg-background/35 pl-7 text-[12px]"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 gap-1.5 border border-border/40 bg-background/35"
+                  disabled={!filteredHistory.length}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(JSON.stringify(filteredHistory, null, 2));
+                    setHistoryCopied(true);
+                    setTimeout(() => setHistoryCopied(false), 1400);
+                  }}
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {historyCopied ? "Copied" : "Copy"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="h-8 gap-1.5 border border-border/40 bg-background/35"
+                  disabled={!filteredHistory.length}
+                  onClick={() => {
+                    const blob = new Blob([JSON.stringify(filteredHistory, null, 2)], { type: "application/json" });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = url;
+                    link.download = "kivo-request-history.json";
+                    link.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export
+                </Button>
+                <Button type="button" variant="secondary" size="sm" className="h-8 border border-border/40 bg-background/35" onClick={onClearHistory}>
+                  Clear
+                </Button>
+              </div>
             </div>
             <div className="thin-scrollbar max-h-[520px] overflow-auto border border-border/20">
-              {requestHistory.length === 0 ? (
+              {filteredHistory.length === 0 ? (
                 <div className="p-4 text-[12px] text-muted-foreground">No requests sent yet.</div>
               ) : (
-                requestHistory.map((entry) => (
+                filteredHistory.map((entry) => (
                   <div key={entry.id || `${entry.sentAt}-${entry.url}`} className="grid grid-cols-[88px_minmax(0,1fr)_92px_120px] gap-3 border-b border-border/10 px-3 py-2 text-[12px]">
                     <div className={entry.ok ? "text-emerald-400" : "text-red-400"}>{entry.status || "ERR"}</div>
                     <div className="min-w-0">

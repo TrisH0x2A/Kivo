@@ -19,6 +19,28 @@ use crate::storage::models::AppSettings;
 // ---------------------------------------------------------------------------
 
 #[test]
+fn digest_auth_header_uses_sha256_digest_parts() {
+    let header = build_digest_auth_header(
+        "user",
+        "pass",
+        "api",
+        "nonce",
+        "auth",
+        "GET",
+        "https://example.com/v1/users?active=true",
+    )
+    .expect("digest header");
+
+    assert!(header.starts_with("Digest "));
+    assert!(header.contains("username=\"user\""));
+    assert!(header.contains("realm=\"api\""));
+    assert!(header.contains("algorithm=\"SHA-256\""));
+    assert!(header.contains("uri=\"/v1/users?active=true\""));
+    assert!(header.contains("qop=auth"));
+    assert!(header.contains("response=\""));
+}
+
+#[test]
 fn parse_no_proxy_list_trims_and_lowers() {
     let list = parse_no_proxy_list("  FOO.com , ,bar.io ,,\tbaz.local\n");
     assert_eq!(list, vec!["foo.com", "bar.io", "baz.local"]);

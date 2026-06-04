@@ -740,6 +740,8 @@ const authModes = [
   { value: "none", label: "No Auth" },
   { value: "basic", label: "Basic Auth" },
   { value: "bearer", label: "Bearer Token" },
+  { value: "jwt", label: "JWT Bearer" },
+  { value: "digest", label: "Digest Auth" },
   { value: "apikey", label: "API Key" },
   { value: "oauth2", label: "OAuth 2.0" },
   { value: "inherit", label: "Inherit from Collection" },
@@ -1808,6 +1810,86 @@ function AuthPanel({ state, onAuthChange, envVars, response, workspaceName, coll
           />
           <p className="text-[11px] text-muted-foreground/70">
             Generates <code className="rounded-sm border border-border/30 px-1 py-0.5 text-[10px] text-foreground">Authorization: Bearer &lt;token&gt;</code> header. Supports <code className="rounded-sm border border-border/30 px-1 py-0.5 text-[10px] text-foreground">{"{{variables}}"}</code>.
+          </p>
+        </div>
+      )}
+
+      {auth.type === "jwt" && (
+        <div className="grid max-w-[520px] gap-2 px-3" style={{ animation: "fadeIn 0.2s ease-out" }}>
+          <label className="text-[10px] uppercase tracking-[0.18em]">JWT Token</label>
+          <EnvHighlightInput
+            value={auth.jwtToken ?? auth.token ?? ""}
+            onValueChange={(val) => onAuthChange({ ...auth, jwtToken: val })}
+            placeholder="Paste signed JWT"
+            envVars={envVars}
+          />
+          <p className="text-[11px] text-muted-foreground/70">
+            Sends the token as <code className="rounded-sm border border-border/30 px-1 py-0.5 text-[10px] text-foreground">Authorization: Bearer &lt;jwt&gt;</code>. Supports <code className="rounded-sm border border-border/30 px-1 py-0.5 text-[10px] text-foreground">{"{{variables}}"}</code>.
+          </p>
+        </div>
+      )}
+
+      {auth.type === "digest" && (
+        <div className="grid max-w-[620px] gap-4 px-3" style={{ animation: "fadeIn 0.2s ease-out" }}>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Username</label>
+              <EnvHighlightInput
+                value={auth.username ?? ""}
+                onValueChange={(val) => onAuthChange({ ...auth, username: val })}
+                placeholder="Digest username"
+                envVars={envVars}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Password</label>
+              <EnvHighlightInput
+                value={auth.password ?? ""}
+                onValueChange={(val) => onAuthChange({ ...auth, password: val })}
+                placeholder="Digest password"
+                type={showPassword ? "text" : "password"}
+                envVars={envVars}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Realm</label>
+              <EnvHighlightInput
+                value={auth.digestRealm ?? ""}
+                onValueChange={(val) => onAuthChange({ ...auth, digestRealm: val })}
+                placeholder="Server realm"
+                envVars={envVars}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Nonce</label>
+              <EnvHighlightInput
+                value={auth.digestNonce ?? ""}
+                onValueChange={(val) => onAuthChange({ ...auth, digestNonce: val })}
+                placeholder="Server nonce"
+                envVars={envVars}
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="grid gap-2">
+              <label className="text-[10px] uppercase tracking-[0.18em]">QOP</label>
+              <SelectMenu
+                value={auth.digestQop ?? "auth"}
+                options={[{ value: "auth", label: "auth" }, { value: "", label: "none" }]}
+                onChange={(digestQop) => onAuthChange({ ...auth, digestQop })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-[10px] uppercase tracking-[0.18em]">Algorithm</label>
+              <SelectMenu
+                value={auth.digestAlgorithm ?? "SHA-256"}
+                options={[{ value: "SHA-256", label: "SHA-256" }]}
+                onChange={(digestAlgorithm) => onAuthChange({ ...auth, digestAlgorithm })}
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground/70">
+            Generates a preemptive Digest header when realm and nonce are known. Automatic challenge retry can be added next.
           </p>
         </div>
       )}
