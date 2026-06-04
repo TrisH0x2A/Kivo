@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { CheckCircle2, ListChecks, Play, RotateCcw, XCircle } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { CheckCircle2, Copy, Download, FileText, ListChecks, Play, RotateCcw, Square, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -25,6 +25,81 @@ function getRunnableRequests(collection, folderFilter) {
     .filter((request) => request.requestMode === REQUEST_MODES.HTTP || request.requestMode === REQUEST_MODES.GRAPHQL)
     .filter((request) => !folder || normalizeFolderPath(request.folderPath) === folder)
     .map((request, index) => ({ request, index }));
+}
+
+function parseRunnerDataRows(source) {
+  const text = String(source || "").trim();
+  if (!text) return [];
+
+  try {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter((row) => row && typeof row === "object" && !Array.isArray(row))
+        .map((row, index) => ({ id: `row-${index + 1}`, values: row }));
+    }
+    if (parsed && typeof parsed === "object") {
+      return [{ id: "row-1", values: parsed }];
+    }
+  } catch {}
+
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return [];
+  const headers = lines[0].split(",").map((part) => part.trim()).filter(Boolean);
+  if (!headers.length) return [];
+  return lines.slice(1).map((line, index) => {
+    const cells = line.split(",");
+    const values = {};
+    headers.forEach((header, cellIndex) => {
+      values[header] = String(cells[cellIndex] ?? "").trim();
+    });
+    return { id: `row-${index + 1}`, values };
+  });
+}
+
+function applyRunnerDataRow(request, row) {
+  if (!row?.values) return request;
+  const variables = Object.fromEntries(
+    Object.entries(row.values).map(([key, value]) => [String(key), String(value ?? "")])
+  );
+  const replaceVars = (value) => String(value ?? "").replace(/\{\{\s*([^}]+?)\s*\}\}/g, (match, key) => (
+    Object.prototype.hasOwnProperty.call(variables, key.trim()) ? variables[key.trim()] : match
+  ));
+  const patchRows = (rows) => Array.isArray(rows)
+    ? rows.map((item) => ({ ...item, value: replaceVars(item?.value) }))
+    : rows;
+  return {
+    ...request,
+    url: replaceVars(request.url),
+    body: replaceVars(request.body),
+    graphqlVariables: typeof request.graphqlVariables === "string"
+      ? replaceVars(request.graphqlVariables)
+      : request.graphqlVariables,
+    headers: patchRows(request.headers),
+    queryParams: patchRows(request.queryParams),
+  };
+}
+
+function buildRunReport({ collectionName, folderFilter, dataRows, summary, results }) {
+  return {
+    collection: collectionName || "",
+    folder: folderFilter || "All folders",
+    dataRows: dataRows.length,
+    summary,
+    generatedAt: new Date().toISOString(),
+    results: results.map((item) => ({
+      name: item.name,
+      method: item.method,
+      url: item.url,
+      dataRow: item.dataRowName || "",
+      status: item.status,
+      statusCode: item.statusCode,
+      duration: item.duration,
+      attempts: item.attempts,
+      tests: item.tests || [],
+      error: item.error || "",
+    })),
+  };
 }
 
 function buildRunnerResponse(result, request) {
@@ -60,8 +135,12 @@ function runStatusTone(status) {
 export function CollectionRunner({ workspace, collection }) {
   const [folderFilter, setFolderFilter] = useState("");
   const [retryCount, setRetryCount] = useState(0);
+  const [stopOnFailure, setStopOnFailure] = useState(false);
+  const [dataSource, setDataSource] = useState("");
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState([]);
+  const [runHistory, setRunHistory] = useState([]);
+  const stopRequestedRef = useRef(false);
 
   const folders = useMemo(() => {
     const values = new Set();
@@ -77,20 +156,32 @@ export function CollectionRunner({ workspace, collection }) {
     [collection, folderFilter]
   );
 
+  const dataRows = useMemo(() => parseRunnerDataRows(dataSource), [dataSource]);
+
+  const runItems = useMemo(() => {
+    const rows = dataRows.length ? dataRows : [{ id: "default", values: null }];
+    return rows.flatMap((row, rowIndex) => runnable.map(({ request, index }) => ({
+      request: applyRunnerDataRow(request, row),
+      index,
+      id: `${row.id}-${index}-${request.name}`,
+      dataRowName: dataRows.length ? `Row ${rowIndex + 1}` : "",
+      dataValues: row.values,
+    })));
+  }, [dataRows, runnable]);
+
   const summary = useMemo(() => {
     const done = results.filter((item) => item.status === "passed" || item.status === "failed");
     const passed = done.filter((item) => item.status === "passed").length;
     const failed = done.filter((item) => item.status === "failed").length;
     const tests = results.flatMap((item) => item.tests || []);
-    return { total: runnable.length, done: done.length, passed, failed, tests: tests.length };
-  }, [results, runnable.length]);
+    return { total: runItems.length, done: done.length, passed, failed, tests: tests.length };
+  }, [results, runItems.length]);
 
   function patchResult(id, patch) {
     setResults((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
-  async function runOne({ request, index }) {
-    const id = `${index}-${request.name}`;
+  async function runOne({ request, index, id, dataRowName, dataValues }) {
     patchResult(id, { status: "running", error: "", attempts: 0 });
     let attempts = 0;
     let lastError = "";
@@ -145,9 +236,11 @@ export function CollectionRunner({ workspace, collection }) {
           duration: response.duration,
           attempts,
           tests,
+          dataRowName,
+          dataValues,
           error: failedTests.map((test) => `${test.name}: ${test.error || "failed"}`).join("\n"),
         });
-        return;
+        return passed;
       } catch (error) {
         lastError = error?.message || String(error);
       }
@@ -159,34 +252,76 @@ export function CollectionRunner({ workspace, collection }) {
       duration: "-",
       attempts,
       tests: [],
+      dataRowName,
+      dataValues,
       error: lastError,
     });
+    return false;
   }
 
   async function runCollection() {
-    if (isRunning || runnable.length === 0) return;
+    if (isRunning || runItems.length === 0) return;
+    stopRequestedRef.current = false;
     setIsRunning(true);
-    setResults(runnable.map(({ request, index }) => ({
-      id: `${index}-${request.name}`,
+    const queued = runItems.map(({ request, index, id, dataRowName, dataValues }) => ({
+      id,
       name: request.name,
       method: request.method,
       url: request.url,
       folderPath: request.folderPath || "",
+      dataRowName,
+      dataValues,
       status: "queued",
       attempts: 0,
       statusCode: 0,
       duration: "-",
       tests: [],
       error: "",
-    })));
+    }));
+    setResults(queued);
 
     try {
-      for (const item of runnable) {
-        await runOne(item);
+      for (const item of runItems) {
+        if (stopRequestedRef.current) {
+          setResults((current) => current.map((result) => result.status === "queued" ? { ...result, status: "skipped" } : result));
+          break;
+        }
+        const passed = await runOne(item);
+        if (!passed && stopOnFailure) {
+          setResults((current) => current.map((result) => result.status === "queued" ? { ...result, status: "skipped" } : result));
+          break;
+        }
       }
     } finally {
       setIsRunning(false);
+      setRunHistory((current) => [{
+        id: `run-${Date.now()}`,
+        ranAt: new Date().toISOString(),
+        collectionName: collection?.name || "",
+        folderFilter,
+        dataRows: dataRows.length,
+      }, ...current].slice(0, 8));
     }
+  }
+
+  function stopRun() {
+    stopRequestedRef.current = true;
+  }
+
+  async function copyReport() {
+    const report = buildRunReport({ collectionName: collection?.name, folderFilter, dataRows, summary, results });
+    await navigator.clipboard.writeText(JSON.stringify(report, null, 2));
+  }
+
+  function downloadReport() {
+    const report = buildRunReport({ collectionName: collection?.name, folderFilter, dataRows, summary, results });
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${collection?.name || "collection"}-run-report.json`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -221,7 +356,22 @@ export function CollectionRunner({ workspace, collection }) {
               className="h-9 w-24 border-border/35 bg-background/40 text-[12px]"
               placeholder="Retries"
             />
-            <Button type="button" className="h-9 gap-2" onClick={runCollection} disabled={isRunning || runnable.length === 0}>
+            <label className="flex h-9 items-center gap-2 border border-border/35 bg-background/30 px-3 text-[12px] text-foreground">
+              <input
+                type="checkbox"
+                className="accent-primary"
+                checked={stopOnFailure}
+                onChange={(event) => setStopOnFailure(event.target.checked)}
+              />
+              Stop on fail
+            </label>
+            {isRunning ? (
+              <Button type="button" variant="outline" className="h-9 gap-2" onClick={stopRun}>
+                <Square className="h-3.5 w-3.5" />
+                Stop
+              </Button>
+            ) : null}
+            <Button type="button" className="h-9 gap-2" onClick={runCollection} disabled={isRunning || runItems.length === 0}>
               {isRunning ? <RotateCcw className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
               {isRunning ? "Running" : "Run"}
             </Button>
@@ -234,35 +384,65 @@ export function CollectionRunner({ workspace, collection }) {
           <div className="px-3 py-2 text-muted-foreground">Failed <span className="font-semibold text-red-500">{summary.failed}</span></div>
           <div className="px-3 py-2 text-muted-foreground">Tests <span className="font-semibold text-foreground">{summary.tests}</span></div>
         </div>
+        <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_240px]">
+          <textarea
+            value={dataSource}
+            onChange={(event) => setDataSource(event.target.value)}
+            placeholder={'Data rows JSON or CSV. Example: [{"userId":"42"}]'}
+            className="min-h-[76px] border border-border/30 bg-background/25 px-3 py-2 font-mono text-[11px] text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50"
+          />
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <FileText className="h-3.5 w-3.5 text-primary" />
+              {dataRows.length ? `${dataRows.length} data row(s) loaded` : "No data rows loaded"}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="h-8 flex-1 gap-1.5 text-[11px]" onClick={copyReport} disabled={!results.length}>
+                <Copy className="h-3.5 w-3.5" />
+                Copy
+              </Button>
+              <Button type="button" variant="outline" className="h-8 flex-1 gap-1.5 text-[11px]" onClick={downloadReport} disabled={!results.length}>
+                <Download className="h-3.5 w-3.5" />
+                Report
+              </Button>
+            </div>
+            <div className="text-[10px] text-muted-foreground">
+              Recent runs: {runHistory.length ? runHistory.map((run) => new Date(run.ranAt).toLocaleTimeString()).join(", ") : "none"}
+            </div>
+          </div>
+        </div>
       </Card>
 
       <Card className="min-h-0 overflow-hidden border border-border/35 bg-[hsl(var(--sidebar))]/98 shadow-[0_8px_22px_hsl(var(--background)/0.2)]">
-        <div className="grid grid-cols-[52px_92px_minmax(0,1.4fr)_92px_92px_minmax(0,1fr)] border-b border-border/25 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+        <div className="grid grid-cols-[52px_92px_minmax(0,1.4fr)_86px_92px_92px_minmax(0,1fr)] border-b border-border/25 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
           <div>#</div>
           <div>Method</div>
           <div>Request</div>
+          <div>Data</div>
           <div>Status</div>
           <div>Time</div>
           <div>Assertions</div>
         </div>
         <div className="thin-scrollbar h-full min-h-0 overflow-auto">
-          {(results.length ? results : runnable.map(({ request, index }) => ({
-            id: `${index}-${request.name}`,
+          {(results.length ? results : runItems.map(({ request, index, id, dataRowName }) => ({
+            id,
             name: request.name,
             method: request.method,
             url: request.url,
+            dataRowName,
             status: "queued",
             duration: "-",
             tests: [],
             error: "",
           }))).map((item, index) => (
-            <div key={item.id} className="grid grid-cols-[52px_92px_minmax(0,1.4fr)_92px_92px_minmax(0,1fr)] items-center border-b border-border/12 px-3 py-2 text-[12px]">
+            <div key={item.id} className="grid grid-cols-[52px_92px_minmax(0,1.4fr)_86px_92px_92px_minmax(0,1fr)] items-center border-b border-border/12 px-3 py-2 text-[12px]">
               <div className="text-muted-foreground">{index + 1}</div>
               <div className="font-semibold text-foreground">{item.method || "GET"}</div>
               <div className="min-w-0">
                 <div className="truncate font-medium text-foreground">{item.name}</div>
                 <div className="truncate text-[11px] text-muted-foreground">{item.url || "-"}</div>
               </div>
+              <div className="truncate text-[11px] text-muted-foreground">{item.dataRowName || "-"}</div>
               <div className={cn("flex items-center gap-1.5 font-medium", runStatusTone(item.status))}>
                 {item.status === "passed" ? <CheckCircle2 className="h-3.5 w-3.5" /> : item.status === "failed" ? <XCircle className="h-3.5 w-3.5" /> : null}
                 {item.statusCode || item.status}
@@ -276,7 +456,7 @@ export function CollectionRunner({ workspace, collection }) {
               </div>
             </div>
           ))}
-          {runnable.length === 0 ? (
+          {runItems.length === 0 ? (
             <div className="p-8 text-center text-[12px] text-muted-foreground">
               No HTTP or GraphQL requests found for this scope.
             </div>
