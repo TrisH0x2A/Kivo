@@ -14,3 +14,8 @@ test("validateScriptSource blocks renderer globals", () => {
 test("validateScriptSource blocks constructor escape attempts", () => {
   assert.equal(validateScriptSource("kivo.log(({}).constructor);"), "Blocked unsafe script token: constructor");
 });
+
+test("validateScriptSource blocks module runtime probes", () => {
+  assert.equal(validateScriptSource("process.env"), "Blocked unsafe script token: process");
+  assert.equal(validateScriptSource("await import('node:fs')"), "Blocked unsafe script token: import");
+});
