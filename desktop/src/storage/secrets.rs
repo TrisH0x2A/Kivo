@@ -1,4 +1,8 @@
 use std::fs;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use std::io::Write;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use std::process::{Command, Stdio};
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -14,6 +18,10 @@ const AUTH_ENCRYPTION_PREFIX: &str = "enc:v1:";
 const AUTH_ENCRYPTION_SALT: &[u8] = b"kivo-auth-encryption-salt-v1";
 const AUTH_ENCRYPTION_ITERATIONS: u32 = 100_000;
 const PROTECTED_SEED_PREFIX: &str = "dpapi:v1:";
+#[cfg(target_os = "macos")]
+const KEYCHAIN_SEED_MARKER: &str = "keychain:v1:com.kivo.desktop.auth-seed";
+#[cfg(target_os = "linux")]
+const SECRET_SERVICE_SEED_MARKER: &str = "secret-service:v1:kivo-auth-seed";
 
 #[cfg(windows)]
 fn protect_seed(seed: &str) -> Result<String, String> {
@@ -102,14 +110,110 @@ fn unprotect_seed(value: &str) -> Result<String, String> {
     Ok(seed)
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
 fn protect_seed(seed: &str) -> Result<String, String> {
-    Ok(seed.to_string())
+    let output = Command::new("security")
+        .args([
+            "add-generic-password",
+            "-U",
+            "-a",
+            "Kivo",
+            "-s",
+            "com.kivo.desktop.auth-seed",
+            "-w",
+            seed,
+        ])
+        .output()
+        .map_err(|e| format!("Failed to open macOS Keychain: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to protect auth seed with macOS Keychain: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(KEYCHAIN_SEED_MARKER.to_string())
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
 fn unprotect_seed(value: &str) -> Result<String, String> {
-    Ok(value.to_string())
+    if value != KEYCHAIN_SEED_MARKER {
+        return Err("Auth secret seed is not stored in macOS Keychain.".to_string());
+    }
+    let output = Command::new("security")
+        .args([
+            "find-generic-password",
+            "-a",
+            "Kivo",
+            "-s",
+            "com.kivo.desktop.auth-seed",
+            "-w",
+        ])
+        .output()
+        .map_err(|e| format!("Failed to read macOS Keychain: {e}"))?;
+    if !output.status.success() {
+        return Err("Kivo auth seed was not found in macOS Keychain.".to_string());
+    }
+    String::from_utf8(output.stdout)
+        .map(|seed| seed.trim().to_string())
+        .map_err(|e| format!("macOS Keychain returned invalid text: {e}"))
+}
+
+#[cfg(target_os = "linux")]
+fn protect_seed(seed: &str) -> Result<String, String> {
+    let mut child = Command::new("secret-tool")
+        .args([
+            "store",
+            "--label=Kivo authentication vault",
+            "application",
+            "kivo",
+            "purpose",
+            "auth-seed",
+        ])
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| {
+            format!("Failed to open Linux Secret Service (install libsecret-tools): {e}")
+        })?;
+    child
+        .stdin
+        .as_mut()
+        .ok_or_else(|| "Failed to open Linux Secret Service input.".to_string())?
+        .write_all(seed.as_bytes())
+        .map_err(|e| format!("Failed to write auth seed to Linux Secret Service: {e}"))?;
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("Failed to store auth seed in Linux Secret Service: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "Failed to protect auth seed with Linux Secret Service: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(SECRET_SERVICE_SEED_MARKER.to_string())
+}
+
+#[cfg(target_os = "linux")]
+fn unprotect_seed(value: &str) -> Result<String, String> {
+    if value != SECRET_SERVICE_SEED_MARKER {
+        return Err("Auth secret seed is not stored in Linux Secret Service.".to_string());
+    }
+    let output = Command::new("secret-tool")
+        .args(["lookup", "application", "kivo", "purpose", "auth-seed"])
+        .output()
+        .map_err(|e| format!("Failed to read Linux Secret Service: {e}"))?;
+    if !output.status.success() || output.stdout.is_empty() {
+        return Err("Kivo auth seed was not found in Linux Secret Service.".to_string());
+    }
+    String::from_utf8(output.stdout)
+        .map(|seed| seed.trim().to_string())
+        .map_err(|e| format!("Linux Secret Service returned invalid text: {e}"))
+}
+
+fn is_protected_seed(value: &str) -> bool {
+    value.starts_with(PROTECTED_SEED_PREFIX)
+        || cfg!(target_os = "macos") && value.starts_with("keychain:v1:")
+        || cfg!(target_os = "linux") && value.starts_with("secret-service:v1:")
 }
 
 #[tauri::command]
@@ -127,7 +231,7 @@ pub fn get_or_create_auth_secret_seed(app: AppHandle) -> Result<String, String> 
             .map_err(|e| format!("Failed to read auth secret seed: {e}"))?;
         let trimmed = seed.trim();
         if !trimmed.is_empty() {
-            if trimmed.starts_with(PROTECTED_SEED_PREFIX) {
+            if is_protected_seed(trimmed) {
                 return unprotect_seed(trimmed);
             }
 
