@@ -343,57 +343,6 @@ export async function runRequestScript({
     };
   }
 
-  const requestApi = {
-    get method() {
-      return requestDraft.method;
-    },
-    set method(value) {
-      requestDraft.method = String(value ?? "GET").toUpperCase();
-    },
-    get url() {
-      return requestDraft.url;
-    },
-    set url(value) {
-      requestDraft.url = String(value ?? "");
-    },
-    get body() {
-      return requestDraft.body;
-    },
-    set body(value) {
-      requestDraft.body = String(value ?? "");
-    },
-    get graphqlVariables() {
-      return requestDraft.graphqlVariables;
-    },
-    set graphqlVariables(value) {
-      requestDraft.graphqlVariables = typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2);
-    },
-    addQueryParam(key, value, enabled = true) {
-      upsertRow(requestDraft.queryParams, key, value, enabled);
-    },
-    removeQueryParam(key) {
-      removeRowsByKey(requestDraft.queryParams, key);
-    },
-    addHeader(key, value, enabled = true) {
-      upsertRow(requestDraft.headers, key, value, enabled);
-    },
-    removeHeader(key) {
-      removeRowsByKey(requestDraft.headers, key);
-    },
-    setBody(value) {
-      requestDraft.body = String(value ?? "");
-    },
-    setGraphqlVariables(value) {
-      requestDraft.graphqlVariables = typeof value === "string" ? value : JSON.stringify(value ?? {}, null, 2);
-    },
-    setMethod(value) {
-      requestDraft.method = String(value ?? "GET").toUpperCase();
-    },
-    setUrl(value) {
-      requestDraft.url = String(value ?? "");
-    },
-  };
-
   const responseApi = {
     status: Number(response?.status ?? 0),
     statusText: String(response?.statusText ?? ""),
@@ -406,116 +355,27 @@ export async function runRequestScript({
     },
   };
 
-  const kivo = {
-    execution: {
-      location: phase,
-      phase,
-    },
-    request: requestApi,
-    response: responseApi,
-    vars: {
-      get(key) {
-        return varsStore.get(String(key));
-      },
-      set(key, value) {
-        varsStore.set(String(key), value);
-      },
-      unset(key) {
-        varsStore.delete(String(key));
-      },
-      has(key) {
-        return varsStore.has(String(key));
-      },
-      all() {
-        return Object.fromEntries(varsStore.entries());
-      },
-    },
-    expect: createExpect,
-    assert(condition, message = "Assertion failed") {
-      if (!condition) {
-        throw new Error(String(message));
-      }
-    },
-    async test(name, fn) {
-      const label = String(name || "Unnamed test");
-      try {
-        await fn();
-        tests.push({ name: label, ok: true });
-      } catch (error) {
-        const message = error?.message || String(error);
-        tests.push({ name: label, ok: false, error: message });
-      }
-    },
-    log(...parts) {
-      logs.push(parts.map(stringifyLogPart).join(" "));
-    },
-    wait(ms) {
-      const timeout = Number(ms);
-      const delay = Math.min(Number.isFinite(timeout) && timeout > 0 ? timeout : 0, MAX_WAIT_MS);
-      return new Promise((resolve) => {
-        setTimeout(resolve, delay);
-      });
-    },
-  };
-
   try {
-    if (canUseWorkerSandbox()) {
-      const workerResult = await runScriptInWorker({
-        source,
-        phase,
-        requestDraft,
-        responseApi,
-        vars: Object.fromEntries(varsStore.entries()),
-      });
-      return {
-        ok: Boolean(workerResult?.ok),
-        request: workerResult?.request || requestDraft,
-        logs: Array.isArray(workerResult?.logs) ? workerResult.logs : [],
-        tests: Array.isArray(workerResult?.tests) ? workerResult.tests : [],
-        context: {
-          vars: workerResult?.vars && typeof workerResult.vars === "object" ? workerResult.vars : Object.fromEntries(varsStore.entries()),
-        },
-        error: String(workerResult?.error || ""),
-      };
+    if (!canUseWorkerSandbox()) {
+      throw new Error("Secure script workers are unavailable. Script execution was blocked.");
     }
 
-    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    const execute = new AsyncFunction(
-      "kivo",
-      "window",
-      "document",
-      "globalThis",
-      "self",
-      "localStorage",
-      "sessionStorage",
-      "indexedDB",
-      "caches",
-      "navigator",
-      "location",
-      "fetch",
-      "XMLHttpRequest",
-      "WebSocket",
-      "EventSource",
-      "Worker",
-      "SharedWorker",
-      "importScripts",
-      "eval",
-      "Function",
-      `"use strict";\n${source}`
-    );
-    await Promise.race([
-      execute(kivo),
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`Script timed out after ${SCRIPT_TIMEOUT_MS} ms.`)), SCRIPT_TIMEOUT_MS)),
-    ]);
+    const workerResult = await runScriptInWorker({
+      source,
+      phase,
+      requestDraft,
+      responseApi,
+      vars: Object.fromEntries(varsStore.entries()),
+    });
     return {
-      ok: true,
-      request: requestDraft,
-      logs,
-      tests,
+      ok: Boolean(workerResult?.ok),
+      request: workerResult?.request || requestDraft,
+      logs: Array.isArray(workerResult?.logs) ? workerResult.logs : [],
+      tests: Array.isArray(workerResult?.tests) ? workerResult.tests : [],
       context: {
-        vars: Object.fromEntries(varsStore.entries()),
+        vars: workerResult?.vars && typeof workerResult.vars === "object" ? workerResult.vars : Object.fromEntries(varsStore.entries()),
       },
-      error: "",
+      error: String(workerResult?.error || ""),
     };
   } catch (error) {
     return {
