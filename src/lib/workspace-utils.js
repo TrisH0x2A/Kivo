@@ -1,22 +1,10 @@
 import { createDefaultAppSettings, createDefaultStore, normalizeRequestRecord, orderRequests } from "./workspace-store.js";
 import { normalizeAuthState } from "./oauth.js";
+export { parseCookies, splitSetCookieHeader } from "./cookie-utils.js";
 
 export const SIDEBAR_COLLAPSED_WIDTH = 52;
 export const SIDEBAR_MIN_WIDTH = 220;
 export const SIDEBAR_REOPEN_WIDTH = 260;
-
-export function parseCookies(headers) {
-  const cookieHeader = Object.entries(headers).find(([key]) => key.toLowerCase() === "set-cookie");
-
-  if (!cookieHeader) {
-    return [];
-  }
-
-  return String(cookieHeader[1])
-    .split(",")
-    .map((cookie) => cookie.trim())
-    .filter(Boolean);
-}
 
 export function clampSidebarWidth(value) {
   return Math.min(420, Math.max(SIDEBAR_MIN_WIDTH, value));
