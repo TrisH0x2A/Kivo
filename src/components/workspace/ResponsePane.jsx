@@ -13,6 +13,8 @@ import { CookieManagerModal, parseSetCookieString } from "@/components/workspace
 import { JsonTree } from "@/components/ui/JsonTree.jsx";
 
 const responseTabs = ["Body", "Headers", "Cookies", "Meta"];
+const MAX_EDITOR_PREVIEW_CHARS = 1_000_000;
+const MAX_JSON_TREE_CHARS = 2_000_000;
 
 function getTone(status) {
   if (status >= 200 && status < 400) {
@@ -77,6 +79,7 @@ export function ResponsePane({
   const isJson = response.isJson;
   const isBinary = Boolean(response.isBinary);
   const responseBodyLanguage = detectResponseLanguage(contentType, response.body || response.rawBody, isJson);
+  const jsonTreeTooLarge = isJson && String(response.body || "").length > MAX_JSON_TREE_CHARS;
 
   let bodyViews = ["Raw"];
   if (isJson) {
@@ -91,13 +94,13 @@ export function ResponsePane({
   }
 
   const parsedJson = useMemo(() => {
-    if (!isJson) return null;
+    if (!isJson || jsonTreeTooLarge) return null;
     try {
       return JSON.parse(response.body);
     } catch {
       return null;
     }
-  }, [response.body, isJson]);
+  }, [response.body, isJson, jsonTreeTooLarge]);
 
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -154,6 +157,11 @@ export function ResponsePane({
   const totalMatches = filteredJson ? (Array.isArray(filteredJson) ? filteredJson.length : Object.keys(filteredJson).length) : 0;
   const isResultCapped = searchQuery && Array.isArray(filteredJson) && filteredJson.length > MAX_DISPLAY;
   const elapsedLabel = `${(elapsedMs / 1000).toFixed(1)}s`;
+  const editorBodyValue = currentView === "JSON" && isJson ? response.body : response.rawBody;
+  const editorPreviewValue = String(editorBodyValue || "").length > MAX_EDITOR_PREVIEW_CHARS
+    ? `${String(editorBodyValue || "").slice(0, MAX_EDITOR_PREVIEW_CHARS)}\n\n[Preview truncated by Kivo. Save or copy the response to inspect the full body.]`
+    : editorBodyValue;
+  const isEditorPreviewCapped = String(editorBodyValue || "").length > MAX_EDITOR_PREVIEW_CHARS;
 
   const responseCookiesPreview = useMemo(() => {
     return (response.cookies || [])
@@ -353,6 +361,12 @@ export function ResponsePane({
                   </div>
                 )}
               </div>
+            ) : currentView === "Tree" && isJson && jsonTreeTooLarge ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 border border-border/10 bg-transparent p-6 text-center text-muted-foreground">
+                <FileJson2 className="h-8 w-8 text-primary/70" />
+                <div className="text-[13px] font-medium text-foreground">JSON tree paused for this response</div>
+                <div className="max-w-md text-[12px]">The body is large enough that parsing it into the interactive tree could slow the app. Use JSON or Raw preview, or save the full response to a file.</div>
+              </div>
             ) : currentView === "Preview" ? (
               <div className="h-full overflow-hidden rounded bg-white border border-border/10 shadow-inner">
                 <iframe
@@ -365,10 +379,10 @@ export function ResponsePane({
             ) : (
               <CodeEditor
                 readOnly
-                value={currentView === "JSON" && isJson ? response.body : response.rawBody}
+                value={editorPreviewValue}
                 language={currentView === "Raw" ? "text" : (currentView === "JSON" && isJson ? "json" : responseBodyLanguage)}
                 wrapLines
-                placeholder="Response body will appear here"
+                placeholder={isEditorPreviewCapped ? "Large response preview is truncated" : "Response body will appear here"}
               />
             )}
           </div>
