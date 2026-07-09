@@ -467,7 +467,7 @@ fn import_openapi_like(value: &Value, format: &str) -> CollectionRecord {
             let Some(path_obj) = path_item.as_object() else {
                 continue;
             };
-            for method in ["get", "post", "put", "patch", "delete", "head", "options"] {
+            for method in ["get", "query", "post", "put", "patch", "delete", "head", "options", "trace"] {
                 let Some(op) = path_obj.get(method) else {
                     continue;
                 };

@@ -38,6 +38,7 @@
   --sidebar-foreground: 24 18% 15%;
   --sidebar-border: 32 20% 79%;
   --tone-get: 208 88% 36%;
+  --tone-query: 188 87% 31%;
   --tone-post: 145 67% 28%;
   --tone-put: 31 92% 32%;
   --tone-patch: 270 55% 38%;
@@ -116,6 +117,7 @@
   --sidebar-foreground: 216 24% 88%;
   --sidebar-border: 223 12% 24%;
   --tone-get: 207 100% 69%;
+  --tone-query: 186 94% 58%;
   --tone-post: 120 41% 67%;
   --tone-put: 35 78% 65%;
   --tone-patch: 283 55% 70%;
@@ -446,6 +448,7 @@
   --sidebar-foreground: 240 20% 91%;
   --sidebar-border: 335 7% 25%;
   --tone-get: 221 36% 69%;
+  --tone-query: 186 54% 48%;
   --tone-post: 93 59% 50%;
   --tone-put: 32 58% 51%;
   --tone-patch: 253 34% 69%;
@@ -923,6 +926,7 @@
   --env-suggestion-active-border: 212 92% 45%;
   --env-suggestion-value: 215 16% 42%;
   --tone-get: 208 88% 36%;
+  --tone-query: 188 87% 31%;
   --tone-post: 145 67% 28%;
   --tone-put: 31 92% 32%;
   --tone-patch: 270 55% 38%;
@@ -970,6 +974,7 @@
   --env-suggestion-active-border: 207 100% 69%;
   --env-suggestion-value: 216 14% 70%;
   --tone-get: 207 100% 69%;
+  --tone-query: 186 94% 58%;
   --tone-post: 120 41% 67%;
   --tone-put: 35 78% 65%;
   --tone-patch: 283 55% 70%;
@@ -1223,6 +1228,14 @@
 
   .tone-get-bg {
     background-color: hsl(var(--tone-get) / 0.12);
+  }
+
+  .tone-query-text {
+    color: hsl(var(--tone-query));
+  }
+
+  .tone-query-bg {
+    background-color: hsl(var(--tone-query) / 0.13);
   }
 
   .tone-post-text {

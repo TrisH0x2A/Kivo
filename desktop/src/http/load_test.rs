@@ -390,7 +390,7 @@ fn build_request_bytes(
 }
 
 fn method_requires_length(m: &str) -> bool {
-    matches!(m, "POST" | "PUT" | "PATCH" | "DELETE")
+    matches!(m, "QUERY" | "POST" | "PUT" | "PATCH" | "DELETE")
 }
 
 fn itoa_u64(n: u64) -> String {

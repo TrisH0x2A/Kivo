@@ -63,7 +63,7 @@ fn round1_keeps_one_decimal_and_handles_non_finite() {
 
 #[test]
 fn method_requires_length_only_for_mutating_verbs() {
-    for m in ["POST", "PUT", "PATCH", "DELETE"] {
+    for m in ["QUERY", "POST", "PUT", "PATCH", "DELETE"] {
         assert!(method_requires_length(m), "{m} should require length");
     }
     for m in ["GET", "HEAD", "OPTIONS", "TRACE", ""] {

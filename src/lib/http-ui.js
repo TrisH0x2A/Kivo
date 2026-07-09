@@ -4,6 +4,7 @@ import { resolveTemplateVariables } from "@/lib/template-variables.js";
 
 const methodTones = {
   GET: "tone-get-text tone-get-bg",
+  QUERY: "tone-query-text tone-query-bg",
   POST: "tone-post-text tone-post-bg",
   PUT: "tone-put-text tone-put-bg",
   PATCH: "tone-patch-text tone-patch-bg",
@@ -800,7 +801,7 @@ function buildPhpSnippet(requestExport) {
 
 function buildRubySnippet(requestExport) {
   const { method, url, headers, body, hasBody } = requestExport;
-  const className = { GET: "Get", POST: "Post", PUT: "Put", PATCH: "Patch", DELETE: "Delete" }[method] ?? "Get";
+  const className = { GET: "Get", POST: "Post", PUT: "Put", PATCH: "Patch", DELETE: "Delete", HEAD: "Head", OPTIONS: "Options" }[method] ?? "";
   const headerLines = Object.entries(headers).map(([key, value]) => `request[${quoteString(key)}] = ${quoteString(value)}`);
 
   return [
@@ -811,7 +812,9 @@ function buildRubySnippet(requestExport) {
     "http = Net::HTTP.new(url.host, url.port)",
     'http.use_ssl = url.scheme == "https"',
     "",
-    `request = Net::HTTP::${className}.new(url)`,
+    className
+      ? `request = Net::HTTP::${className}.new(url)`
+      : `request = Net::HTTPGenericRequest.new(${quoteString(method)}, true, ${hasBody ? "true" : "false"}, url)`,
     ...headerLines,
     hasBody ? `request.body = ${quoteString(body)}` : null,
     "",

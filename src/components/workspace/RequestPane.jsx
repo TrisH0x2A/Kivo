@@ -20,7 +20,7 @@ import { LoadTestPane } from "@/components/workspace/LoadTestPane.jsx";
 import { RequestTabBar } from "@/components/workspace/RequestTabBar.jsx";
 
 const tabs = ["Params", "Body", "Auth", "Headers", "Scripts", "Docs", "Settings", "Load Test"];
-const requestMethods = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+const requestMethods = ["GET", "QUERY", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const DEFAULT_USER_AGENT_VALUE = "kivo/0.4.1";
 const webSocketBodyModes = [
   { value: "json", label: "JSON" },
