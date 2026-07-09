@@ -780,7 +780,10 @@ export function useWorkspaceStore() {
   }, []);
 
   function updateStore(updater) {
-    setStore((current) => normalizeStore(typeof updater === "function" ? updater(current) : updater));
+    setStore((current) => {
+      const next = typeof updater === "function" ? updater(current) : updater;
+      return next && typeof next === "object" ? next : current;
+    });
   }
 
   function recordRequestHistory({ request, workspaceName, collectionName, response: savedResponse, url, error = "" }) {
