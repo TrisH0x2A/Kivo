@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { applyRunnerDataRow, parseCsvTable, parseRunnerDataRows } from "../src/lib/collection-runner.js";
+import { applyRunnerDataRow, getRunnableRequests, normalizeRunnerFolderPath, parseCsvTable, parseRunnerDataRows } from "../src/lib/collection-runner.js";
 
 test("parseCsvTable supports quoted commas and escaped quotes", () => {
   assert.deepEqual(parseCsvTable('name,query\n"Ada, Lovelace","say ""hi"""'), [
@@ -32,4 +32,20 @@ test("applyRunnerDataRow replaces request placeholders", () => {
     headers: [{ key: "X-Name", value: "Ada", enabled: true }],
     queryParams: [{ key: "id", value: "42", enabled: true }],
   });
+});
+
+test("getRunnableRequests normalizes folder filters", () => {
+  const collection = {
+    requests: [
+      { name: "List", requestMode: "http", folderPath: " users / active " },
+      { name: "Stream", requestMode: "sse", folderPath: "users/active" },
+      { name: "Query", requestMode: "graphql", folderPath: "users/active" },
+    ],
+  };
+
+  assert.equal(normalizeRunnerFolderPath(" users / active "), "users/active");
+  assert.deepEqual(
+    getRunnableRequests(collection, "users/active").map(({ request }) => request.name),
+    ["List", "Query"]
+  );
 });
