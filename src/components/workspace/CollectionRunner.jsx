@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CheckCircle2, Copy, Download, FileText, ListChecks, Play, RotateCcw, Square, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { buildRequestPayload } from "@/lib/http-ui.js";
 import { formatSavedAt, REQUEST_MODES } from "@/lib/workspace-store.js";
-import { sendHttpRequest } from "@/lib/http-client.js";
+import { cancelHttpRequest, sendHttpRequest } from "@/lib/http-client.js";
 import { formatResponseBody, isJsonText } from "@/lib/formatters.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
 import { cn } from "@/lib/utils.js";
@@ -27,6 +27,48 @@ function getRunnableRequests(collection, folderFilter) {
     .map((request, index) => ({ request, index }));
 }
 
+function parseCsvTable(text) {
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        cell += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        cell += char;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      row.push(cell);
+      cell = "";
+    } else if (char === "\n") {
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else if (char !== "\r") {
+      cell += char;
+    }
+  }
+
+  row.push(cell);
+  rows.push(row);
+  return rows.filter((entry) => entry.some((value) => String(value || "").trim()));
+}
+
 function parseRunnerDataRows(source) {
   const text = String(source || "").trim();
   if (!text) return [];
@@ -43,12 +85,11 @@ function parseRunnerDataRows(source) {
     }
   } catch {}
 
-  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((part) => part.trim()).filter(Boolean);
+  const csvRows = parseCsvTable(text);
+  if (csvRows.length < 2) return [];
+  const headers = csvRows[0].map((part) => part.trim()).filter(Boolean);
   if (!headers.length) return [];
-  return lines.slice(1).map((line, index) => {
-    const cells = line.split(",");
+  return csvRows.slice(1).map((cells, index) => {
     const values = {};
     headers.forEach((header, cellIndex) => {
       values[header] = String(cells[cellIndex] ?? "").trim();
@@ -141,6 +182,8 @@ export function CollectionRunner({ workspace, collection }) {
   const [results, setResults] = useState([]);
   const [runHistory, setRunHistory] = useState([]);
   const stopRequestedRef = useRef(false);
+  const currentRequestIdRef = useRef("");
+  const runHistoryKey = useMemo(() => `kivo.runnerHistory.${workspace?.name || "workspace"}.${collection?.name || "collection"}`, [workspace?.name, collection?.name]);
 
   const folders = useMemo(() => {
     const values = new Set();
@@ -157,6 +200,23 @@ export function CollectionRunner({ workspace, collection }) {
   );
 
   const dataRows = useMemo(() => parseRunnerDataRows(dataSource), [dataSource]);
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(runHistoryKey);
+      const parsed = JSON.parse(raw || "[]");
+      setRunHistory(Array.isArray(parsed) ? parsed.slice(0, 8) : []);
+    } catch {
+      setRunHistory([]);
+    }
+  }, [runHistoryKey]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(runHistoryKey, JSON.stringify(runHistory.slice(0, 8)));
+    } catch {
+    }
+  }, [runHistory, runHistoryKey]);
 
   const runItems = useMemo(() => {
     const rows = dataRows.length ? dataRows : [{ id: "default", values: null }];
@@ -207,10 +267,15 @@ export function CollectionRunner({ workspace, collection }) {
           requestForSend = preRun.request || request;
         }
 
+        const requestId = `runner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        currentRequestIdRef.current = requestId;
         const result = await sendHttpRequest({
           ...buildRequestPayload(requestForSend, workspace?.name || "", collection?.name || ""),
-          requestId: `runner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          requestId,
         });
+        if (currentRequestIdRef.current === requestId) {
+          currentRequestIdRef.current = "";
+        }
         const response = buildRunnerResponse(result, requestForSend);
         const afterSource = String(request.scriptAfterResponse || "").trim();
         let tests = [];
@@ -243,6 +308,10 @@ export function CollectionRunner({ workspace, collection }) {
         return passed;
       } catch (error) {
         lastError = error?.message || String(error);
+      } finally {
+        if (currentRequestIdRef.current.startsWith("runner-")) {
+          currentRequestIdRef.current = "";
+        }
       }
     }
 
@@ -306,6 +375,9 @@ export function CollectionRunner({ workspace, collection }) {
 
   function stopRun() {
     stopRequestedRef.current = true;
+    if (currentRequestIdRef.current) {
+      cancelHttpRequest(currentRequestIdRef.current).catch(() => {});
+    }
   }
 
   async function copyReport() {
