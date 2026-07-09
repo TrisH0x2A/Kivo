@@ -233,9 +233,7 @@ self.onmessage = async (event) => {
     },
   };
   try {
-    const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
-    const execute = new AsyncFunction(
-      "kivo",
+    const shadowedGlobals = [
       "window",
       "document",
       "globalThis",
@@ -255,9 +253,15 @@ self.onmessage = async (event) => {
       "importScripts",
       "eval",
       "Function",
-      \`"use strict";\\n\${source}\`
-    );
-    await execute(kivo);
+    ].join(", ");
+    const moduleSource = \`export default async function(kivo, \${shadowedGlobals}) {\\n"use strict";\\n\${source}\\n}\`;
+    const moduleUrl = URL.createObjectURL(new Blob([moduleSource], { type: "text/javascript" }));
+    try {
+      const scriptModule = await import(moduleUrl);
+      await scriptModule.default(kivo);
+    } finally {
+      URL.revokeObjectURL(moduleUrl);
+    }
     self.postMessage({ ok: true, request: requestDraft, logs, tests, vars: Object.fromEntries(varsStore.entries()), error: "" });
   } catch (error) {
     self.postMessage({ ok: false, request: requestDraft, logs, tests, vars: Object.fromEntries(varsStore.entries()), error: error?.message || String(error) });
@@ -270,7 +274,7 @@ function runScriptInWorker({ source, phase, requestDraft, responseApi, vars }) {
   return new Promise((resolve) => {
     const blob = new Blob([buildWorkerSource()], { type: "text/javascript" });
     const workerUrl = URL.createObjectURL(blob);
-    const worker = new Worker(workerUrl);
+    const worker = new Worker(workerUrl, { type: "module" });
     let finished = false;
     const finish = (result) => {
       if (finished) return;
