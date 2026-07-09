@@ -41,6 +41,25 @@ fn digest_auth_header_uses_sha256_digest_parts() {
 }
 
 #[test]
+fn parse_digest_challenge_reads_quoted_values() {
+    let challenge = parse_digest_challenge(
+        r#"Digest realm="api", nonce="abc123", qop="auth,auth-int", algorithm=SHA-256"#,
+    )
+    .expect("digest challenge");
+
+    assert_eq!(challenge.realm, "api");
+    assert_eq!(challenge.nonce, "abc123");
+    assert_eq!(challenge.qop, "auth,auth-int");
+    assert_eq!(challenge.algorithm, "SHA-256");
+}
+
+#[test]
+fn choose_digest_qop_prefers_auth() {
+    assert_eq!(choose_digest_qop("auth-int, auth", "auth"), "auth");
+    assert_eq!(choose_digest_qop("", "auth"), "auth");
+}
+
+#[test]
 fn parse_no_proxy_list_trims_and_lowers() {
     let list = parse_no_proxy_list("  FOO.com , ,bar.io ,,\tbaz.local\n");
     assert_eq!(list, vec!["foo.com", "bar.io", "baz.local"]);

@@ -15,7 +15,7 @@ use chrono::{DateTime, Duration as ChronoDuration, Utc};
 use prost::Message;
 use prost_types::FileDescriptorSet;
 use prost_reflect::{DescriptorPool, DynamicMessage, MethodDescriptor, ReflectMessage};
-use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT};
+use reqwest::header::{HeaderMap, HeaderName, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, COOKIE, SET_COOKIE, USER_AGENT, WWW_AUTHENTICATE};
 use reqwest::multipart;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -769,6 +769,42 @@ async fn send_http_request_with_cancel(
     }
 }
 
+async fn build_http_request_builder(
+    client: &reqwest::Client,
+    method: reqwest::Method,
+    url: &str,
+    headers: &HashMap<String, String>,
+    disable_user_agent: bool,
+    cookie_header: Option<&str>,
+    has_multipart_file_rows: bool,
+    body_rows: &[FormBodyRowPayload],
+    resolved_body_file_path: Option<&str>,
+    resolved_body: Option<&str>,
+) -> Result<reqwest::RequestBuilder, String> {
+    let mut request = client
+        .request(method, url)
+        .headers(build_headers(headers, disable_user_agent)?);
+
+    if let Some(cookie_header) = cookie_header {
+        request = request.header(COOKIE, cookie_header);
+    }
+
+    if has_multipart_file_rows {
+        request = request.multipart(build_multipart_form(body_rows).await?);
+    } else if let Some(path) = resolved_body_file_path {
+        if !path.trim().is_empty() {
+            let bytes = fs::read(path).map_err(|err| format!("Failed to read body file: {err}"))?;
+            request = request.body(bytes);
+        }
+    } else if let Some(body) = resolved_body {
+        if !body.trim().is_empty() {
+            request = request.body(body.to_string());
+        }
+    }
+
+    Ok(request)
+}
+
 #[tauri::command]
 pub async fn cancel_oauth_exchange(request_id: String) -> Result<bool, String> {
     let trimmed = request_id.trim().to_string();
@@ -879,6 +915,76 @@ fn build_digest_auth_header(
         parts.push(format!("cnonce=\"{cnonce}\""));
     }
     Some(format!("Digest {}", parts.join(", ")))
+}
+
+#[derive(Clone, Debug)]
+struct DigestChallenge {
+    realm: String,
+    nonce: String,
+    qop: String,
+    algorithm: String,
+}
+
+fn parse_digest_challenge(value: &str) -> Option<DigestChallenge> {
+    let trimmed = value.trim();
+    if !trimmed.to_ascii_lowercase().starts_with("digest ") {
+        return None;
+    }
+
+    let mut params = HashMap::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    for ch in trimmed[7..].chars() {
+        match ch {
+            '"' => {
+                in_quotes = !in_quotes;
+                current.push(ch);
+            }
+            ',' if !in_quotes => {
+                insert_digest_param(&mut params, &current);
+                current.clear();
+            }
+            _ => current.push(ch),
+        }
+    }
+    insert_digest_param(&mut params, &current);
+
+    let realm = params.remove("realm").unwrap_or_default();
+    let nonce = params.remove("nonce").unwrap_or_default();
+    if realm.is_empty() || nonce.is_empty() {
+        return None;
+    }
+
+    Some(DigestChallenge {
+        realm,
+        nonce,
+        qop: params.remove("qop").unwrap_or_else(|| "auth".to_string()),
+        algorithm: params.remove("algorithm").unwrap_or_else(|| "SHA-256".to_string()),
+    })
+}
+
+fn insert_digest_param(params: &mut HashMap<String, String>, raw: &str) {
+    let Some((key, value)) = raw.split_once('=') else {
+        return;
+    };
+    let key = key.trim().to_ascii_lowercase();
+    if key.is_empty() {
+        return;
+    }
+    let value = value.trim().trim_matches('"').to_string();
+    params.insert(key, value);
+}
+
+fn choose_digest_qop(challenge_qop: &str, fallback_qop: &str) -> String {
+    let options = challenge_qop
+        .split(',')
+        .map(|part| part.trim())
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>();
+    if options.iter().any(|part| part.eq_ignore_ascii_case("auth")) {
+        return "auth".to_string();
+    }
+    options.first().copied().unwrap_or(fallback_qop.trim()).to_string()
 }
 
 fn normalize_url(raw: &str) -> Result<String, String> {
@@ -2064,6 +2170,7 @@ pub async fn send_http_request(
         .map(|path| resolve_variables(path, &env_vars));
 
     let mut url = normalize_url(&resolved_url)?;
+    let mut digest_retry_credentials: Option<(String, String, String)> = None;
 
     if !merged_headers
         .keys()
@@ -2081,6 +2188,7 @@ pub async fn send_http_request(
                 } else {
                     resolve_variables(&auth.digest_qop, &env_vars)
                 };
+                digest_retry_credentials = Some((username.clone(), password.clone(), qop.clone()));
                 if let Some(header) = build_digest_auth_header(
                     &username,
                     &password,
@@ -2104,6 +2212,7 @@ pub async fn send_http_request(
                 } else {
                     resolve_variables(&auth.digest_qop, &env_vars)
                 };
+                digest_retry_credentials = Some((username.clone(), password.clone(), qop.clone()));
                 if let Some(header) = build_digest_auth_header(
                     &username,
                     &password,
@@ -2196,9 +2305,6 @@ pub async fn send_http_request(
 
     let request_url = reqwest::Url::parse(&url)
         .map_err(|_| format!("Invalid URL: {url}"))?;
-    let mut request = client
-        .request(method.clone(), &url)
-        .headers(build_headers(&merged_headers, payload.disable_user_agent.unwrap_or(false))?);
 
     let use_cookie_jar = payload.use_cookie_jar.unwrap_or(true);
     let should_send_cookies = use_cookie_jar && app_settings.send_cookies_automatically;
@@ -2206,32 +2312,75 @@ pub async fn send_http_request(
     let has_cookie_header = merged_headers
         .keys()
         .any(|key| key.trim().eq_ignore_ascii_case("cookie"));
-    if should_send_cookies && !has_cookie_header {
-        if let Some(cookie_header) = build_cookie_header_from_store(
+    let cookie_header = if should_send_cookies && !has_cookie_header {
+        build_cookie_header_from_store(
             &app,
             &payload.workspace_name,
             &payload.collection_name,
             &request_url,
-        )? {
-            request = request.header(COOKIE, cookie_header);
-        }
-    }
+        )?
+    } else {
+        None
+    };
 
-    if has_multipart_file_rows {
-        request = request.multipart(build_multipart_form(&payload.body_rows).await?);
-    } else if let Some(path) = resolved_body_file_path {
-        if !path.trim().is_empty() {
-            let bytes = fs::read(&path).map_err(|err| format!("Failed to read body file: {err}"))?;
-            request = request.body(bytes);
-        }
-    } else if let Some(body) = resolved_body {
-        if !body.trim().is_empty() {
-            request = request.body(body);
-        }
-    }
+    let request = build_http_request_builder(
+        &client,
+        method.clone(),
+        &url,
+        &merged_headers,
+        payload.disable_user_agent.unwrap_or(false),
+        cookie_header.as_deref(),
+        has_multipart_file_rows,
+        &payload.body_rows,
+        resolved_body_file_path.as_deref(),
+        resolved_body.as_deref(),
+    )
+    .await?;
 
     let started_at = Instant::now();
-    let response = send_http_request_with_cancel(request, &mut cancel_rx).await?;
+    let mut response = send_http_request_with_cancel(request, &mut cancel_rx).await?;
+    if response.status().as_u16() == 401 {
+        if let Some((username, password, fallback_qop)) = digest_retry_credentials.as_ref() {
+            let digest_challenge = response
+                .headers()
+                .get_all(WWW_AUTHENTICATE)
+                .iter()
+                .filter_map(|value| value.to_str().ok())
+                .find_map(parse_digest_challenge);
+
+            if let Some(challenge) = digest_challenge {
+                if challenge.algorithm.trim().is_empty() || challenge.algorithm.eq_ignore_ascii_case("SHA-256") {
+                    let qop = choose_digest_qop(&challenge.qop, fallback_qop);
+                    if let Some(header) = build_digest_auth_header(
+                        username,
+                        password,
+                        &challenge.realm,
+                        &challenge.nonce,
+                        &qop,
+                        &payload.method,
+                        &url,
+                    ) {
+                        let mut retry_headers = merged_headers.clone();
+                        retry_headers.insert("Authorization".to_string(), header);
+                        let retry_request = build_http_request_builder(
+                            &client,
+                            method.clone(),
+                            &url,
+                            &retry_headers,
+                            payload.disable_user_agent.unwrap_or(false),
+                            cookie_header.as_deref(),
+                            has_multipart_file_rows,
+                            &payload.body_rows,
+                            resolved_body_file_path.as_deref(),
+                            resolved_body.as_deref(),
+                        )
+                        .await?;
+                        response = send_http_request_with_cancel(retry_request, &mut cancel_rx).await?;
+                    }
+                }
+            }
+        }
+    }
     let duration_ms = started_at.elapsed().as_millis();
 
     let status = response.status();

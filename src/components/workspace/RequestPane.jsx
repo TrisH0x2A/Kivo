@@ -1647,7 +1647,7 @@ function AuthPanel({ state, onAuthChange, envVars, response, workspaceName, coll
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground/70">
-            Generates a preemptive Digest header when realm and nonce are known. Automatic challenge retry can be added next.
+            Generates a preemptive Digest header when realm and nonce are known, then retries once from a SHA-256 server challenge when needed.
           </p>
         </div>
       )}
