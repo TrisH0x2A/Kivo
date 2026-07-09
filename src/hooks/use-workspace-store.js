@@ -564,7 +564,6 @@ export function useWorkspaceStore() {
   const [sendStartedAt, setSendStartedAt] = useState(0);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSetupComplete, setIsSetupComplete] = useState(true);
-  const [starCount, setStarCount] = useState(null);
   const saveTimerRef = useRef(null);
   const saveFingerprintRef = useRef("");
   const resizeRef = useRef({ active: false, startX: 0, startWidth: 304 });
@@ -605,22 +604,6 @@ export function useWorkspaceStore() {
   }, [activeCollection]);
 
   const response = activeRequest?.lastResponse ?? createEmptyResponse();
-
-  useEffect(() => {
-    async function fetchStars() {
-      try {
-        const res = await fetch("https://api.github.com/repos/DevlogZz/Kivo");
-        const data = await res.json();
-        if (data.stargazers_count !== undefined) {
-          setStarCount(data.stargazers_count);
-        }
-      } catch (error) {
-        console.error("Failed to fetch star count:", error);
-      }
-    }
-
-    fetchStars();
-  }, []);
 
   useEffect(() => {
     if (!isSetupComplete) return;
@@ -2897,7 +2880,6 @@ export function useWorkspaceStore() {
     sendStartedAt,
     isHydrated,
     isSetupComplete,
-    starCount,
     saveTimerRef,
     resizeRef,
     activeWorkspace,

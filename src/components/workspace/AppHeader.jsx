@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card.jsx";
 import { ThemeToggle } from "@/components/workspace/ThemeToggle.jsx";
 import { useTheme } from "@/hooks/use-theme.js";
 
-export function AppHeader({ workspaceTitle, workspaceDescription, starCount }) {
+export function AppHeader({ workspaceTitle, workspaceDescription }) {
   const { theme, toggleTheme } = useTheme();
   const version = "0.4.1";
 
@@ -31,7 +31,7 @@ export function AppHeader({ workspaceTitle, workspaceDescription, starCount }) {
           onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
         >
           <Github className="h-3.5 w-3.5" />
-          {starCount !== null ? <span className="leading-none">{starCount.toLocaleString()}</span> : null}
+          <span className="leading-none">GitHub</span>
         </Button>
         <ThemeToggle theme={theme} onToggle={toggleTheme} />
       </div>

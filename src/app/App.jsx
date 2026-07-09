@@ -108,7 +108,6 @@ export default function App() {
     isSending,
     sendStartedAt,
     isSetupComplete,
-    starCount,
     resizeRef,
     activeWorkspace,
     activeCollection,
@@ -542,7 +541,7 @@ export default function App() {
                     onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
                   >
                     <Github className="h-[16px] w-[16px]" />
-                    <span className="text-[11px] font-semibold">{starCount ?? "..."}</span>
+                    <span className="text-[11px] font-semibold">GitHub</span>
                     <Star className="h-[14px] w-[14px] fill-current text-yellow-500/80" />
                   </button>
                   <Button
@@ -610,7 +609,7 @@ export default function App() {
                     onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
                   >
                     <Github className="h-[16px] w-[16px]" />
-                    <span className="text-[11px] font-semibold">{starCount ?? "..."}</span>
+                    <span className="text-[11px] font-semibold">GitHub</span>
                     <Star className="h-[14px] w-[14px] fill-current text-yellow-500/80" />
                   </button>
                   <Button
