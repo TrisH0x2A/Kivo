@@ -17,6 +17,7 @@ import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
 import { EnvHighlightInput } from "@/components/ui/EnvHighlightInput.jsx";
 import { LoadTestPane } from "@/components/workspace/LoadTestPane.jsx";
+import { RequestDocsPanel } from "@/components/workspace/RequestDocsPanel.jsx";
 import { RequestTabBar } from "@/components/workspace/RequestTabBar.jsx";
 
 const tabs = ["Params", "Body", "Auth", "Headers", "Scripts", "Docs", "Settings", "Load Test"];
@@ -2697,15 +2698,7 @@ export function RequestPane({
         ) : null}
 
         {activeTab === "Docs" ? (
-          <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] px-3 py-3">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Notes</div>
-            <textarea
-              className="thin-scrollbar min-h-0 flex-1 resize-none border-0 bg-transparent p-3 text-[12px] leading-5 text-foreground outline-none"
-              value={state.docs}
-              onChange={(event) => onChange("docs", event.target.value)}
-              placeholder="Request notes, examples, reminders..."
-            />
-          </div>
+          <RequestDocsPanel request={state} onChange={onChange} />
         ) : null}
 
         {activeTab === "Settings" ? (
