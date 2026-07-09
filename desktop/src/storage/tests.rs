@@ -147,6 +147,18 @@ mod protocol_and_import_export_tests {
                 "url": "https://api.example.com/users?limit=10",
                 "header": [{ "key": "Accept", "value": "application/json" }]
               }
+            },
+            {
+              "name": "SOAP envelope",
+              "request": {
+                "method": "POST",
+                "url": "https://api.example.com/soap",
+                "header": [{ "key": "Content-Type", "value": "application/soap+xml" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "<soap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" />"
+                }
+              }
             }
           ]
         }
@@ -154,9 +166,10 @@ mod protocol_and_import_export_tests {
 
         let parsed = parse_collection_content(content).unwrap();
         assert_eq!(parsed.detected_format, "postman");
-        assert_eq!(parsed.collection.requests.len(), 1);
+        assert_eq!(parsed.collection.requests.len(), 2);
         assert_eq!(parsed.collection.requests[0].method, "GET");
         assert_eq!(parsed.collection.requests[0].query_params.len(), 1);
+        assert_eq!(parsed.collection.requests[1].body_type, "soap");
     }
 
     #[test]
@@ -239,11 +252,21 @@ mod protocol_and_import_export_tests {
         graphql_req.url = "https://api.example.com/graphql".to_string();
         graphql_req.body = RequestTextOrJson::Text("query { health }".to_string());
 
-        let requests = vec![http_req, graphql_req];
+        let mut soap_req = make_request("SOAP envelope");
+        soap_req.method = "POST".to_string();
+        soap_req.body_type = "soap".to_string();
+        soap_req.url = "https://api.example.com/soap".to_string();
+        soap_req.body = RequestTextOrJson::Text("<soap:Envelope />".to_string());
+
+        let requests = vec![http_req, graphql_req, soap_req];
         let options = ExportEnvOptions::default();
 
         let postman = build_export_value("postman", "Export Test", &requests, &options).unwrap();
         assert!(postman.get("item").is_some());
+        assert_eq!(
+            postman.pointer("/item/2/request/body/options/raw/language").and_then(|v| v.as_str()),
+            Some("xml")
+        );
 
         let openapi = build_export_value("openapi3.0", "Export Test", &requests, &options).unwrap();
         assert_eq!(openapi.get("openapi").and_then(|v| v.as_str()), Some("3.0.0"));

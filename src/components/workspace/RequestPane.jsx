@@ -1791,6 +1791,7 @@ export function RequestPane({
   const activeTab = state.activeEditorTab ?? "Params";
   const bodyDisabled = !isWebSocketRequest && !isSocketIoRequest && !isGrpcRequest && (state.method === "GET" || state.method === "DELETE" || state.bodyType === "none");
   const isJsonBody = state.bodyType === "json";
+  const isSoapBody = state.bodyType === "soap";
   const isXmlBody = state.bodyType === "xml";
   const isYamlBody = state.bodyType === "yaml";
   const isGraphqlBody = state.bodyType === "graphql";
@@ -2103,7 +2104,7 @@ export function RequestPane({
 
   function handleBodyTypeChange(bodyType) {
     const currentType = state.bodyType;
-    const textBodyTypes = ["json", "graphql", "xml", "yaml", "text"];
+    const textBodyTypes = ["json", "graphql", "soap", "xml", "yaml", "text"];
 
     if (textBodyTypes.includes(currentType)) {
       bodyCacheRef.current[currentType] = String(state.body ?? "");
@@ -2592,7 +2593,7 @@ export function RequestPane({
                 />
                 <div className="flex items-center gap-1 border border-border/25 bg-transparent px-2.5 py-1.5 uppercase tracking-[0.14em]">
                   <Braces className="h-3 w-3" />
-                  <span>{isWebSocketRequest ? "WebSocket Message" : isSocketIoRequest ? `Socket.IO Payload${selectedSocketIoEvent ? ` · ${selectedSocketIoEvent.name}` : ""}` : (isGraphqlBody ? "GraphQL Request" : isTableBody ? "Form Request" : isFileBody ? "Binary/File Upload" : isJsonBody ? "JSON Highlight" : "Plain Editor")}</span>
+                  <span>{isWebSocketRequest ? "WebSocket Message" : isSocketIoRequest ? `Socket.IO Payload${selectedSocketIoEvent ? ` · ${selectedSocketIoEvent.name}` : ""}` : (isGraphqlBody ? "GraphQL Request" : isTableBody ? "Form Request" : isFileBody ? "Binary/File Upload" : isSoapBody ? "SOAP Envelope" : isJsonBody ? "JSON Highlight" : "Plain Editor")}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -2660,8 +2661,8 @@ export function RequestPane({
               <CodeEditor
                 value={state.body}
                 onChange={(value) => (isSocketIoRequest ? handleSocketIoBodyChange(value) : onChange("body", value))}
-                placeholder={isJsonBody ? '{\n  "name": "Kivo"\n}' : "Enter request body..."}
-                language={isJsonBody ? "json" : isXmlBody ? "xml" : isYamlBody ? "yaml" : "text"}
+                placeholder={isJsonBody ? '{\n  "name": "Kivo"\n}' : isSoapBody ? '<soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">\n  <soap:Body>\n  </soap:Body>\n</soap:Envelope>' : "Enter request body..."}
+                language={isJsonBody ? "json" : (isSoapBody || isXmlBody) ? "xml" : isYamlBody ? "yaml" : "text"}
                 disabled={bodyDisabled}
               />
             ) : null}

@@ -106,6 +106,47 @@ fn parse_headers_array(value: Option<&Value>) -> Vec<KeyValueRow> {
     headers
 }
 
+fn detect_raw_body_type(body: &Value, headers: &[KeyValueRow]) -> String {
+    let raw_language = as_str(body.pointer("/options/raw/language"));
+    let language = raw_language.trim().to_lowercase();
+    if language == "graphql" {
+        return "graphql".to_string();
+    }
+    if language == "xml" {
+        return "xml".to_string();
+    }
+    if language == "yaml" || language == "yml" {
+        return "yaml".to_string();
+    }
+    if language == "text" || language == "plain" {
+        return "text".to_string();
+    }
+
+    let content_type = headers
+        .iter()
+        .find(|header| header.enabled && header.key.trim().eq_ignore_ascii_case("content-type"))
+        .map(|header| header.value.trim().to_lowercase())
+        .unwrap_or_default();
+
+    if content_type.contains("application/soap+xml") {
+        return "soap".to_string();
+    }
+    if content_type.contains("application/graphql") {
+        return "graphql".to_string();
+    }
+    if content_type.contains("application/xml") || content_type.contains("text/xml") {
+        return "xml".to_string();
+    }
+    if content_type.contains("yaml") || content_type.contains("yml") {
+        return "yaml".to_string();
+    }
+    if content_type.starts_with("text/") {
+        return "text".to_string();
+    }
+
+    "json".to_string()
+}
+
 fn parse_headers_object(value: Option<&Value>) -> Vec<KeyValueRow> {
     let mut headers = vec![];
     if let Some(obj) = value.and_then(|v| v.as_object()) {
@@ -256,7 +297,7 @@ fn import_postman_items(
         if let Some(body) = req_json.get("body") {
             let mode = as_str(body.get("mode"));
             if mode == "raw" {
-                request.body_type = "json".to_string();
+                request.body_type = detect_raw_body_type(body, &request.headers);
                 request.body = RequestTextOrJson::Text(as_str(body.get("raw")));
             } else if mode == "urlencoded" || mode == "formdata" {
                 request.body_type = if mode == "urlencoded" {

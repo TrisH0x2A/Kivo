@@ -17,6 +17,7 @@ const bodyContentTypes = {
   json: "application/json",
   "form-urlencoded": "application/x-www-form-urlencoded",
   graphql: "application/json",
+  soap: "application/soap+xml",
   xml: "application/xml",
   yaml: "application/yaml",
   text: "text/plain",
@@ -487,6 +488,7 @@ function detectBodyTypeByHeaders(headers, body) {
   if (contentType.includes("application/json")) return "json";
   if (contentType.includes("application/x-www-form-urlencoded")) return "form-urlencoded";
   if (contentType.includes("multipart/form-data")) return "form-data";
+  if (contentType.includes("application/soap+xml")) return "soap";
   if (contentType.includes("application/xml") || contentType.includes("text/xml")) return "xml";
   if (contentType.includes("yaml") || contentType.includes("yml")) return "yaml";
 
@@ -939,6 +941,7 @@ export const requestBodyModes = [
   { value: "form-data", label: "Form Data" },
   { value: "form-urlencoded", label: "Form URL Encoded" },
   { value: "graphql", label: "GraphQL" },
+  { value: "soap", label: "SOAP XML" },
   { value: "xml", label: "XML" },
   { value: "yaml", label: "YAML" },
   { value: "text", label: "Plain Text" },

@@ -707,6 +707,7 @@ fn request_to_postman_item(request: &RequestRecord) -> serde_json::Value {
     if body_type == "json"
         || body_type == "text"
         || body_type == "xml"
+        || body_type == "soap"
         || body_type == "yaml"
         || body_type == "graphql"
     {
@@ -719,6 +720,16 @@ fn request_to_postman_item(request: &RequestRecord) -> serde_json::Value {
             RequestTextOrJson::Json(json) => serde_json::to_string_pretty(json).unwrap_or_default(),
         };
         body.insert("raw".to_string(), serde_json::Value::String(raw));
+        let raw_language = match body_type {
+            "graphql" => "graphql",
+            "xml" | "soap" => "xml",
+            "yaml" => "yaml",
+            _ => "text",
+        };
+        body.insert(
+            "options".to_string(),
+            serde_json::json!({ "raw": { "language": raw_language } }),
+        );
     }
 
     let header = request
