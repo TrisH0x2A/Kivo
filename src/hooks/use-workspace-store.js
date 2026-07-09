@@ -566,6 +566,7 @@ export function useWorkspaceStore() {
   const [isSetupComplete, setIsSetupComplete] = useState(true);
   const [starCount, setStarCount] = useState(null);
   const saveTimerRef = useRef(null);
+  const saveFingerprintRef = useRef("");
   const resizeRef = useRef({ active: false, startX: 0, startWidth: 304 });
   const activeHttpRequestIdRef = useRef("");
   const wsConnectionsRef = useRef(new Map());
@@ -727,9 +728,24 @@ export function useWorkspaceStore() {
       return undefined;
     }
 
+    let fingerprint = "";
+    try {
+      fingerprint = JSON.stringify(store);
+    } catch {
+      fingerprint = `${Date.now()}`;
+    }
+
+    if (fingerprint === saveFingerprintRef.current) {
+      return undefined;
+    }
+
     window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
-      saveAppState(store).catch((err) => { console.error("saveAppState failed:", err); });
+      saveAppState(store)
+        .then(() => {
+          saveFingerprintRef.current = fingerprint;
+        })
+        .catch((err) => { console.error("saveAppState failed:", err); });
     }, 300);
 
     return () => {
