@@ -142,7 +142,7 @@ export function RequestTabs({
   }
 
   return (
-    <div className="flex items-stretch overflow-x-auto bg-card px-1 thin-scrollbar lg:h-[44px]">
+    <div className="flex items-stretch overflow-x-auto overflow-y-hidden px-1 thin-scrollbar lg:h-[44px]">
       {requestTabs.map((request) => (
         (() => {
           const isWebSocket = request.requestMode === REQUEST_MODES.WEBSOCKET;
@@ -203,7 +203,7 @@ export function RequestTabs({
         type="button"
         onClick={openCreateRequestMenu}
         className={cn(
-          "flex w-9 items-center justify-center text-muted-foreground hover:bg-card/45 hover:text-foreground transition-opacity",
+          "flex w-9 items-center justify-center bg-transparent text-muted-foreground hover:text-foreground transition-opacity",
           !activeWorkspaceName && "opacity-0 pointer-events-none"
         )}
       >
