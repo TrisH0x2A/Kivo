@@ -1023,20 +1023,6 @@
     font-size: clamp(12px, 0.74vw + 4px, 16px);
     line-height: 1.45;
     font-feature-settings: "ss01" 1, "cv02" 1, "cv03" 1;
-    background-image: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
-  }
-
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    background:
-      linear-gradient(90deg, hsl(var(--border) / 0.16) 1px, transparent 1px),
-      linear-gradient(180deg, hsl(var(--border) / 0.12) 1px, transparent 1px);
-    background-size: 28px 28px;
-    mask-image: linear-gradient(180deg, black, transparent 78%);
-    opacity: 0.42;
   }
 
   .theme-light body {
@@ -1115,10 +1101,7 @@
     background-image: radial-gradient(circle at top left, rgba(189, 147, 249, 0.17), transparent 23%), linear-gradient(180deg, hsl(231 15% 20%) 0%, hsl(231 15% 17%) 100%);
   }
 
-  body {
-    background-image:
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 58%, hsl(var(--card) / 0.72) 100%) !important;
-  }
+
 
   button,
   input,
@@ -1173,28 +1156,21 @@
 
 @layer utilities {
   .panel-surface {
-    @apply border border-border/55 backdrop-blur-xl;
-    background-color: hsl(var(--card) / 0.9);
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.04), 0 10px 30px hsl(0 0% 0% / 0.18);
+    @apply border border-border/55;
+    background-color: hsl(var(--card));
   }
 
   .kivo-app-shell {
-    background:
-      linear-gradient(180deg, hsl(var(--card) / 0.54), hsl(var(--background) / 0.48)),
-      linear-gradient(90deg, hsl(var(--primary) / 0.08), transparent 38%, hsl(var(--accent) / 0.08));
+    background: hsl(var(--card));
   }
 
   .kivo-topbar {
-    background:
-      linear-gradient(180deg, hsl(var(--background) / 0.82), hsl(var(--background) / 0.46));
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.045), 0 1px 0 hsl(var(--border) / 0.7);
+    background: hsl(var(--background));
   }
 
   .kivo-panel {
     border: 1px solid hsl(var(--border) / 0.42);
-    background:
-      linear-gradient(180deg, hsl(var(--card) / 0.94), hsl(var(--card) / 0.82));
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.04), 0 12px 26px hsl(0 0% 0% / 0.16);
+    background: hsl(var(--card));
   }
 
   .kivo-command {
@@ -1547,9 +1523,6 @@
   body {
     background-color: hsl(var(--background));
     background-image:
-      linear-gradient(135deg, hsl(var(--primary) / 0.07) 0%, transparent 34%, hsl(var(--accent) / 0.08) 100%),
-      repeating-linear-gradient(90deg, hsl(var(--foreground) / 0.028) 0 1px, transparent 1px 48px),
-      repeating-linear-gradient(0deg, hsl(var(--foreground) / 0.022) 0 1px, transparent 1px 48px),
       linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 58%, hsl(var(--card) / 0.76) 100%) !important;
   }
 
@@ -1605,45 +1578,23 @@
       0 14px 30px hsl(0 0% 0% / 0.16) !important;
   }
 
-  .panel-surface,
-  [class*="bg-card"],
-  [class*="bg-[hsl(var(--sidebar))"] {
-    backdrop-filter: saturate(1.08);
-  }
 
   .panel-surface {
     border-color: hsl(var(--border) / 0.58);
-    background:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.035), transparent 36%),
-      linear-gradient(180deg, hsl(var(--card) / 0.94), hsl(var(--card) / 0.82));
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.045),
-      inset 0 -1px 0 hsl(var(--background) / 0.36),
-      0 18px 38px hsl(0 0% 0% / 0.18);
+    background: hsl(var(--card));
   }
 
   .kivo-app-shell {
-    background:
-      linear-gradient(90deg, hsl(var(--primary) / 0.09), transparent 32%, hsl(var(--accent) / 0.09)),
-      linear-gradient(180deg, hsl(var(--card) / 0.58), hsl(var(--background) / 0.72));
+    background: hsl(var(--card));
   }
 
   .kivo-topbar {
-    background:
-      linear-gradient(180deg, hsl(var(--card) / 0.72), hsl(var(--background) / 0.58));
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.05),
-      inset 0 -1px 0 hsl(var(--border) / 0.68);
+    background: hsl(var(--background));
   }
 
   .kivo-panel {
     border-color: hsl(var(--border) / 0.5);
-    background:
-      linear-gradient(180deg, hsl(var(--foreground) / 0.035), transparent 34%),
-      linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.84));
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.05),
-      0 16px 34px hsl(0 0% 0% / 0.15);
+    background: hsl(var(--card));
   }
 
   .panel-surface,
@@ -1663,6 +1614,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+
     *,
     *::before,
     *::after {

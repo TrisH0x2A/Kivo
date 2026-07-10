@@ -77,10 +77,10 @@ function EnvChip({ globalCount, collectionCount, onClick }) {
       type="button"
       onClick={onClick}
       title={`Workspace Globals: ${globalCount}\nCollection Variables: ${collectionCount}`}
-      className="group flex h-7 items-center gap-2 border border-border/40 bg-accent/30 px-2 text-[10px] font-semibold text-muted-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+      className="group flex items-center gap-2 border border-border/40 bg-accent/30 px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
     >
       <span className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
-        <Globe className="h-3 w-3 text-primary/80 group-hover:text-primary transition-colors" />
+        <Globe className="h-3.5 w-3.5 text-primary/80 group-hover:text-primary transition-colors" />
         <span className="uppercase tracking-[0.1em]">ENV</span>
       </span>
       {total > 0 && (
@@ -97,6 +97,18 @@ export default function App() {
   const activeThemeMeta = getThemeMeta(theme);
   const ActiveThemeIcon = THEME_ICON_MAP[activeThemeMeta.icon] ?? SunMedium;
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
+  const [githubStars, setGithubStars] = useState(null);
+
+  useEffect(() => {
+    fetch("https://api.github.com/repos/DevlogZz/Kivo")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.stargazers_count !== undefined) {
+          setGithubStars(data.stargazers_count);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [settingsConfig, setSettingsConfig] = useState({ tab: "Overview", envTab: "workspace" });
   const [appSettingsTab, setAppSettingsTab] = useState("Storage");
@@ -541,7 +553,9 @@ export default function App() {
                     onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
                   >
                     <Github className="h-[16px] w-[16px]" />
-                    <span className="text-[11px] font-semibold">GitHub</span>
+                    <span className="text-[11px] font-semibold">
+                      {githubStars !== null ? (githubStars > 999 ? (githubStars / 1000).toFixed(1) + 'k' : githubStars) : "GitHub"}
+                    </span>
                     <Star className="h-[14px] w-[14px] fill-current text-yellow-500/80" />
                   </button>
                   <Button
@@ -609,7 +623,9 @@ export default function App() {
                     onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
                   >
                     <Github className="h-[16px] w-[16px]" />
-                    <span className="text-[11px] font-semibold">GitHub</span>
+                    <span className="text-[11px] font-semibold">
+                      {githubStars !== null ? (githubStars > 999 ? (githubStars / 1000).toFixed(1) + 'k' : githubStars) : "GitHub"}
+                    </span>
                     <Star className="h-[14px] w-[14px] fill-current text-yellow-500/80" />
                   </button>
                   <Button

@@ -14,7 +14,7 @@ All notable changes to this project will be documented in this file.
 - **fix**: trim auth payload values before save/send
 - **chore**: restore newline storage handling
 
-**Author**: dexter-xD, Now part of DevlogZz.
+**Author**: TrisH0x2A.
 
 ## [0.4.0]. 2026-04-22
 
@@ -37,8 +37,8 @@ All notable changes to this project will be documented in this file.
 - **fix**: update auth test fixtures and validation
 - **fix**: trim refresh inputs and handle cursor drift
 
-**Note**: This project has officially migrated from `dexter-xD/Kivo` to `DevlogZz/Kivo`.
-**Author**: dexter-xD, Now part of DevlogZz.
+**Note**: This project has officially migrated from `dexter-xD/Kivo` to `TrisH0x2A/Kivo`.
+**Author**: TrisH0x2A.
 
 ## [0.3.6]. 2026-04-18
 
@@ -72,10 +72,10 @@ All notable changes to this project will be documented in this file.
 - **CI/CD**: Fully automated release pipeline for Windows, Linux (DEB/RPM), and macOS (DMG).
 
 ## What's Changed
-* feat: add macOS build support (Intel + Apple Silicon DMGs) by @sriannamalai in https://github.com/dexter-xD/Kivo/pull/4
+* feat: add macOS build support (Intel + Apple Silicon DMGs) by @sriannamalai in https://github.com/TrisH0x2A/Kivo/pull/4
 
 ## New Contributors
-* @sriannamalai made their first contribution in https://github.com/dexter-xD/Kivo/pull/4
+* @sriannamalai made their first contribution in https://github.com/TrisH0x2A/Kivo/pull/4
 
 ## [0.3.3]. 2026-04-08
 

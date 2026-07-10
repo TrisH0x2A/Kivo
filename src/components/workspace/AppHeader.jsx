@@ -28,7 +28,7 @@ export function AppHeader({ workspaceTitle, workspaceDescription }) {
           variant="outline"
           size="sm"
           className="h-7 gap-1.5 rounded-sm border-border/40 bg-card/40 px-2.5 text-[11px] text-foreground"
-          onClick={() => openUrl("https://github.com/DevlogZz/Kivo")}
+          onClick={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
         >
           <Github className="h-3.5 w-3.5" />
           <span className="leading-none">GitHub</span>

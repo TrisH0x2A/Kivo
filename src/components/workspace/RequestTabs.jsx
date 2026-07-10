@@ -142,7 +142,7 @@ export function RequestTabs({
   }
 
   return (
-    <div className="flex items-stretch overflow-x-auto border-b border-border/30 bg-card/28 px-1 thin-scrollbar lg:h-[44px]">
+    <div className="flex items-stretch overflow-x-auto bg-card px-1 thin-scrollbar lg:h-[44px]">
       {requestTabs.map((request) => (
         (() => {
           const isWebSocket = request.requestMode === REQUEST_MODES.WEBSOCKET;
@@ -175,10 +175,10 @@ export function RequestTabs({
               onClick={() => selectRequest(activeWorkspaceName, activeCollectionName, request.name)}
 
               className={cn(
-                "group relative flex min-w-[120px] items-center gap-2 border-r border-border/25 px-3 text-[12px] transition-colors lg:text-[13.5px]",
+                "group relative flex min-w-[120px] items-center gap-2 px-3 text-[12px] transition-colors lg:text-[13.5px]",
                 request.name === activeRequestName
                   ? "bg-primary/10 text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]"
-                  : "bg-card/20 text-muted-foreground hover:bg-card/45 hover:text-foreground"
+                  : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
             >
               <span className={cn("px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] lg:text-[11px]", methodTone)}>{displayMethod}</span>

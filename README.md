@@ -5,7 +5,7 @@
 
   **A minimal, fast, and modern desktop HTTP client built with Rust and Tauri**
   
-  **Author**: dexter-xD, Now part of DevlogZz
+  **Author**: TrisH0x2A
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Rust](https://img.shields.io/badge/Rust-1.77+-orange.svg)](https://www.rust-lang.org/)
@@ -44,13 +44,13 @@ Get the latest stable version for your operating system:
 
 | Platform | Installer | Architecture |
 | :--- | :--- | :--- |
-| **Windows** | [Download .exe](https://github.com/DevlogZz/Kivo/releases/download/v0.4.1/Kivo_0.4.1_x64-setup.exe) / [.msi](https://github.com/DevlogZz/Kivo/releases/download/v0.4.1/Kivo_0.4.1_x64_en-US.msi) | `x64` |
-| **macOS** | [Apple Silicon .dmg](https://github.com/DevlogZz/Kivo/releases/download/v0.4.1/Kivo_0.4.1_aarch64.dmg) | `arm64` |
-| **macOS** | [Intel .dmg](https://github.com/DevlogZz/Kivo/releases/download/v0.4.1/Kivo_0.4.1_x64.dmg) | `x64` |
-| **Linux** | [Download .deb](https://github.com/DevlogZz/Kivo/releases/download/v0.4.1/Kivo_0.4.1_amd64.deb) | `x64` |
-| **Linux** | [Download .rpm](https://github.com/DevlogZz/Kivo/releases/download/v0.4.1/Kivo-0.4.1-1.x86_64.rpm) | `x64` |
+| **Windows** | [Download .exe](https://github.com/TrisH0x2A/Kivo/releases/download/v0.4.1/Kivo_0.4.1_x64-setup.exe) / [.msi](https://github.com/TrisH0x2A/Kivo/releases/download/v0.4.1/Kivo_0.4.1_x64_en-US.msi) | `x64` |
+| **macOS** | [Apple Silicon .dmg](https://github.com/TrisH0x2A/Kivo/releases/download/v0.4.1/Kivo_0.4.1_aarch64.dmg) | `arm64` |
+| **macOS** | [Intel .dmg](https://github.com/TrisH0x2A/Kivo/releases/download/v0.4.1/Kivo_0.4.1_x64.dmg) | `x64` |
+| **Linux** | [Download .deb](https://github.com/TrisH0x2A/Kivo/releases/download/v0.4.1/Kivo_0.4.1_amd64.deb) | `x64` |
+| **Linux** | [Download .rpm](https://github.com/TrisH0x2A/Kivo/releases/download/v0.4.1/Kivo-0.4.1-1.x86_64.rpm) | `x64` |
 
-*For other formats and old releases, visit the [Releases page](https://github.com/DevlogZz/Kivo/releases).*
+*For other formats and old releases, visit the [Releases page](https://github.com/TrisH0x2A/Kivo/releases).*
 
 ### Linux Installation Guide
 
@@ -81,7 +81,7 @@ Get the latest stable version for your operating system:
 
 1. Clone the repository
    ```bash
-   git clone https://github.com/DevlogZz/Kivo.git
+   git clone https://github.com/TrisH0x2A/Kivo.git
    cd Kivo
    ```
 
@@ -147,7 +147,7 @@ Contributions are welcome! If you have suggestions for improvements or encounter
 - **fix**: resolve auth environment variable exporting
 - **fix**: update auth test fixtures and validation
 - **fix**: trim refresh inputs and handle cursor drift
-- **Note**: This project has officially migrated from `dexter-xD/Kivo` to `DevlogZz/Kivo`.
+- **Note**: This project has officially migrated from `dexter-xD/Kivo` to `TrisH0x2A/Kivo`.
 
 ### v0.3.6 (2026-04-19)
 

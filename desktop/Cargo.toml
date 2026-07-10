@@ -2,9 +2,9 @@
 name = "kivo"
 version = "0.4.1"
 description = "A minimal cross-platform HTTP client built with Rust and Tauri for fast and simple API testing."
-authors = ["TrisH0x2A, Now part of DevlogZz"]
+authors = ["TrisH0x2A"]
 license = "MIT"
-repository = "https://github.com/DevlogZz/Kivo"
+repository = "https://github.com/TrisH0x2A/Kivo"
 edition = "2021"
 rust-version = "1.77"
 

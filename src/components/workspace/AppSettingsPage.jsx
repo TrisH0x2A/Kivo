@@ -354,7 +354,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
       body,
     });
 
-    return `https://github.com/DevlogZz/Kivo/issues/new?${params.toString()}`;
+    return `https://github.com/TrisH0x2A/Kivo/issues/new?${params.toString()}`;
   }, [appVersion]);
 
   const featureRequestUrl = useMemo(() => {
@@ -378,7 +378,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
       body,
     });
 
-    return `https://github.com/DevlogZz/Kivo/issues/new?${params.toString()}`;
+    return `https://github.com/TrisH0x2A/Kivo/issues/new?${params.toString()}`;
   }, []);
 
   const filteredCookies = useMemo(() => {
@@ -1187,7 +1187,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
           <div className="grid gap-2.5 text-[12px]">
             <button
               type="button"
-              onClick={() => handleOpenExternal("https://github.com/DevlogZz/Kivo/blob/main/CHANGELOG.md", "changelog")}
+              onClick={() => handleOpenExternal("https://github.com/TrisH0x2A/Kivo/blob/main/CHANGELOG.md", "changelog")}
               className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
             >
               <span className="flex items-center gap-2 text-foreground"><BookOpen className="h-3.5 w-3.5 text-primary" />View Changelog</span>
@@ -1196,7 +1196,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
             <button
               type="button"
-              onClick={() => handleOpenExternal("https://github.com/DevlogZz/Kivo/blob/main/LICENSE", "license")}
+              onClick={() => handleOpenExternal("https://github.com/TrisH0x2A/Kivo/blob/main/LICENSE", "license")}
               className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
             >
               <span className="flex items-center gap-2 text-foreground"><FileText className="h-3.5 w-3.5 text-primary" />View License</span>
@@ -1205,7 +1205,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
             <button
               type="button"
-              onClick={() => handleOpenExternal("https://github.com/DevlogZz/Kivo", "GitHub")}
+              onClick={() => handleOpenExternal("https://github.com/TrisH0x2A/Kivo", "GitHub")}
               className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
             >
               <span className="flex items-center gap-2 text-foreground"><Star className="h-3.5 w-3.5 text-amber-400" />Give a Star on GitHub</span>
@@ -1214,7 +1214,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
             <button
               type="button"
-              onClick={() => handleOpenExternal("https://github.com/sponsors/DevlogZz", "sponsorship page")}
+              onClick={() => handleOpenExternal("https://github.com/sponsors/TrisH0x2A", "sponsorship page")}
               className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
             >
               <span className="flex items-center gap-2 text-foreground"><Heart className="h-3.5 w-3.5 text-rose-400" />Sponsor this Project</span>

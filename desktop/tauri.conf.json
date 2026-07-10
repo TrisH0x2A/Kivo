@@ -28,7 +28,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/DevlogZz/Kivo/releases/latest/download/latest.json"
+        "https://github.com/TrisH0x2A/Kivo/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI1ODhGOEUyQTIyNzg1MjcKUldRbmhTZWk0dmlJdFNUY21qaGRtUmhuUmFXZ0ZHUTY5UnpqVFlGN2xQL2czS1hXRXEreXQ3MEYK"
     }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CheckCircle2, Copy, Download, FileText, ListChecks, Play, RotateCcw, Square, TimerReset, XCircle } from "lucide-react";
+import { Braces, CheckCircle2, Copy, Download, FileText, ListChecks, Play, RotateCcw, Square, Table2, TimerReset, Trash2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -42,6 +42,23 @@ function runStatusTone(status) {
   return "text-muted-foreground";
 }
 
+function getDataSourceMeta(source, rows) {
+  const text = String(source || "").trim();
+  if (!text) {
+    return { label: "Empty", detail: "Optional data rows", tone: "text-muted-foreground", icon: FileText };
+  }
+  try {
+    JSON.parse(text);
+    return rows.length
+      ? { label: "JSON", detail: `${rows.length} row${rows.length === 1 ? "" : "s"} ready`, tone: "text-emerald-500", icon: Braces }
+      : { label: "JSON", detail: "Use an object or array of objects", tone: "text-amber-500", icon: Braces };
+  } catch {
+    return rows.length
+      ? { label: "CSV", detail: `${rows.length} row${rows.length === 1 ? "" : "s"} ready`, tone: "text-emerald-500", icon: Table2 }
+      : { label: "Invalid", detail: "Paste JSON array/object or CSV with headers", tone: "text-red-500", icon: XCircle };
+  }
+}
+
 export function CollectionRunner({ workspace, collection }) {
   const [folderFilter, setFolderFilter] = useState("");
   const [retryCount, setRetryCount] = useState(0);
@@ -69,6 +86,8 @@ export function CollectionRunner({ workspace, collection }) {
   );
 
   const dataRows = useMemo(() => parseRunnerDataRows(dataSource), [dataSource]);
+  const dataMeta = useMemo(() => getDataSourceMeta(dataSource, dataRows), [dataRows, dataSource]);
+  const DataMetaIcon = dataMeta.icon;
 
   useEffect(() => {
     try {
@@ -265,6 +284,14 @@ export function CollectionRunner({ workspace, collection }) {
     URL.revokeObjectURL(url);
   }
 
+  function insertJsonSample() {
+    setDataSource('[\n  { "userId": "42", "postId": "12" },\n  { "userId": "43", "postId": "13" }\n]');
+  }
+
+  function insertCsvSample() {
+    setDataSource("userId,postId\n42,12\n43,13");
+  }
+
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
       <Card className="overflow-hidden border border-border/40 bg-[hsl(var(--sidebar))]/95 shadow-[0_18px_38px_hsl(0_0%_0%/0.16)]">
@@ -328,15 +355,40 @@ export function CollectionRunner({ workspace, collection }) {
           <div className="px-4 py-2.5 text-muted-foreground">Tests <span className="ml-1 font-semibold text-foreground">{summary.tests}</span></div>
         </div>
         <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-          <textarea
-            value={dataSource}
-            onChange={(event) => setDataSource(event.target.value)}
-            placeholder={'Data rows JSON or CSV. Example: [{"userId":"42"}]'}
-            className="min-h-[82px] border border-border/35 bg-background/28 px-3 py-2 font-mono text-[11px] leading-5 text-foreground outline-none placeholder:text-muted-foreground transition-colors focus:border-primary/55"
-          />
+          <div className="min-h-[132px] overflow-hidden border border-border/35 bg-background/24">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/18 bg-background/28 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <DataMetaIcon className={cn("h-3.5 w-3.5 shrink-0", dataMeta.tone)} />
+                <div className="min-w-0">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-foreground">Data Input</div>
+                  <div className={cn("truncate text-[10px]", dataMeta.tone)}>{dataMeta.label} · {dataMeta.detail}</div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={insertJsonSample}>
+                  <Braces className="h-3 w-3" />
+                  JSON
+                </Button>
+                <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-[10px]" onClick={insertCsvSample}>
+                  <Table2 className="h-3 w-3" />
+                  CSV
+                </Button>
+                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" onClick={() => setDataSource("")} disabled={!dataSource}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+            <textarea
+              value={dataSource}
+              onChange={(event) => setDataSource(event.target.value)}
+              spellCheck={false}
+              placeholder={'Paste JSON array/object or CSV with headers. Use {{userId}} etc in requests.'}
+              className="thin-scrollbar min-h-[94px] w-full resize-none border-0 bg-transparent px-3 py-2.5 font-mono text-[11px] leading-5 text-foreground outline-none placeholder:text-muted-foreground/70"
+            />
+          </div>
           <div className="grid content-start gap-2 border border-border/25 bg-background/18 p-3">
             <div className="flex items-center gap-2 text-[11px] font-medium text-muted-foreground">
-              <FileText className="h-3.5 w-3.5 text-primary" />
+              <DataMetaIcon className={cn("h-3.5 w-3.5", dataMeta.tone)} />
               {dataRows.length ? `${dataRows.length} data row(s) loaded` : "No data rows loaded"}
             </div>
             <div className="flex gap-2">
