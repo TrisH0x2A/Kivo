@@ -1243,9 +1243,9 @@ export function RequestPane({
   }
 
   return (
-    <Card className="flex h-full min-h-0 flex-col gap-0 overflow-hidden border-0 border-r border-border/30 bg-background p-0 shadow-none">
+    <Card className="kivo-glass flex h-full min-h-0 flex-col gap-0 overflow-hidden border-0 bg-background/20 p-0 shadow-none">
       <div className={cn(
-        "grid gap-px border-b border-border/25 bg-transparent",
+        "kivo-quiet-divider grid gap-px border-b bg-background/12",
         isGrpcRequest
           ? "grid-cols-[88px_minmax(0,1fr)_92px] xl:grid-cols-[100px_minmax(0,1fr)_260px_40px_40px_108px]"
           : "grid-cols-[108px_minmax(0,1fr)_92px] lg:grid-cols-[124px_minmax(0,1fr)_108px]"
@@ -1276,7 +1276,7 @@ export function RequestPane({
 
         {isGrpcRequest ? (
           <Button
-            className="h-8 gap-1.5 rounded-none px-2.5 text-[12px] xl:hidden"
+              className="h-8 gap-1.5 px-2.5 text-[12px] xl:hidden"
             onClick={onSend}
             type="button"
             disabled={isSending}
@@ -1307,7 +1307,7 @@ export function RequestPane({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 rounded-none text-muted-foreground lg:h-10"
+              className="h-8 text-muted-foreground lg:h-10"
               disabled={!hasValidGrpcUrl}
               onClick={handleGrpcReflectionRefresh}
             >
@@ -1326,7 +1326,7 @@ export function RequestPane({
             type="button"
             variant="ghost"
             size="icon"
-            className="hidden h-8 rounded-none text-muted-foreground xl:inline-flex xl:h-10"
+            className="hidden h-8 text-muted-foreground xl:inline-flex xl:h-10"
             onClick={handleGrpcProtoBrowse}
           >
             <FileCode2 className="h-4 w-4" />
@@ -1335,7 +1335,7 @@ export function RequestPane({
 
         <Button
           className={cn(
-            "h-8 gap-1.5 rounded-none px-2.5 text-[12px] lg:h-10 lg:text-[14px]",
+            "h-8 gap-1.5 px-2.5 text-[12px] lg:h-10 lg:text-[14px]",
             isGrpcRequest && "hidden xl:inline-flex"
           )}
           onClick={onSend}
@@ -1348,7 +1348,7 @@ export function RequestPane({
       </div>
 
       {isGrpcRequest ? (
-        <div className="grid grid-cols-[minmax(0,1fr)_34px_34px] gap-px border-b border-border/25 bg-transparent xl:hidden">
+        <div className="kivo-quiet-divider grid grid-cols-[minmax(0,1fr)_34px_34px] gap-px border-b bg-background/8 xl:hidden">
           {hasGrpcProtoSelected ? (
             <SelectMenu
               value={state.grpcMethodPath || ""}
@@ -1367,7 +1367,7 @@ export function RequestPane({
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 rounded-none text-muted-foreground"
+              className="h-8 text-muted-foreground"
               disabled={!hasValidGrpcUrl}
               onClick={handleGrpcReflectionRefresh}
             >
@@ -1384,7 +1384,7 @@ export function RequestPane({
             type="button"
             variant="ghost"
             size="icon"
-            className="h-8 rounded-none text-muted-foreground"
+            className="h-8 text-muted-foreground"
             onClick={handleGrpcProtoBrowse}
           >
             <FileCode2 className="h-4 w-4" />
@@ -1393,7 +1393,7 @@ export function RequestPane({
       ) : null}
 
       {isGrpcRequest ? (
-        <div className="flex items-center justify-between border-b border-border/20 bg-transparent px-3 py-2 text-[11px] text-muted-foreground">
+        <div className="kivo-quiet-divider flex items-center justify-between border-b bg-background/8 px-3 py-2 text-[11px] text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2 truncate">
             <FileText className="h-3.5 w-3.5 shrink-0 tone-grpc-text" />
             <span className="truncate">{grpcSelectedProtoFileName || "No .proto file selected"}</span>
@@ -1411,7 +1411,7 @@ export function RequestPane({
       ) : null}
 
       {isGrpcRequest && grpcReflectionStatus ? (
-        <div className="border-b border-border/15 px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="kivo-quiet-divider border-b px-3 py-1.5 text-[11px] text-muted-foreground">
           {grpcReflectionStatus}
         </div>
       ) : null}
@@ -1431,9 +1431,9 @@ export function RequestPane({
       <div className="min-h-0 flex-1 overflow-hidden bg-transparent">
         {activeTab === "Params" ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] text-[12px]">
-            <div className="border-b border-border/20 px-3 py-3">
+            <div className="kivo-quiet-divider border-b px-3 py-3">
               <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">URL Preview</div>
-              <div className="bg-transparent px-3 py-2 text-foreground">{urlPreview || state.url}</div>
+              <div className="kivo-field px-3 py-2 text-foreground">{urlPreview || state.url}</div>
             </div>
             <TableEditor rows={state.queryParams} onChange={onParamsChange} title="Query Parameters" addLabel="Add" />
           </div>
@@ -1450,7 +1450,7 @@ export function RequestPane({
             <GrpcHeadersPanel headers={state.headers} onHeadersChange={onHeadersChange} />
           ) : (
             <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-              <label className="flex items-center gap-2 border-b border-border/20 bg-transparent px-4 py-2.5 text-[11px] text-muted-foreground lg:text-[12px] cursor-pointer">
+              <label className="kivo-quiet-divider flex items-center gap-2 border-b bg-background/8 px-4 py-2.5 text-[11px] text-muted-foreground lg:text-[12px] cursor-pointer">
                 <input
                   type="checkbox"
                   className="accent-primary w-3 h-3.5 outline-none"

@@ -34,7 +34,7 @@ export function WorkspaceView({
   const streamMode = STREAM_MODE_BY_REQUEST[request.requestMode];
 
   return (
-    <div className="grid h-full min-h-0 overflow-hidden bg-background lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)] xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.75fr)]">
+    <div className="grid h-full min-h-0 gap-2 overflow-hidden bg-transparent lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.8fr)] xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.75fr)]">
       <RequestPane
         state={request}
         isSending={isSending}

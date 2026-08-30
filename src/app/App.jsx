@@ -19,6 +19,7 @@ import {
   Beaker,
   Building2,
   Code2,
+  FolderTree,
   Flame,
   FlaskConical,
   GitBranch,
@@ -89,6 +90,75 @@ function EnvChip({ globalCount, collectionCount, onClick }) {
         </span>
       )}
     </button>
+  );
+}
+
+function BottomDock({
+  activeView,
+  activeThemeMeta,
+  ActiveThemeIcon,
+  githubStars,
+  onOpenCollections,
+  onOpenSettings,
+  onOpenGithub,
+  onToggleTheme,
+}) {
+  const formattedStars =
+    githubStars !== null
+      ? githubStars > 999
+        ? `${(githubStars / 1000).toFixed(1)}k`
+        : githubStars
+      : "GitHub";
+
+  return (
+    <nav className="kivo-bottom-dock shrink-0 px-3 py-2" aria-label="Primary navigation">
+      <div className="mx-auto flex h-11 max-w-[760px] items-center justify-center gap-1 border border-border/14 bg-card px-1.5 shadow-[0_-12px_36px_hsl(0_0%_0%/0.12)]">
+        <button
+          type="button"
+          className={`kivo-dock-item ${activeView === "collections" ? "is-active" : ""}`}
+          onClick={onOpenCollections}
+          title="Collections"
+          aria-label="Open collections"
+          aria-current={activeView === "collections" ? "page" : undefined}
+        >
+          <FolderTree className="h-4 w-4" />
+          <span>Collections</span>
+        </button>
+        <button
+          type="button"
+          className={`kivo-dock-item ${activeView === "settings" ? "is-active" : ""}`}
+          onClick={onOpenSettings}
+          title="App settings"
+          aria-label="Open app settings"
+          aria-current={activeView === "settings" ? "page" : undefined}
+        >
+          <Settings className="h-4 w-4" />
+          <span>Settings</span>
+        </button>
+        <div className="mx-1 h-5 w-px bg-border/16" />
+        <button
+          type="button"
+          className="kivo-dock-item"
+          onClick={onOpenGithub}
+          title="Open GitHub"
+          aria-label="Open Kivo on GitHub"
+        >
+          <Github className="h-4 w-4" />
+          <span>{formattedStars}</span>
+          <Star className="h-3.5 w-3.5 fill-current text-yellow-500/90" />
+        </button>
+        <button
+          type="button"
+          className="kivo-dock-item"
+          onClick={onToggleTheme}
+          title={`Switch theme (current: ${activeThemeMeta.label})`}
+          aria-label={`Switch theme. Current theme: ${activeThemeMeta.label}`}
+        >
+          <ActiveThemeIcon className="h-4 w-4" />
+          <span>{activeThemeMeta.label}</span>
+        </button>
+      </div>
+    </nav>
   );
 }
 
@@ -377,6 +447,11 @@ export default function App() {
     }
   }
 
+  function openCollectionsView() {
+    handleSidebarTabChange("requests");
+    setForcedView(null);
+  }
+
   if (!isSetupComplete) {
     return (
       <Suspense fallback={<WorkspaceFallback />}>
@@ -428,59 +503,60 @@ export default function App() {
           onCancel={() => setShowWorkspaceModal(false)}
         />
       )}
-      <div className="kivo-app-shell flex h-full min-h-0 overflow-hidden border border-border/40">
-        <div style={{ width: `${sidebarWidth}px` }} className="min-h-0 shrink-0 overflow-hidden">
-          <Suspense fallback={<WorkspaceFallback />}>
-            <Sidebar
-              iconSrc="/icon.ico"
-              sidebarTab={store.sidebarTab}
-              collapsed={store.sidebarCollapsed}
-              workspaces={store.workspaces}
-              activeWorkspaceName={store.activeWorkspaceName}
-              activeCollectionName={store.activeCollectionName}
-              activeRequestName={store.activeRequestName}
-              onSidebarTabChange={handleSidebarTabChangeWithView}
-              onSelectWorkspace={selectWorkspace}
-              onSelectCollection={(wName, cName) => {
-                selectCollection(wName, cName);
-                openCollectionSettings("Overview");
-              }}
-              onOpenCollectionSettings={() => openCollectionSettings("Overview")}
-              onOpenAppSettings={openAppSettings}
-              onSelectRequest={handleSelectRequest}
-              onCreateWorkspace={createWorkspaceRecord}
-              onRenameWorkspace={renameWorkspaceRecord}
-              onDeleteWorkspace={deleteWorkspaceRecord}
-              onCreateCollection={createCollectionRecord}
-              onRenameCollection={renameCollectionRecord}
-              onDeleteCollection={deleteCollectionRecord}
-              onDuplicateCollection={duplicateCollectionRecord}
-              onImportCollection={importCollectionRecord}
-              onCreateFolder={createFolderRecord}
-              onRenameFolder={renameFolderRecord}
-              onDeleteFolder={deleteFolderRecord}
-              onUpdateFolderSettings={updateFolderSettingsRecord}
-              onCreateRequest={createRequestRecord}
-              onRenameRequest={renameRequestRecord}
-              onDeleteRequest={deleteRequestRecord}
-              onDuplicateRequest={duplicateRequestRecord}
-              onImportRequests={importRequestRecords}
-              onPasteRequest={pasteRequestRecord}
-              onPasteFolder={pasteFolderRecord}
-              onTogglePinRequest={togglePinRequestRecord}
-            />
-          </Suspense>
-        </div>
+      <div className="kivo-app-shell flex h-full min-h-0 flex-col overflow-hidden border border-border/10">
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div style={{ width: `${sidebarWidth}px` }} className="min-h-0 shrink-0 overflow-hidden">
+            <Suspense fallback={<WorkspaceFallback />}>
+              <Sidebar
+                iconSrc="/icon.ico"
+                sidebarTab={store.sidebarTab}
+                collapsed={store.sidebarCollapsed}
+                workspaces={store.workspaces}
+                activeWorkspaceName={store.activeWorkspaceName}
+                activeCollectionName={store.activeCollectionName}
+                activeRequestName={store.activeRequestName}
+                onSidebarTabChange={handleSidebarTabChangeWithView}
+                onSelectWorkspace={selectWorkspace}
+                onSelectCollection={(wName, cName) => {
+                  selectCollection(wName, cName);
+                  openCollectionSettings("Overview");
+                }}
+                onOpenCollectionSettings={() => openCollectionSettings("Overview")}
+                onOpenAppSettings={openAppSettings}
+                onSelectRequest={handleSelectRequest}
+                onCreateWorkspace={createWorkspaceRecord}
+                onRenameWorkspace={renameWorkspaceRecord}
+                onDeleteWorkspace={deleteWorkspaceRecord}
+                onCreateCollection={createCollectionRecord}
+                onRenameCollection={renameCollectionRecord}
+                onDeleteCollection={deleteCollectionRecord}
+                onDuplicateCollection={duplicateCollectionRecord}
+                onImportCollection={importCollectionRecord}
+                onCreateFolder={createFolderRecord}
+                onRenameFolder={renameFolderRecord}
+                onDeleteFolder={deleteFolderRecord}
+                onUpdateFolderSettings={updateFolderSettingsRecord}
+                onCreateRequest={createRequestRecord}
+                onRenameRequest={renameRequestRecord}
+                onDeleteRequest={deleteRequestRecord}
+                onDuplicateRequest={duplicateRequestRecord}
+                onImportRequests={importRequestRecords}
+                onPasteRequest={pasteRequestRecord}
+                onPasteFolder={pasteFolderRecord}
+                onTogglePinRequest={togglePinRequestRecord}
+              />
+            </Suspense>
+          </div>
 
-        <SidebarResizer
-          onMouseDown={(event) => {
-            resizeRef.current = { active: true, startX: event.clientX, startWidth: sidebarWidth };
-            document.body.style.cursor = "col-resize";
-            document.body.style.userSelect = "none";
-          }}
-        />
+          <SidebarResizer
+            onMouseDown={(event) => {
+              resizeRef.current = { active: true, startX: event.clientX, startWidth: sidebarWidth };
+              document.body.style.cursor = "col-resize";
+              document.body.style.userSelect = "none";
+            }}
+          />
 
-        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
           {showAppSettings ? (
             <Suspense fallback={<WorkspaceFallback />}>
               <AppSettingsPage
@@ -528,7 +604,7 @@ export default function App() {
 
             <>
               { }
-              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b border-border/25 px-5 py-3 backdrop-blur-md">
+              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b px-5 py-3 backdrop-blur-md">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="text-[17px] font-semibold tracking-tight text-foreground truncate">
                     {activeCollection?.name ?? "Collection"}
@@ -545,37 +621,6 @@ export default function App() {
                       />
                     </>
                   )}
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    type="button"
-                    className="kivo-command flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-muted-foreground transition-all hover:text-foreground"
-                    onClick={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
-                  >
-                    <Github className="h-[16px] w-[16px]" />
-                    <span className="text-[11px] font-semibold">
-                      {githubStars !== null ? (githubStars > 999 ? (githubStars / 1000).toFixed(1) + 'k' : githubStars) : "GitHub"}
-                    </span>
-                    <Star className="h-[14px] w-[14px] fill-current text-yellow-500/80" />
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
-                    onClick={toggleTheme}
-                    title={`Switch theme (current: ${activeThemeMeta.label})`}
-                  >
-                    <ActiveThemeIcon className="h-[18px] w-[18px]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
-                    onClick={() => openCollectionSettings("Overview")}
-                    title="Collection Settings"
-                  >
-                    <Settings className="h-[18px] w-[18px]" />
-                  </Button>
                 </div>
               </div>
 
@@ -596,7 +641,7 @@ export default function App() {
           ) : showWorkspaceView ? (
 
             <>
-              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b border-border/25 px-5 py-3.5 backdrop-blur-md">
+              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b px-5 py-3.5 backdrop-blur-md">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-3">
                     <div className="text-[18px] font-semibold tracking-tight text-foreground">
@@ -616,40 +661,9 @@ export default function App() {
                     </>
                   )}
                 </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    type="button"
-                    className="kivo-command flex cursor-pointer items-center gap-1.5 px-3 py-1.5 text-muted-foreground transition-all hover:text-foreground"
-                    onClick={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
-                  >
-                    <Github className="h-[16px] w-[16px]" />
-                    <span className="text-[11px] font-semibold">
-                      {githubStars !== null ? (githubStars > 999 ? (githubStars / 1000).toFixed(1) + 'k' : githubStars) : "GitHub"}
-                    </span>
-                    <Star className="h-[14px] w-[14px] fill-current text-yellow-500/80" />
-                  </button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
-                    onClick={toggleTheme}
-                    title={`Switch theme (current: ${activeThemeMeta.label})`}
-                  >
-                    <ActiveThemeIcon className="h-[18px] w-[18px]" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 text-muted-foreground hover:bg-accent/40 hover:text-foreground"
-                    onClick={() => openCollectionSettings("Overview")}
-                    title="Collection Settings"
-                  >
-                    <Settings className="h-[18px] w-[18px]" />
-                  </Button>
-                </div>
               </div>
 
-              <div className="flex min-h-0 shrink-0 border-b border-border/25 bg-background/25">
+              <div className="kivo-quiet-divider flex min-h-0 shrink-0 border-b bg-background/10">
                 <RequestTabs
                   activeWorkspaceName={activeWorkspace?.name}
                   activeCollectionName={activeCollection?.name}
@@ -661,7 +675,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden bg-background/20">
+              <div className="min-h-0 flex-1 overflow-hidden bg-background p-2 pl-0">
                 <Suspense fallback={<WorkspaceFallback />}>
                   <WorkspaceView
                     request={activeRequest}
@@ -687,7 +701,18 @@ export default function App() {
               </div>
             </>
           ) : null}
-        </main>
+          </main>
+        </div>
+        <BottomDock
+          activeView={showAppSettings ? "settings" : "collections"}
+          activeThemeMeta={activeThemeMeta}
+          ActiveThemeIcon={ActiveThemeIcon}
+          githubStars={githubStars}
+          onOpenCollections={openCollectionsView}
+          onOpenSettings={() => openAppSettings("Storage")}
+          onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
+          onToggleTheme={toggleTheme}
+        />
       </div>
     </div>
   );

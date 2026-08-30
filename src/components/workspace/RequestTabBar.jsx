@@ -25,7 +25,7 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
   }, [menuOpen]);
 
   return (
-    <div className="border-b border-border/25 px-2 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
+    <div className="kivo-quiet-divider border-b bg-background/8 px-2 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
       <div className="flex items-center gap-1">
         {mainTabs.map((tab) => (
           <button
@@ -33,8 +33,8 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
             type="button"
             onClick={() => onTabChange(tab)}
             className={cn(
-              "whitespace-nowrap px-2 py-1 text-muted-foreground transition-colors lg:px-3 lg:py-1.5",
-              activeTab === tab && "text-foreground"
+              "whitespace-nowrap px-2 py-1 text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground lg:px-3 lg:py-1.5",
+              activeTab === tab && "kivo-tab-active"
             )}
           >
             {tab}
@@ -47,8 +47,8 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
               className={cn(
-                "flex items-center gap-1 whitespace-nowrap px-2 py-1 text-muted-foreground transition-colors lg:px-3 lg:py-1.5",
-                isOverflowActive && "text-foreground"
+                "flex items-center gap-1 whitespace-nowrap px-2 py-1 text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground lg:px-3 lg:py-1.5",
+                isOverflowActive && "kivo-tab-active"
               )}
             >
               {isOverflowActive && <span>{activeTab}</span>}
@@ -56,7 +56,7 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
             </button>
 
             {menuOpen && (
-              <div className="absolute right-0 top-full z-50 mt-1 min-w-[130px] border border-border/60 bg-popover py-1 shadow-2xl">
+              <div className="kivo-glass absolute right-0 top-full z-50 mt-1 min-w-[130px] py-1 shadow-2xl">
                 {overflowTabs.map((tab) => (
                   <button
                     key={tab}

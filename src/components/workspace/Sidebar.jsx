@@ -2029,9 +2029,10 @@ export function RequestsView({
                         setEditingItemId(`col:${col.name}`);
                       }}
                       onContextMenu={(e) => openCollectionContextMenu(e, effectiveWorkspaceName, col.name)}
+                      data-active={isActive}
                       className={cn(
-                        "group flex items-center gap-1 px-1 py-1 rounded transition-colors cursor-pointer select-none",
-                        isActive ? "bg-accent/40 text-foreground" : "text-foreground/80 hover:bg-accent/20"
+                        "kivo-nav-item group flex items-center gap-1 px-1 py-1 transition-colors cursor-pointer select-none",
+                        isActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]" : "text-foreground/80 hover:bg-accent/18"
                       )}
                     >
                       <button
@@ -2067,7 +2068,7 @@ export function RequestsView({
                     </div>
                   )}
                   {isColExpanded && (
-                    <div className="space-y-0.5 ml-3 pl-2 border-l border-border/30">
+                    <div className="ml-3 space-y-0.5 pl-2">
                       {(() => {
                         const folders = Array.from(
                           new Set([
@@ -2126,9 +2127,10 @@ export function RequestsView({
                                     setEditingItemId(`req:${col.name}:${req.name}`);
                                   }}
                                   className={cn(
-                                    "group flex items-center gap-2 px-2 py-1 text-[12px] rounded transition-colors cursor-pointer select-none",
-                                    isReqActive ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:bg-accent/35 hover:text-foreground"
+                                    "kivo-nav-item group flex items-center gap-2 px-2 py-1 text-[12px] transition-colors cursor-pointer select-none",
+                                    isReqActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]" : "text-muted-foreground hover:bg-accent/24 hover:text-foreground"
                                   )}
+                                  data-active={isReqActive}
                                   onContextMenu={(e) => openRequestContextMenu(e, effectiveWorkspaceName, col.name, req)}
                                 >
                                   <div className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -2169,7 +2171,7 @@ export function RequestsView({
                                       />
                                     ) : (
                                       <div
-                                        className="group flex items-center gap-1 px-1.5 py-1 text-[11.5px] text-muted-foreground rounded hover:bg-accent/25"
+                                        className="group flex items-center gap-1 px-1.5 py-1 text-[11.5px] text-muted-foreground hover:bg-accent/20"
                                         onContextMenu={(event) => openFolderContextMenu(event, effectiveWorkspaceName, col.name, folderPath)}
                                         onDoubleClick={(event) => {
                                           event.stopPropagation();
@@ -2220,7 +2222,7 @@ export function RequestsView({
                                     )}
 
                                     {isFolderExpanded ? (
-                                      <div className="ml-3 space-y-0.5 border-l border-border/20 pl-2">
+                                      <div className="ml-3 space-y-0.5 pl-2">
                                         {childFolders.map((childPath) => renderFolderNode(childPath))}
                                         {folderRequests.map((request, index) => renderRequestRow(request, index))}
 
@@ -2447,8 +2449,8 @@ export function RequestsView({
 }
 
 export function Sidebar({
-  iconSrc, sidebarTab, collapsed, workspaces, activeWorkspaceName, activeCollectionName, activeRequestName,
-  onSidebarTabChange, onSelectWorkspace, onSelectCollection, onSelectRequest,
+  workspaces, activeWorkspaceName, activeCollectionName, activeRequestName,
+  onSelectWorkspace, onSelectCollection, onSelectRequest,
   onCreateWorkspace, onRenameWorkspace, onDeleteWorkspace,
   onCreateCollection, onRenameCollection, onDeleteCollection, onDuplicateCollection, onImportCollection,
   onCreateFolder,
@@ -2457,50 +2459,41 @@ export function Sidebar({
   onUpdateFolderSettings,
   onCreateRequest, onRenameRequest, onDeleteRequest, onDuplicateRequest, onImportRequests, onPasteRequest, onPasteFolder, onTogglePinRequest,
   onOpenCollectionSettings,
-  onOpenAppSettings,
 }) {
   return (
-    <aside className={cn("grid h-full min-h-0 overflow-hidden border-r border-border/30 bg-border/20", collapsed ? "grid-cols-[52px]" : "grid-cols-[52px_minmax(0,1fr)] gap-px")}>
-      <Card data-tauri-drag-region className="flex min-h-0 flex-col items-center gap-2 bg-[hsl(var(--sidebar))]/96 p-2.5 shadow-none">
-        <div className="flex h-8 w-8 items-center justify-center overflow-hidden bg-card/85"><img src={iconSrc} alt="Kivo" className="h-6 w-6 object-contain" /></div>
-        <Button variant={sidebarTab === "requests" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => onSidebarTabChange("requests")}><SquareKanban className="h-4 w-4" /></Button>
-        <Button variant={sidebarTab === "settings" ? "secondary" : "ghost"} size="icon" className="h-8 w-8" onClick={() => onOpenAppSettings?.()}><Settings className="h-4 w-4" /></Button>
-        <div className="mt-auto" />
+    <aside className="h-full min-h-0 overflow-hidden border-r border-border/10 bg-[hsl(var(--sidebar))]">
+      <Card className="flex h-full min-h-0 flex-col gap-3 overflow-hidden border-0 bg-transparent p-3 text-[12px] text-[hsl(var(--sidebar-foreground))] shadow-none">
+        <RequestsView
+          workspaces={workspaces}
+          activeWorkspaceName={activeWorkspaceName}
+          activeCollectionName={activeCollectionName}
+          activeRequestName={activeRequestName}
+          onSelectWorkspace={onSelectWorkspace}
+          onSelectCollection={onSelectCollection}
+          onSelectRequest={onSelectRequest}
+          onOpenCollectionSettings={onOpenCollectionSettings}
+          onCreateWorkspace={onCreateWorkspace}
+          onRenameWorkspace={onRenameWorkspace}
+          onDeleteWorkspace={onDeleteWorkspace}
+          onCreateCollection={onCreateCollection}
+          onRenameCollection={onRenameCollection}
+          onDeleteCollection={onDeleteCollection}
+          onDuplicateCollection={onDuplicateCollection}
+          onImportCollection={onImportCollection}
+          onCreateFolder={onCreateFolder}
+          onRenameFolder={onRenameFolder}
+          onDeleteFolder={onDeleteFolder}
+          onUpdateFolderSettings={onUpdateFolderSettings}
+          onCreateRequest={onCreateRequest}
+          onRenameRequest={onRenameRequest}
+          onDeleteRequest={onDeleteRequest}
+          onDuplicateRequest={onDuplicateRequest}
+          onImportRequests={onImportRequests}
+          onPasteRequest={onPasteRequest}
+          onPasteFolder={onPasteFolder}
+          onTogglePinRequest={onTogglePinRequest}
+        />
       </Card>
-      {!collapsed && (
-        <Card className="flex min-h-0 flex-col gap-3 overflow-hidden bg-[hsl(var(--sidebar))]/98 p-2 text-[12px] text-[hsl(var(--sidebar-foreground))] shadow-none">
-          <RequestsView
-            workspaces={workspaces}
-            activeWorkspaceName={activeWorkspaceName}
-            activeCollectionName={activeCollectionName}
-            activeRequestName={activeRequestName}
-            onSelectWorkspace={onSelectWorkspace}
-            onSelectCollection={onSelectCollection}
-            onSelectRequest={onSelectRequest}
-            onOpenCollectionSettings={onOpenCollectionSettings}
-            onCreateWorkspace={onCreateWorkspace}
-            onRenameWorkspace={onRenameWorkspace}
-            onDeleteWorkspace={onDeleteWorkspace}
-            onCreateCollection={onCreateCollection}
-            onRenameCollection={onRenameCollection}
-            onDeleteCollection={onDeleteCollection}
-            onDuplicateCollection={onDuplicateCollection}
-            onImportCollection={onImportCollection}
-            onCreateFolder={onCreateFolder}
-            onRenameFolder={onRenameFolder}
-            onDeleteFolder={onDeleteFolder}
-            onUpdateFolderSettings={onUpdateFolderSettings}
-            onCreateRequest={onCreateRequest}
-            onRenameRequest={onRenameRequest}
-            onDeleteRequest={onDeleteRequest}
-            onDuplicateRequest={onDuplicateRequest}
-            onImportRequests={onImportRequests}
-            onPasteRequest={onPasteRequest}
-            onPasteFolder={onPasteFolder}
-            onTogglePinRequest={onTogglePinRequest}
-          />
-        </Card>
-      )}
     </aside>
   );
 }

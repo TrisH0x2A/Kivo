@@ -226,8 +226,8 @@ export function ResponsePane({
   }
 
   return (
-    <Card className="flex h-full min-h-0 flex-col gap-0 overflow-hidden border-0 bg-background p-0 shadow-none">
-      <div className="flex items-center justify-between border-b border-border/25 px-3 py-2 text-[11px] text-muted-foreground lg:py-2.5 lg:text-[12px]">
+    <Card className="kivo-glass flex h-full min-h-0 flex-col gap-0 overflow-hidden border-0 bg-background/20 p-0 shadow-none">
+      <div className="kivo-quiet-divider flex items-center justify-between border-b bg-background/12 px-3 py-2 text-[11px] text-muted-foreground lg:py-2.5 lg:text-[12px]">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Clock3 className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
@@ -248,7 +248,7 @@ export function ResponsePane({
         </div>
       </div>
 
-      <div className="border-b border-border/25 px-3 py-2 text-[12px] lg:text-[13px]">
+      <div className="kivo-quiet-divider border-b bg-background/8 px-3 py-2 text-[12px] lg:text-[13px]">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden pr-1">
             {responseTabs.map((tab) => (
@@ -256,7 +256,7 @@ export function ResponsePane({
                 key={tab}
                 type="button"
                 onClick={() => onTabChange(tab)}
-                className={cn("shrink-0 whitespace-nowrap px-1.5 py-1 text-[11px] text-muted-foreground transition-colors lg:px-2.5 lg:py-1.5 lg:text-[13px]", activeTab === tab && "text-foreground")}
+                className={cn("shrink-0 whitespace-nowrap px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground lg:px-2.5 lg:py-1.5 lg:text-[13px]", activeTab === tab && "kivo-tab-active")}
               >
                 {tab}
                 {tab === "Headers" ? ` ${Object.keys(response.headers).length}` : ""}
@@ -303,7 +303,7 @@ export function ResponsePane({
                   <span>Body</span>
                 </div>
                 {currentView === "Tree" && (
-                  <div className="ml-2 flex w-48 items-center gap-1.5 rounded border border-border/20 bg-transparent py-[3px] pl-2.5 pr-1.5 normal-case tracking-normal transition-colors focus-within:border-primary/50 shadow-sm">
+                  <div className="kivo-field ml-2 flex w-48 items-center gap-1.5 py-[3px] pl-2.5 pr-1.5 normal-case tracking-normal transition-colors">
                     <Search className="h-[11px] w-[11px] text-muted-foreground shrink-0" />
                     <input
                       type="text"
@@ -327,8 +327,8 @@ export function ResponsePane({
                     type="button"
                     onClick={() => onBodyViewChange(view)}
                     className={cn(
-                      "px-2 py-1 text-muted-foreground disabled:opacity-40 transition-colors",
-                      currentView === view && "text-foreground"
+                      "px-2 py-1 text-muted-foreground disabled:opacity-40 transition-colors hover:bg-accent/20 hover:text-foreground",
+                      currentView === view && "kivo-tab-active"
                     )}
                   >
                     {view}
@@ -337,13 +337,13 @@ export function ResponsePane({
               </div>
             </div>
             {isBinary ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 border border-border/10 bg-transparent p-6 text-center text-muted-foreground">
+              <div className="kivo-field flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
                 <Download className="h-8 w-8 text-primary/70" />
                 <div className="text-[13px] font-medium text-foreground">Binary response</div>
                 <div className="max-w-sm text-[12px]">Preview is unavailable for this content type. Save the response to inspect the original bytes.</div>
               </div>
             ) : currentView === "Tree" && parsedJson !== null ? (
-              <div className="thin-scrollbar h-full overflow-auto rounded border border-border/10 bg-transparent p-4 shadow-inner">
+              <div className="kivo-field thin-scrollbar h-full overflow-auto p-4">
                 {(Array.isArray(displayJson) ? displayJson.length > 0 : Object.keys(displayJson || {}).length > 0) ? (
                   <div className="flex flex-col gap-0">
                     {searchQuery && (
@@ -363,13 +363,13 @@ export function ResponsePane({
                 )}
               </div>
             ) : currentView === "Tree" && isJson && jsonTreeTooLarge ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 border border-border/10 bg-transparent p-6 text-center text-muted-foreground">
+              <div className="kivo-field flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
                 <FileJson2 className="h-8 w-8 text-primary/70" />
                 <div className="text-[13px] font-medium text-foreground">JSON tree paused for this response</div>
                 <div className="max-w-md text-[12px]">The body is large enough that parsing it into the interactive tree could slow the app. Use JSON or Raw preview, or save the full response to a file.</div>
               </div>
             ) : currentView === "Preview" ? (
-              <div className="h-full overflow-hidden rounded bg-white border border-border/10 shadow-inner">
+              <div className="h-full overflow-hidden border border-border/10 bg-white shadow-inner">
                 <iframe
                   srcDoc={response.body || response.rawBody}
                   title="HTML Preview"
@@ -395,7 +395,7 @@ export function ResponsePane({
             <div className="thin-scrollbar min-h-0 overflow-auto bg-transparent">
               {Object.entries(response.headers).length ? (
                 Object.entries(response.headers).map(([key, value]) => (
-                  <div key={key} className="grid grid-cols-[220px_minmax(0,1fr)] border-b border-border/10 text-[12px]">
+                  <div key={key} className="kivo-row-hover kivo-quiet-divider grid grid-cols-[220px_minmax(0,1fr)] border-b text-[12px]">
                     <div className="px-3 py-2 text-muted-foreground">{key}</div>
                     <div className="px-3 py-2 text-foreground">{String(value)}</div>
                   </div>
@@ -421,7 +421,7 @@ export function ResponsePane({
             <div className="thin-scrollbar min-h-0 overflow-auto bg-transparent">
               {responseCookiesPreview.length ? (
                 responseCookiesPreview.map((cookie, index) => (
-                  <div key={`${cookie.name}-${index}`} className="grid grid-cols-[220px_minmax(0,1fr)] border-b border-border/10 text-[12px]">
+                  <div key={`${cookie.name}-${index}`} className="kivo-row-hover kivo-quiet-divider grid grid-cols-[220px_minmax(0,1fr)] border-b text-[12px]">
                     <div className="px-3 py-2 text-foreground">{cookie.name}</div>
                     <div className="px-3 py-2 text-muted-foreground">{cookie.value}</div>
                   </div>
@@ -439,7 +439,7 @@ export function ResponsePane({
               <ListTree className="h-3 w-3" />
               <span>Meta</span>
             </div>
-            <div className="bg-transparent p-3 text-[12px] text-muted-foreground">
+            <div className="kivo-field p-3 text-[12px] text-muted-foreground">
               <div className="grid gap-2">
                 <div className="flex items-center justify-between">
                   <span>Method</span>

@@ -1522,8 +1522,7 @@
 
   body {
     background-color: hsl(var(--background));
-    background-image:
-      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 58%, hsl(var(--card) / 0.76) 100%) !important;
+    background-image: none !important;
   }
 
   ::selection {
@@ -1580,51 +1579,114 @@
 
 
   .panel-surface {
-    border-color: hsl(var(--border) / 0.34);
-    background:
-      linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--card) / 0.9));
+    border-color: hsl(var(--border) / 0.12);
+    background: hsl(var(--card));
+    box-shadow: none;
   }
 
   .kivo-app-shell {
-    background: hsl(var(--card));
+    background: hsl(var(--background));
+    box-shadow: none;
   }
 
   .kivo-topbar {
+    border-color: hsl(var(--border) / 0.1);
     background: hsl(var(--background));
+    box-shadow: none;
   }
 
   .kivo-panel {
-    border-color: hsl(var(--border) / 0.32);
-    background:
-      linear-gradient(180deg, hsl(var(--card) / 0.96), hsl(var(--background) / 0.42));
+    border-color: hsl(var(--border) / 0.12);
+    background: hsl(var(--card));
+    box-shadow: none;
   }
 
   .kivo-soft-panel {
-    border: 1px solid hsl(var(--border) / 0.24);
-    background:
-      linear-gradient(180deg, hsl(var(--card) / 0.9), hsl(var(--background) / 0.26));
-    box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.04),
-      0 18px 42px hsl(0 0% 0% / 0.11);
+    border: 1px solid hsl(var(--border) / 0.12);
+    background: hsl(var(--card));
+    box-shadow: 0 16px 36px hsl(0 0% 0% / 0.08);
   }
 
   .kivo-field {
-    border: 1px solid hsl(var(--border) / 0.28);
-    background: hsl(var(--background) / 0.28);
-    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.035);
+    border: 1px solid hsl(var(--border) / 0.14);
+    background: hsl(var(--input) / 0.58);
+    box-shadow: none;
   }
 
   .kivo-field:focus,
   .kivo-field:focus-within {
     border-color: hsl(var(--primary) / 0.56);
-    background: hsl(var(--background) / 0.38);
+    background: hsl(var(--input) / 0.72);
     box-shadow:
-      inset 0 1px 0 hsl(var(--foreground) / 0.04),
       0 0 0 3px hsl(var(--primary) / 0.08);
   }
 
   .kivo-quiet-divider {
-    border-color: hsl(var(--border) / 0.14);
+    border-color: hsl(var(--border) / 0.1);
+  }
+
+  .kivo-glass {
+    border: 1px solid hsl(var(--border) / 0.12);
+    background: hsl(var(--popover));
+    box-shadow: 0 14px 36px hsl(0 0% 0% / 0.12);
+  }
+
+  .kivo-bottom-dock {
+    border-top: 1px solid hsl(var(--border) / 0.1);
+    background: hsl(var(--background));
+  }
+
+  .kivo-dock-item {
+    display: inline-flex;
+    height: 34px;
+    min-width: 42px;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    border: 1px solid transparent;
+    padding: 0 12px;
+    color: hsl(var(--muted-foreground));
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0;
+  }
+
+  .kivo-dock-item:hover {
+    background: hsl(var(--accent) / 0.46);
+    color: hsl(var(--foreground));
+  }
+
+  .kivo-dock-item.is-active {
+    border-color: hsl(var(--primary) / 0.2);
+    background: hsl(var(--primary) / 0.12);
+    color: hsl(var(--foreground));
+    box-shadow: inset 0 -2px 0 hsl(var(--primary) / 0.62);
+  }
+
+  .kivo-nav-item {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kivo-nav-item::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 2px;
+    background: hsl(var(--primary) / 0);
+    transition: background-color 140ms ease;
+  }
+
+  .kivo-nav-item:hover::before,
+  .kivo-nav-item[data-active="true"]::before {
+    background: hsl(var(--primary) / 0.78);
+  }
+
+  .kivo-tab-active {
+    color: hsl(var(--foreground));
+    background: hsl(var(--primary) / 0.1);
+    box-shadow: inset 0 -1px 0 hsl(var(--primary) / 0.5);
   }
 
   .kivo-row-hover {

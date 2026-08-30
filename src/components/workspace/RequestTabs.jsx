@@ -142,7 +142,7 @@ export function RequestTabs({
   }
 
   return (
-    <div className="flex items-stretch overflow-x-auto overflow-y-hidden px-1 thin-scrollbar lg:h-[44px]">
+    <div className="thin-scrollbar flex items-stretch overflow-x-auto overflow-y-hidden px-1 lg:h-[44px]">
       {requestTabs.map((request) => (
         (() => {
           const isWebSocket = request.requestMode === REQUEST_MODES.WEBSOCKET;
@@ -177,8 +177,8 @@ export function RequestTabs({
               className={cn(
                 "group relative flex min-w-[120px] items-center gap-2 px-3 text-[12px] transition-colors lg:text-[13.5px]",
                 request.name === activeRequestName
-                  ? "bg-primary/10 text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]"
-                  : "bg-card text-muted-foreground hover:bg-accent hover:text-foreground"
+                  ? "bg-primary/10 text-foreground shadow-[inset_0_-1px_0_hsl(var(--primary)/0.72),inset_0_0_0_1px_hsl(var(--primary)/0.1)]"
+                  : "bg-transparent text-muted-foreground hover:bg-accent/18 hover:text-foreground"
               )}
             >
               <span className={cn("px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] lg:text-[11px]", methodTone)}>{displayMethod}</span>
@@ -213,7 +213,7 @@ export function RequestTabs({
       {createRequestMenu ? createPortal(
         <div
           ref={createMenuRef}
-          className="thin-scrollbar fixed z-[220] min-w-[220px] max-w-[calc(100vw-16px)] overflow-y-auto border border-border/60 bg-popover p-1 shadow-2xl"
+          className="kivo-glass thin-scrollbar fixed z-[220] min-w-[220px] max-w-[calc(100vw-16px)] overflow-y-auto p-1 shadow-2xl"
           style={createRequestMenuStyle}
           onMouseDown={(event) => event.stopPropagation()}
         >
