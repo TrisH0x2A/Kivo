@@ -4,6 +4,9 @@
 
 :root,
 .theme-light {
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 4px;
   --background: 38 38% 93%;
   --foreground: 24 18% 15%;
   --card: 42 30% 97%;
@@ -83,23 +86,23 @@
 }
 
 .theme-dark {
-  --background: 225 13% 12%;
-  --foreground: 216 24% 88%;
-  --card: 222 14% 16%;
-  --card-foreground: 216 24% 88%;
-  --popover: 224 14% 18%;
-  --popover-foreground: 216 24% 88%;
-  --primary: 217 92% 67%;
+  --background: 224 18% 9%;
+  --foreground: 214 30% 92%;
+  --card: 222 16% 13%;
+  --card-foreground: 216 26% 91%;
+  --popover: 222 16% 15%;
+  --popover-foreground: 216 26% 91%;
+  --primary: 212 100% 66%;
   --primary-foreground: 210 40% 98%;
-  --secondary: 223 13% 22%;
-  --secondary-foreground: 216 24% 88%;
-  --muted: 222 12% 19%;
-  --muted-foreground: 218 14% 61%;
-  --accent: 223 14% 23%;
-  --accent-foreground: 216 24% 88%;
-  --border: 222 14% 24%;
-  --input: 223 13% 20%;
-  --ring: 217 92% 67%;
+  --secondary: 221 15% 20%;
+  --secondary-foreground: 216 26% 91%;
+  --muted: 222 14% 17%;
+  --muted-foreground: 216 15% 66%;
+  --accent: 216 20% 22%;
+  --accent-foreground: 216 26% 91%;
+  --border: 219 16% 25%;
+  --input: 221 15% 16%;
+  --ring: 212 100% 66%;
   --success: 142 45% 50%;
   --success-foreground: 210 40% 98%;
   --warning: 40 72% 58%;
@@ -113,9 +116,9 @@
   --env-suggestion-active-text: 215 20% 92%;
   --env-suggestion-active-border: 207 100% 69%;
   --env-suggestion-value: 216 14% 70%;
-  --sidebar: 223 15% 15%;
-  --sidebar-foreground: 216 24% 88%;
-  --sidebar-border: 223 12% 24%;
+  --sidebar: 224 21% 11%;
+  --sidebar-foreground: 216 26% 90%;
+  --sidebar-border: 220 16% 22%;
   --tone-get: 207 100% 69%;
   --tone-query: 186 94% 58%;
   --tone-post: 120 41% 67%;
@@ -1020,7 +1023,7 @@
   body {
     @apply bg-background text-foreground antialiased;
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-    font-size: clamp(12px, 0.74vw + 4px, 16px);
+    font-size: 13px;
     line-height: 1.45;
     font-feature-settings: "ss01" 1, "cv02" 1, "cv03" 1;
   }
@@ -1115,7 +1118,7 @@
   textarea,
   select,
   [role="button"] {
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm);
   }
 
   button {
@@ -1144,8 +1147,8 @@
     outline-offset: -1px;
   }
 
-  :where(button, input, textarea, select, [role="button"], [class*="rounded"]) {
-    border-radius: 0 !important;
+  :where(button, input, textarea, select, [role="button"]) {
+    border-radius: var(--radius-sm);
   }
 
   #root {
@@ -1435,7 +1438,7 @@
 
   .thin-scrollbar::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
-    border-radius: 0;
+    border-radius: 999px;
     background-clip: padding-box;
     background-color: hsl(var(--muted-foreground) / 0.34);
   }
@@ -1445,7 +1448,7 @@
   }
 
   .thin-scrollbar::-webkit-scrollbar-track {
-    border-radius: 0;
+    border-radius: 999px;
     background: hsl(var(--background) / 0.08);
   }
 
@@ -1474,13 +1477,13 @@
 
   .editor-suggestion-scroll::-webkit-scrollbar-track {
     margin: 4px 0;
-    border-radius: 0;
+    border-radius: 999px;
     background: hsl(var(--background) / 0.08);
   }
 
   .editor-suggestion-scroll::-webkit-scrollbar-thumb {
     border: 1px solid transparent;
-    border-radius: 0;
+    border-radius: 999px;
     background-clip: padding-box;
     background-color: hsl(var(--muted-foreground) / 0.34);
   }
@@ -1514,15 +1517,9 @@
     text-rendering: geometricPrecision;
   }
 
-  *,
-  *::before,
-  *::after {
-    border-radius: 0 !important;
-  }
-
   body {
     background-color: hsl(var(--background));
-    background-image: none !important;
+    background-image: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.96) 100%) !important;
   }
 
   ::selection {
@@ -1535,7 +1532,7 @@
   textarea,
   select,
   [role="button"] {
-    border-radius: 0 !important;
+    border-radius: var(--radius-sm);
   }
 
   button,
@@ -1579,38 +1576,50 @@
 
 
   .panel-surface {
-    border-color: hsl(var(--border) / 0.12);
-    background: hsl(var(--card));
-    box-shadow: none;
+    border-color: hsl(var(--border) / 0.18);
+    border-radius: var(--radius-md);
+    background: hsl(var(--card) / 0.96);
+    box-shadow: 0 18px 42px hsl(0 0% 0% / 0.14), inset 0 1px 0 hsl(var(--foreground) / 0.035);
   }
 
   .kivo-app-shell {
-    background: hsl(var(--background));
-    box-shadow: none;
+    position: relative;
+    background:
+      linear-gradient(90deg, hsl(var(--foreground) / 0.018) 1px, transparent 1px),
+      linear-gradient(180deg, hsl(var(--foreground) / 0.014) 1px, transparent 1px),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background) / 0.98) 100%);
+    background-size: 32px 32px, 32px 32px, auto;
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.025);
   }
 
   .kivo-topbar {
-    border-color: hsl(var(--border) / 0.1);
-    background: hsl(var(--background));
-    box-shadow: none;
+    border-color: hsl(var(--border) / 0.16);
+    background: hsl(var(--background) / 0.86);
+    box-shadow: 0 10px 28px hsl(0 0% 0% / 0.08);
   }
 
   .kivo-panel {
-    border-color: hsl(var(--border) / 0.12);
-    background: hsl(var(--card));
-    box-shadow: none;
+    border-color: hsl(var(--border) / 0.18);
+    border-radius: var(--radius-md);
+    background: hsl(var(--card) / 0.96);
+    box-shadow:
+      0 20px 46px hsl(0 0% 0% / 0.16),
+      inset 0 1px 0 hsl(var(--foreground) / 0.04),
+      inset 0 0 0 1px hsl(var(--foreground) / 0.012);
   }
 
   .kivo-soft-panel {
-    border: 1px solid hsl(var(--border) / 0.12);
-    background: hsl(var(--card));
-    box-shadow: 0 16px 36px hsl(0 0% 0% / 0.08);
+    border: 1px solid hsl(var(--border) / 0.18);
+    border-radius: var(--radius-md);
+    background: hsl(var(--card) / 0.95);
+    box-shadow: 0 16px 36px hsl(0 0% 0% / 0.11);
   }
 
   .kivo-field {
-    border: 1px solid hsl(var(--border) / 0.14);
-    background: hsl(var(--input) / 0.58);
-    box-shadow: none;
+    border: 1px solid hsl(var(--border) / 0.22);
+    border-radius: var(--radius-sm);
+    background: hsl(var(--input) / 0.72);
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.035);
   }
 
   .kivo-field:focus,
@@ -1622,51 +1631,249 @@
   }
 
   .kivo-quiet-divider {
-    border-color: hsl(var(--border) / 0.1);
+    border-color: hsl(var(--border) / 0.15);
   }
 
   .kivo-glass {
-    border: 1px solid hsl(var(--border) / 0.12);
-    background: hsl(var(--popover));
-    box-shadow: 0 14px 36px hsl(0 0% 0% / 0.12);
+    border: 1px solid hsl(var(--border) / 0.2);
+    border-radius: var(--radius-md);
+    background: hsl(var(--popover) / 0.94);
+    box-shadow: 0 18px 46px hsl(0 0% 0% / 0.2);
+    backdrop-filter: blur(18px);
   }
 
-  .kivo-bottom-dock {
-    border-top: 1px solid hsl(var(--border) / 0.1);
-    background: hsl(var(--background));
+  .kivo-settings-rail {
+    border-right: 1px solid hsl(var(--border) / 0.15);
+    background:
+      linear-gradient(180deg, hsl(var(--card) / 0.64), hsl(var(--background) / 0.92) 42%, hsl(var(--background)));
+    box-shadow: inset -1px 0 0 hsl(var(--foreground) / 0.018);
   }
 
-  .kivo-dock-item {
+  .kivo-scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .kivo-scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kivo-settings-header {
+    border-bottom: 1px solid hsl(var(--border) / 0.15);
+    background: hsl(var(--background) / 0.88);
+    box-shadow: 0 10px 28px hsl(0 0% 0% / 0.07);
+  }
+
+  .kivo-settings-nav-item {
+    position: relative;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: hsl(var(--muted-foreground));
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      transform 120ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .kivo-settings-nav-item::before {
+    content: "";
+    position: absolute;
+    inset: 8px auto 8px 0;
+    width: 2px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background-color 140ms ease;
+  }
+
+  .kivo-settings-nav-item:hover {
+    border-color: hsl(var(--border) / 0.18);
+    background: hsl(var(--accent) / 0.24);
+    color: hsl(var(--foreground));
+  }
+
+  .kivo-settings-nav-item[data-active="true"] {
+    border-color: hsl(var(--primary) / 0.22);
+    background: hsl(var(--primary) / 0.1);
+    box-shadow:
+      inset 0 1px 0 hsl(var(--foreground) / 0.04),
+      0 8px 18px hsl(var(--primary) / 0.07);
+  }
+
+  .kivo-settings-nav-item[data-active="true"]::before {
+    background: hsl(var(--primary) / 0.78);
+  }
+
+  .kivo-settings-pill,
+  .kivo-settings-stat {
+    border: 1px solid hsl(var(--border) / 0.18);
+    border-radius: var(--radius-sm);
+    background: hsl(var(--card) / 0.58);
+    color: hsl(var(--muted-foreground));
+  }
+
+  .kivo-settings-pill {
     display: inline-flex;
-    height: 34px;
+    height: 28px;
+    align-items: center;
+    padding: 0 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .kivo-settings-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 9px;
+    font-size: 10.5px;
+  }
+
+  .kivo-settings-stat strong {
+    color: hsl(var(--foreground));
+    font-size: 12px;
+  }
+
+  .kivo-setting-check {
+    display: flex;
+    min-height: 34px;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid hsl(var(--border) / 0.16);
+    border-radius: var(--radius-sm);
+    background: hsl(var(--background) / 0.24);
+    padding: 7px 10px;
+    color: hsl(var(--foreground));
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease;
+  }
+
+  .kivo-setting-check:hover {
+    border-color: hsl(var(--primary) / 0.22);
+    background: hsl(var(--accent) / 0.18);
+  }
+
+  .kivo-theme-tile,
+  .kivo-link-row {
+    border: 1px solid hsl(var(--border) / 0.2);
+    border-radius: var(--radius-sm);
+    background: hsl(var(--background) / 0.24);
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      box-shadow 160ms ease;
+  }
+
+  .kivo-theme-tile:hover,
+  .kivo-link-row:hover {
+    border-color: hsl(var(--primary) / 0.25);
+    background: hsl(var(--accent) / 0.22);
+  }
+
+  .kivo-theme-tile[data-active="true"] {
+    border-color: hsl(var(--primary) / 0.5);
+    background: hsl(var(--primary) / 0.1);
+    box-shadow: inset 2px 0 0 hsl(var(--primary) / 0.72);
+  }
+
+  .kivo-chrome-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid hsl(var(--border) / 0.18);
+    border-radius: var(--radius-md);
+    background: hsl(var(--card) / 0.52);
+    padding: 3px;
+    box-shadow:
+      inset 0 1px 0 hsl(var(--foreground) / 0.035),
+      0 10px 26px hsl(0 0% 0% / 0.08);
+  }
+
+  .kivo-chrome-action {
+    display: inline-flex;
+    height: 28px;
     min-width: 42px;
     align-items: center;
     justify-content: center;
-    gap: 7px;
+    gap: 6px;
     border: 1px solid transparent;
-    padding: 0 12px;
+    border-radius: var(--radius-sm);
+    padding: 0 9px;
     color: hsl(var(--muted-foreground));
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
     line-height: 1;
     letter-spacing: 0;
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      transform 140ms ease,
+      box-shadow 160ms ease;
   }
 
-  .kivo-dock-item:hover {
-    background: hsl(var(--accent) / 0.46);
+  .kivo-chrome-action:hover {
+    border-color: hsl(var(--primary) / 0.24);
+    background: hsl(var(--accent) / 0.42);
     color: hsl(var(--foreground));
   }
 
-  .kivo-dock-item.is-active {
-    border-color: hsl(var(--primary) / 0.2);
-    background: hsl(var(--primary) / 0.12);
-    color: hsl(var(--foreground));
-    box-shadow: inset 0 -2px 0 hsl(var(--primary) / 0.62);
+  input[type="checkbox"],
+  input[type="radio"] {
+    display: inline-grid;
+    height: 14px;
+    width: 14px;
+    flex: 0 0 auto;
+    place-content: center;
+    appearance: none;
+    border: 1px solid hsl(var(--border) / 0.44);
+    background: hsl(var(--input) / 0.72);
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.04);
+  }
+
+  input[type="radio"] {
+    border-radius: 999px;
+  }
+
+  input[type="checkbox"]::before,
+  input[type="radio"]::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    transform: scale(0);
+    transition: transform 120ms ease;
+    background: hsl(var(--primary));
+  }
+
+  input[type="checkbox"]::before {
+    border-radius: 2px;
+  }
+
+  input[type="radio"]::before {
+    border-radius: 999px;
+  }
+
+  input[type="checkbox"]:checked,
+  input[type="radio"]:checked {
+    border-color: hsl(var(--primary) / 0.72);
+    background: hsl(var(--primary) / 0.14);
+  }
+
+  input[type="checkbox"]:checked::before,
+  input[type="radio"]:checked::before {
+    transform: scale(1);
   }
 
   .kivo-nav-item {
     position: relative;
     overflow: hidden;
+    border-radius: var(--radius-sm);
+    border: 1px solid transparent;
   }
 
   .kivo-nav-item::before {
@@ -1674,6 +1881,7 @@
     position: absolute;
     inset: 0 auto 0 0;
     width: 2px;
+    border-radius: 999px;
     background: hsl(var(--primary) / 0);
     transition: background-color 140ms ease;
   }
@@ -1683,10 +1891,19 @@
     background: hsl(var(--primary) / 0.78);
   }
 
+  .kivo-nav-item:hover {
+    border-color: hsl(var(--border) / 0.16);
+  }
+
+  .kivo-nav-item[data-active="true"] {
+    border-color: hsl(var(--primary) / 0.2);
+  }
+
   .kivo-tab-active {
     color: hsl(var(--foreground));
-    background: hsl(var(--primary) / 0.1);
-    box-shadow: inset 0 -1px 0 hsl(var(--primary) / 0.5);
+    border-radius: var(--radius-sm);
+    background: hsl(var(--primary) / 0.12);
+    box-shadow: inset 0 -2px 0 hsl(var(--primary) / 0.62);
   }
 
   .kivo-row-hover {
@@ -1698,6 +1915,34 @@
   .kivo-row-hover:hover {
     background: hsl(var(--primary) / 0.045);
     box-shadow: inset 2px 0 0 hsl(var(--primary) / 0.46);
+  }
+
+  .kivo-sidebar {
+    background:
+      linear-gradient(180deg, hsl(var(--sidebar)) 0%, hsl(var(--background)) 100%);
+    box-shadow:
+      inset -1px 0 0 hsl(var(--foreground) / 0.025),
+      18px 0 46px hsl(0 0% 0% / 0.1);
+  }
+
+  .kivo-sidebar-card {
+    background:
+      linear-gradient(180deg, hsl(var(--foreground) / 0.025) 0%, transparent 28%);
+  }
+
+  .kivo-workspace-switcher {
+    border-color: hsl(var(--border) / 0.16);
+    background: hsl(var(--card) / 0.46);
+    box-shadow: inset 0 1px 0 hsl(var(--foreground) / 0.035);
+  }
+
+  .kivo-workspace-switcher:hover {
+    border-color: hsl(var(--primary) / 0.28);
+    background: hsl(var(--accent) / 0.38);
+  }
+
+  .kivo-workspace-switcher svg:first-child {
+    color: hsl(var(--primary));
   }
 
   .panel-surface,
@@ -1714,6 +1959,21 @@
   .method-chip,
   [class*="tone-"] {
     letter-spacing: 0;
+  }
+
+  .rounded-none {
+    border-radius: var(--radius-xs) !important;
+  }
+
+  .rounded-sm {
+    border-radius: var(--radius-xs) !important;
+  }
+
+  .rounded-md,
+  .rounded-lg,
+  .rounded-xl,
+  .rounded-2xl {
+    border-radius: var(--radius-md) !important;
   }
 
   @media (prefers-reduced-motion: reduce) {

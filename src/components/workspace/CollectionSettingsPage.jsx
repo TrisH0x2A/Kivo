@@ -20,12 +20,12 @@ import { useWorkspaceEnvironments } from "@/hooks/use-workspace-environments.js"
 import { cn } from "@/lib/utils.js";
 
 const TABS = [
-  { id: "Overview", label: "Overview" },
-  { id: "Headers", label: "Headers" },
-  { id: "Environments", label: "Environments" },
-  { id: "Auth", label: "Auth" },
-  { id: "Docs", label: "Docs" },
-  { id: "Runner", label: "Runner" },
+  { id: "Overview", label: "Overview", description: "Path, requests, and collection health", icon: Layers },
+  { id: "Headers", label: "Headers", description: "Shared request headers", icon: Code2 },
+  { id: "Environments", label: "Environments", description: "Variables and active state", icon: Globe },
+  { id: "Auth", label: "Auth", description: "Inherited authentication", icon: Share2 },
+  { id: "Docs", label: "Docs", description: "Generated Markdown docs", icon: BookOpen },
+  { id: "Runner", label: "Runner", description: "Run the full collection", icon: FlaskConical },
 ];
 
 function createHeaderRow() {
@@ -48,15 +48,15 @@ function HeadersTable({ rows, onChange, onDelete }) {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-transparent">
-      <div className="grid grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-2 border-b border-border/25 bg-transparent px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+    <div className="flex h-full min-h-0 flex-col bg-card/30">
+      <div className="grid grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_40px] items-center gap-2 border-b border-border/20 bg-background/25 px-3 py-2 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
         <span>On</span>
         <span>Header</span>
         <span>Value</span>
         <span></span>
       </div>
 
-      <div className="thin-scrollbar min-h-0 flex-1 overflow-auto bg-transparent px-1">
+      <div className="thin-scrollbar min-h-0 flex-1 overflow-auto bg-background/10 px-1">
         {rows.length > 0 ? (
           <div className="grid">
             {rows.map((row) => (
@@ -100,7 +100,7 @@ function HeadersTable({ rows, onChange, onDelete }) {
         )}
       </div>
 
-      <div className="border-t border-border/20 bg-transparent px-3 py-2">
+      <div className="border-t border-border/20 bg-background/25 px-3 py-2">
         <Button type="button" variant="outline" className="h-8 text-[12px]" onClick={addRow}>
           Add Header
         </Button>
@@ -116,31 +116,28 @@ function OverviewTab({ workspace, collection, storagePath, envVars, onNavigate }
   const collectionPath =
     storagePath && workspace && collection
       ? [storagePath, workspace.name, "collections", collection.name].join(sep)
-      : "Loading…";
+      : "Loading...";
 
   const globalCount = envVars?.workspace?.length ?? 0;
   const collectionCount = envVars?.collection?.length ?? 0;
   const requestCount = collection?.requests?.length ?? 0;
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-8 gap-6 max-w-4xl">
-      <div className="mb-2">
-        <h2 className="text-xl font-semibold text-foreground tracking-tight">Collection Overview</h2>
-        <p className="text-[13px] text-muted-foreground mt-1">Manage everything across all requests in {collection?.name}.</p>
+    <div className="flex flex-col gap-4">
+      <div>
+        <h2 className="text-[17px] font-semibold tracking-tight text-foreground">Collection Overview</h2>
+        <p className="mt-1 text-[12px] text-muted-foreground">Manage everything shared across requests in {collection?.name}.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        { /* ... */ }
-        <Card
-          className="flex flex-col flex-1 rounded-none border-border/20 bg-transparent p-5 shadow-sm transition-all hover:bg-transparent"
-        >
-          <div className="flex items-center gap-3 mb-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-none bg-blue-500/10 text-blue-400">
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-4">
+        <Card className="kivo-soft-panel flex min-h-[134px] flex-col p-4 transition-colors xl:col-span-2">
+          <div className="mb-3 flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center border border-primary/15 bg-primary/10 text-primary">
               <FolderOpen className="h-4 w-4" />
             </div>
-            <h3 className="font-semibold text-foreground text-[13px]">Storage Path</h3>
+            <h3 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Storage Path</h3>
           </div>
-          <div className="mt-auto flex items-center justify-between rounded-none bg-transparent px-3 py-2.5 outline outline-1 outline-border/20 group-hover:bg-transparent transition-colors cursor-pointer" onClick={() => invoke("reveal_item", { workspaceName: workspace?.name, collectionName: collection?.name }).catch(console.error)}>
+          <div className="mt-auto flex cursor-pointer items-center justify-between border border-border/20 bg-background/30 px-3 py-2.5 transition-colors hover:border-primary/30 hover:bg-primary/10" onClick={() => invoke("reveal_item", { workspaceName: workspace?.name, collectionName: collection?.name }).catch(console.error)}>
             <p className="font-mono text-[11px] text-muted-foreground truncate w-full group-hover:text-foreground transition-colors" title={collectionPath}>
               {collectionPath}
             </p>
@@ -148,15 +145,29 @@ function OverviewTab({ workspace, collection, storagePath, envVars, onNavigate }
           </div>
         </Card>
 
-        <Card className="flex flex-col flex-1 rounded-none border-border/20 bg-transparent p-5 shadow-sm transition-all hover:bg-transparent">
+        <Card className="kivo-soft-panel flex min-h-[134px] flex-col justify-between p-4 transition-colors">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-none bg-purple-500/10 text-purple-400">
+              <div className="flex h-8 w-8 items-center justify-center border border-primary/15 bg-primary/10 text-primary">
                 <Layers className="h-4 w-4" />
               </div>
-              <h3 className="font-semibold text-foreground text-[13px]">Total Requests</h3>
+              <h3 className="text-[12px] font-semibold text-foreground">Requests</h3>
             </div>
-            <div className="text-2xl font-bold tracking-tight text-foreground/90">{requestCount}</div>
+          </div>
+          <div className="text-3xl font-semibold tracking-tight text-foreground">{requestCount}</div>
+          <p className="text-[11px] text-muted-foreground">Saved in this collection</p>
+        </Card>
+
+        <Card className="kivo-soft-panel flex min-h-[134px] flex-col justify-between p-4 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center border border-primary/15 bg-primary/10 text-primary">
+              <Globe className="h-4 w-4" />
+            </div>
+            <h3 className="text-[12px] font-semibold text-foreground">Variables</h3>
+          </div>
+          <div className="flex items-end gap-3">
+            <span className="text-3xl font-semibold tracking-tight text-foreground">{globalCount + collectionCount}</span>
+            <span className="pb-1 text-[11px] text-muted-foreground">{globalCount} workspace / {collectionCount} collection</span>
           </div>
         </Card>
       </div>
@@ -172,21 +183,21 @@ function HeadersTab({ config, updateConfig, onSave, onReset, isDirty, isSaving }
   }));
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-8 gap-6 max-w-4xl">
+    <div className="flex min-h-[560px] flex-col gap-4">
       <div>
         <h3 className="text-lg font-semibold text-foreground tracking-tight">Default Headers</h3>
         <p className="text-[13px] text-muted-foreground mt-1">
           Automatically attached to every request in this collection. Per-request headers will override these.
         </p>
       </div>
-      <Card className="flex flex-col gap-4 rounded-none border-border/20 bg-transparent p-1 shadow-sm overflow-hidden flex-1 min-h-0">
+      <Card className="kivo-panel flex min-h-0 flex-1 flex-col overflow-hidden p-1">
         <HeadersTable
           rows={rows}
           onChange={(nextRows) => updateConfig({ defaultHeaders: nextRows })}
           onDelete={(nextRows) => onSave({ defaultHeaders: nextRows })}
         />
       </Card>
-      <div className="flex items-center justify-between border-t border-border/10 pt-4 shrink-0">
+      <div className="flex shrink-0 items-center justify-between border-t border-border/10 pt-4">
         <div className="flex items-center gap-3 text-sm">
           {isDirty && (
             <div className="flex items-center gap-1.5 text-[12px] font-medium text-amber-500">
@@ -201,7 +212,7 @@ function HeadersTab({ config, updateConfig, onSave, onReset, isDirty, isSaving }
         <div className="flex items-center gap-3">
           <Button className="h-9 px-6 text-[13px] gap-2 shadow-md transition-transform active:scale-95" onClick={() => onSave()} disabled={isSaving || !isDirty}>
             <Save className="h-4 w-4" />
-            {isSaving ? "Savingâ€¦" : "Save"}
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
@@ -231,7 +242,7 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
   const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6 p-8">
+    <div className="flex min-h-[560px] flex-col gap-4">
       <div>
         <h3 className="text-lg font-semibold text-foreground tracking-tight">Collection Auth</h3>
         <p className="text-[13px] text-muted-foreground mt-1">
@@ -239,20 +250,20 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
         </p>
       </div>
 
-      <Card className={cn("flex min-h-0 flex-col gap-5 rounded-none border-border/20 bg-transparent p-5 shadow-sm", auth.type === "oauth2" ? "flex-1 overflow-hidden p-0" : "")}>
+      <Card className={cn("kivo-soft-panel flex min-h-0 flex-col gap-5 p-4", auth.type === "oauth2" ? "flex-1 overflow-hidden p-0" : "")}>
         <div className={cn("grid gap-3 text-left w-full", auth.type === "oauth2" && "border-b border-border/20 px-5 py-4") }>
           <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Authentication Type</label>
-          <div className="mt-1 inline-flex w-fit flex-wrap items-center gap-2 rounded-none border border-border/20 bg-transparent p-1">
+          <div className="mt-1 grid w-full grid-cols-2 gap-1 border border-border/20 bg-background/30 p-1 sm:grid-cols-4 xl:inline-grid xl:w-fit xl:grid-cols-8">
             {AUTH_MODES.map((m) => (
               <button
                 key={m.value}
                 type="button"
                 onClick={() => updateConfig({ defaultAuth: { ...auth, type: m.value } })}
                 className={cn(
-                  "px-4 py-1.5 rounded-none text-[12px] font-medium transition-all",
+                  "border border-transparent px-3 py-1.5 text-[12px] font-medium transition-all",
                   auth.type === m.value
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                    ? "border-primary/30 bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-accent/30 hover:text-foreground"
                 )}
               >
                 {m.label}
@@ -270,13 +281,13 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                 onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, token: val } })}
                 placeholder="eyJhbG..."
                 type={showToken ? "text" : "password"}
-                inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20 pr-10"
+                inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20 pr-10"
                 envVars={envVars}
               />
               <button
                 type="button"
                 onClick={() => setShowToken(!showToken)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-none text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground z-10"
+                className="absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground"
               >
                 {showToken ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
               </button>
@@ -292,10 +303,10 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
               value={auth.jwtToken ?? auth.token ?? ""}
               onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, jwtToken: val } })}
               placeholder="Paste signed JWT"
-              inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
+              inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
               envVars={envVars}
             />
-            <p className="text-[11px] text-muted-foreground mt-1">Sends <code className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded-none">Authorization: Bearer &lt;jwt&gt;</code>. Supports {'{{variables}}'}.</p>
+            <p className="text-[11px] text-muted-foreground mt-1">Sends <code className="text-[10px] bg-primary/10 text-primary px-1 py-0.5">Authorization: Bearer &lt;jwt&gt;</code>. Supports {'{{variables}}'}.</p>
           </div>
         )}
 
@@ -307,7 +318,7 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                 value={auth.username ?? ""}
                 onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, username: val } })}
                 placeholder="Enter username"
-                inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
+                inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
                 envVars={envVars}
               />
             </div>
@@ -319,20 +330,20 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                   onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, password: val } })}
                   placeholder="Enter password"
                   type={showPassword ? "text" : "password"}
-                  inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20 pr-10"
+                  inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20 pr-10"
                   envVars={envVars}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-none text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground z-10"
+                  className="absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                 </button>
               </div>
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">
-              Generates <code className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded-none">Authorization: Basic base64(user:pass)</code>. Supports {'{{variables}}'}.
+              Generates <code className="text-[10px] bg-primary/10 text-primary px-1 py-0.5">Authorization: Basic base64(user:pass)</code>. Supports {'{{variables}}'}.
             </p>
           </div>
         )}
@@ -369,7 +380,7 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                 value={auth.customScheme ?? ""}
                 onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, customScheme: val } })}
                 placeholder="e.g. Token, SharedKey, ApiToken"
-                inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
+                inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
                 envVars={envVars}
               />
             </div>
@@ -379,7 +390,7 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                 value={auth.customValue ?? ""}
                 onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, customValue: val } })}
                 placeholder="Credential value"
-                inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
+                inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
                 envVars={envVars}
               />
             </div>
@@ -395,7 +406,7 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                 value={auth.apiKeyName ?? ""}
                 onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, apiKeyName: val } })}
                 placeholder="e.g. X-API-Key"
-                inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
+                inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
                 envVars={envVars}
               />
             </div>
@@ -405,23 +416,23 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
                 value={auth.apiKeyValue ?? ""}
                 onValueChange={(val) => updateConfig({ defaultAuth: { ...auth, apiKeyValue: val } })}
                 placeholder="Enter API key value"
-                inputClassName="h-10 border-border/40 bg-transparent font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
+                inputClassName="h-10 border-border/40 bg-background/35 font-mono text-[12px] focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20"
                 envVars={envVars}
               />
             </div>
             <div className="grid gap-2">
               <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">Add To</label>
-              <div className="mx-5 mt-5 flex flex-wrap items-center gap-2 rounded-none border border-border/20 bg-transparent p-1 w-fit">
+              <div className="mt-1 inline-flex w-fit flex-wrap items-center gap-1 border border-border/20 bg-background/30 p-1">
                 {API_KEY_IN_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
                     onClick={() => updateConfig({ defaultAuth: { ...auth, apiKeyIn: opt.value } })}
                     className={cn(
-                      "px-4 py-1.5 rounded-none text-[12px] font-medium transition-all",
+                      "border border-transparent px-4 py-1.5 text-[12px] font-medium transition-all",
                       (auth.apiKeyIn ?? "header") === opt.value
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                        ? "border-primary/30 bg-primary text-primary-foreground shadow-sm"
+                        : "text-muted-foreground hover:bg-accent/30 hover:text-foreground"
                     )}
                   >
                     {opt.label}
@@ -475,7 +486,7 @@ function AuthTab({ workspace, collection, config, updateConfig, onSave, onReset,
         <div className="flex items-center gap-3">
           <Button className="h-9 px-6 text-[13px] gap-2 shadow-md transition-transform active:scale-95" onClick={() => onSave()} disabled={isSaving || !isDirty}>
             <Save className="h-4 w-4" />
-            {isSaving ? "Savingâ€¦" : "Save"}
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
@@ -554,7 +565,7 @@ function DocsTab({ collection, config }) {
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-4">
-      <Card className="border-border/25 bg-transparent p-5 shadow-sm">
+      <Card className="kivo-soft-panel p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-semibold text-foreground tracking-tight">API Documentation</h3>
@@ -575,7 +586,7 @@ function DocsTab({ collection, config }) {
       <textarea
         value={markdown}
         readOnly
-        className="thin-scrollbar h-full min-h-0 resize-none border border-border/25 bg-background/35 p-4 font-mono text-[12px] leading-6 text-foreground outline-none"
+        className="kivo-field thin-scrollbar h-full min-h-0 resize-none p-4 font-mono text-[12px] leading-6 text-foreground outline-none"
       />
     </div>
   );
@@ -629,44 +640,78 @@ export function CollectionSettingsPage({
     setActiveTab(tab);
   }
 
+  const activeTabMeta = TABS.find((tab) => tab.id === activeTab) ?? TABS[0];
+  const ActiveTabIcon = activeTabMeta.icon;
+  const activeHeaderCount = (config.defaultHeaders || []).filter((row) => row?.enabled !== false && String(row?.key || "").trim()).length;
+
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden bg-[hsl(var(--card)/0.92)]">
-      { }
-      <div className="flex items-center gap-3 border-b border-border/25 bg-transparent px-6 py-4 shrink-0">
-        <div className="flex h-8 w-8 items-center justify-center rounded-none bg-primary/10">
-          <FileJson className="h-4 w-4 text-primary" />
-        </div>
-        <div>
-          <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
-            Collection Settings
+    <div className="grid h-full min-h-0 grid-cols-[236px_minmax(0,1fr)] overflow-hidden bg-background">
+      <aside className="kivo-settings-rail kivo-scrollbar-none flex min-h-0 flex-col overflow-y-auto overflow-x-hidden px-3 py-4">
+        <div className="mb-4 flex items-center gap-3 px-2">
+          <div className="flex h-9 w-9 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
+            <FileJson className="h-4 w-4" />
           </div>
-          <div className="text-[18px] font-semibold text-foreground leading-tight">
-            {collection?.name ?? ""}
+          <div className="min-w-0">
+            <div className="truncate text-[15px] font-semibold tracking-tight text-foreground">{collection?.name ?? "Collection"}</div>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground/75">Collection settings</p>
           </div>
         </div>
-      </div>
 
-      { }
-      <div className="flex items-center gap-1 border-b border-border/25 bg-transparent px-4 shrink-0">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={cn(
-              "px-4 py-2.5 text-[12.5px] border-b-2 transition-colors -mb-px",
-              activeTab === tab.id
-                ? "border-primary text-foreground font-medium"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+        <div className="grid gap-1">
+          {TABS.map((tab) => {
+            const TabIcon = tab.icon;
+            const selected = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                data-active={selected}
+                className="kivo-settings-nav-item group flex w-full items-center gap-3 px-2.5 py-2.5 text-left"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-border/15 bg-background/25 text-muted-foreground transition-colors group-hover:text-foreground group-data-[active=true]:border-primary/25 group-data-[active=true]:bg-primary/10 group-data-[active=true]:text-primary">
+                  <TabIcon className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-medium text-foreground">{tab.label}</span>
+                  <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{tab.description}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-      { }
-      <div className="flex-1 min-h-0 overflow-auto bg-[hsl(var(--card)/0.92)]">
+        <div className="mt-auto grid gap-2 px-2 pt-4">
+          <div className="kivo-settings-stat">
+            <span>Requests</span>
+            <strong>{collection?.requests?.length ?? 0}</strong>
+          </div>
+          <div className="kivo-settings-stat">
+            <span>Headers</span>
+            <strong>{activeHeaderCount}</strong>
+          </div>
+        </div>
+      </aside>
+
+      <section className="flex min-h-0 flex-col overflow-hidden">
+        <div className="kivo-settings-header flex shrink-0 items-center justify-between gap-4 px-6 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
+              <ActiveTabIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Collection Settings</div>
+              <h2 className="truncate text-[20px] font-semibold tracking-tight text-foreground">{activeTabMeta.label}</h2>
+              <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{activeTabMeta.description}</p>
+            </div>
+          </div>
+          <div className={cn("kivo-settings-pill", isDirty && "border-amber-400/30 bg-amber-400/10 text-amber-200")}>
+            {isSaving ? "Saving..." : isDirty ? "Unsaved" : "Saved"}
+          </div>
+        </div>
+
+        <div className="thin-scrollbar min-h-0 flex-1 overflow-auto bg-background px-6 py-5">
+          <div className="flex h-full min-h-0 w-full max-w-6xl flex-col">
         {activeTab === "Overview" && (
           <OverviewTab
             workspace={workspace}
@@ -689,11 +734,11 @@ export function CollectionSettingsPage({
         )}
 
         {activeTab === "Environments" && (
-          <div className="h-full min-h-0 flex flex-col p-8 gap-4 max-w-4xl w-full">
+          <div className="flex min-h-[560px] w-full flex-col gap-4">
             <div>
               <h3 className="text-lg font-semibold text-foreground tracking-tight">Environments</h3>
               <p className="text-[13px] text-muted-foreground mt-1">
-                Define reusable state values. Use <code className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-none">{"{{KEY}}"}</code> in
+                Define reusable state values. Use <code className="text-[11px] bg-primary/10 text-primary px-1.5 py-0.5">{"{{KEY}}"}</code> in
                 URLs, headers, and payloads to interpolate them dynamically. Collection keys take priority.
               </p>
             </div>
@@ -705,7 +750,7 @@ export function CollectionSettingsPage({
               onSetActive={setActiveEnvironment}
               onDelete={deleteEnvironment}
             />
-            <Card className="flex-1 min-h-0 rounded-none border-border/20 bg-transparent shadow-sm overflow-hidden flex flex-col mt-2">
+            <Card className="kivo-panel mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
               <EnvEditor
                 workspaceName={workspace?.name}
                 collectionName={collection?.name}
@@ -738,8 +783,10 @@ export function CollectionSettingsPage({
         {activeTab === "Runner" && (
           <CollectionRunner workspace={workspace} collection={collection} />
         )}
+          </div>
+        </div>
+      </section>
       </div>
-    </div>
   );
 }
 

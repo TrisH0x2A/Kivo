@@ -226,8 +226,8 @@ export function ResponsePane({
   }
 
   return (
-    <Card className="kivo-glass flex h-full min-h-0 flex-col gap-0 overflow-hidden border-0 bg-background/20 p-0 shadow-none">
-      <div className="kivo-quiet-divider flex items-center justify-between border-b bg-background/12 px-3 py-2 text-[11px] text-muted-foreground lg:py-2.5 lg:text-[12px]">
+    <Card className="kivo-panel flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
+      <div className="kivo-quiet-divider flex items-center justify-between border-b bg-card/80 px-3 py-2 text-[11px] text-muted-foreground lg:py-2.5 lg:text-[12px]">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Clock3 className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
@@ -248,7 +248,7 @@ export function ResponsePane({
         </div>
       </div>
 
-      <div className="kivo-quiet-divider border-b bg-background/8 px-3 py-2 text-[12px] lg:text-[13px]">
+      <div className="kivo-quiet-divider border-b bg-card/70 px-3 py-2 text-[12px] lg:text-[13px]">
         <div className="flex items-center justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden pr-1">
             {responseTabs.map((tab) => (

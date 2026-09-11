@@ -40,7 +40,7 @@ export function SelectMenu({ value, options, onChange, className, renderValue, r
         }}
         disabled={disabled}
         className={cn(
-          "flex h-8 w-full items-center justify-between border border-border/25 bg-background/15 px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:bg-card/35 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70",
+          "kivo-field flex h-8 w-full items-center justify-between px-3 text-left text-[12px] text-foreground outline-none transition-colors hover:border-primary/30 hover:bg-input/80 focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70",
           buttonClassName
         )}
       >
@@ -49,7 +49,7 @@ export function SelectMenu({ value, options, onChange, className, renderValue, r
       </button>
 
       {open && !disabled ? (
-        <div className="absolute left-0 top-[calc(100%+4px)] z-[330] min-w-full overflow-hidden border border-border/35 bg-background shadow-xl">
+        <div className="kivo-glass absolute left-0 top-[calc(100%+6px)] z-[330] min-w-full overflow-hidden p-1 shadow-xl">
           {options.map((option) => {
             const active = option.value === value;
 
@@ -63,7 +63,7 @@ export function SelectMenu({ value, options, onChange, className, renderValue, r
                 }}
                 className={cn(
                   "flex w-full items-center justify-between px-3 py-2 text-left text-[12px] transition-colors",
-                  active ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-card/40 hover:text-foreground"
+                  active ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/30 hover:text-foreground"
                 )}
               >
                 {renderOption ? renderOption(option, active) : <span>{option.label}</span>}

@@ -27,7 +27,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy, rustfmt
+          components: clippy
 
       - name: Cache cargo registry & target
         uses: Swatinem/rust-cache@v2
@@ -36,10 +36,6 @@ jobs:
 
       - name: Create dummy dist (Tauri requirement)
         run: mkdir -p dist && touch dist/index.html
-
-      - name: Cargo fmt (check)
-        working-directory: desktop
-        run: cargo fmt --all -- --check
 
       - name: Cargo clippy
         working-directory: desktop

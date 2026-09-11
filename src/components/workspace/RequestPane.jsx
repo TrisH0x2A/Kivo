@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus, RefreshCw, SendHorizontal, Trash2, Wand2, X } from "lucide-react";
+import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus, RefreshCw, SendHorizontal, Trash2, TriangleAlert, Wand2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { CodeEditor } from "@/components/workspace/CodeEditor.jsx";
@@ -1243,9 +1243,9 @@ export function RequestPane({
   }
 
   return (
-    <Card className="kivo-glass flex h-full min-h-0 flex-col gap-0 overflow-hidden border-0 bg-background/20 p-0 shadow-none">
+    <Card className="kivo-panel flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
       <div className={cn(
-        "kivo-quiet-divider grid gap-px border-b bg-background/12",
+          "kivo-quiet-divider grid gap-px border-b bg-card",
         isGrpcRequest
           ? "grid-cols-[88px_minmax(0,1fr)_92px] xl:grid-cols-[100px_minmax(0,1fr)_260px_40px_40px_108px]"
           : "grid-cols-[108px_minmax(0,1fr)_92px] lg:grid-cols-[124px_minmax(0,1fr)_108px]"
@@ -1348,7 +1348,7 @@ export function RequestPane({
       </div>
 
       {isGrpcRequest ? (
-        <div className="kivo-quiet-divider grid grid-cols-[minmax(0,1fr)_34px_34px] gap-px border-b bg-background/8 xl:hidden">
+        <div className="kivo-quiet-divider grid grid-cols-[minmax(0,1fr)_34px_34px] gap-px border-b bg-card xl:hidden">
           {hasGrpcProtoSelected ? (
             <SelectMenu
               value={state.grpcMethodPath || ""}
@@ -1393,7 +1393,7 @@ export function RequestPane({
       ) : null}
 
       {isGrpcRequest ? (
-        <div className="kivo-quiet-divider flex items-center justify-between border-b bg-background/8 px-3 py-2 text-[11px] text-muted-foreground">
+        <div className="kivo-quiet-divider flex items-center justify-between border-b bg-card px-3 py-2 text-[11px] text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2 truncate">
             <FileText className="h-3.5 w-3.5 shrink-0 tone-grpc-text" />
             <span className="truncate">{grpcSelectedProtoFileName || "No .proto file selected"}</span>
@@ -1411,14 +1411,14 @@ export function RequestPane({
       ) : null}
 
       {isGrpcRequest && grpcReflectionStatus ? (
-        <div className="kivo-quiet-divider border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="kivo-quiet-divider border-b bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
           {grpcReflectionStatus}
         </div>
       ) : null}
 
       {missingVars.length > 0 && (
         <div className="flex items-center gap-2 border-b border-amber-500/20 bg-amber-500/[0.08] px-3 py-1.5 text-[11px] text-amber-500 dark:text-amber-400">
-          <span className="shrink-0">âš </span>
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
           <span>
             Undefined variable{missingVars.length > 1 ? "s" : ""}:{" "}
             <code className="font-mono">{missingVars.map((k) => `{{${k}}}`).join(", ")}</code>
@@ -1431,7 +1431,7 @@ export function RequestPane({
       <div className="min-h-0 flex-1 overflow-hidden bg-transparent">
         {activeTab === "Params" ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] text-[12px]">
-            <div className="kivo-quiet-divider border-b px-3 py-3">
+            <div className="kivo-quiet-divider border-b bg-card px-3 py-3">
               <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">URL Preview</div>
               <div className="kivo-field px-3 py-2 text-foreground">{urlPreview || state.url}</div>
             </div>
@@ -1450,7 +1450,7 @@ export function RequestPane({
             <GrpcHeadersPanel headers={state.headers} onHeadersChange={onHeadersChange} />
           ) : (
             <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-              <label className="kivo-quiet-divider flex items-center gap-2 border-b bg-background/8 px-4 py-2.5 text-[11px] text-muted-foreground lg:text-[12px] cursor-pointer">
+              <label className="kivo-quiet-divider flex items-center gap-2 border-b bg-card px-4 py-2.5 text-[11px] text-muted-foreground lg:text-[12px] cursor-pointer">
                 <input
                   type="checkbox"
                   className="accent-primary w-3 h-3.5 outline-none"

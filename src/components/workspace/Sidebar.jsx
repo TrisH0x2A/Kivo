@@ -1194,6 +1194,8 @@ export function RequestsView({
   workspaces, activeWorkspaceName, activeCollectionName, activeRequestName,
   onSelectWorkspace, onSelectCollection, onSelectRequest,
   onOpenCollectionSettings,
+  onOpenAppSettings,
+  settingsActive = false,
   onCreateWorkspace,
   onRenameWorkspace,
   onDeleteWorkspace,
@@ -1821,12 +1823,12 @@ export function RequestsView({
   }, [activeCollectionName]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden">
 
       <div className="relative mb-4">
         <button
           onClick={() => setIsWorkspaceSwitcherOpen(!isWorkspaceSwitcherOpen)}
-          className="flex w-full items-center justify-between gap-2 border border-transparent px-2 py-1.5 text-left transition-colors hover:border-border/35 hover:bg-accent/35"
+          className="kivo-workspace-switcher flex w-full items-center justify-between gap-2 border border-transparent px-2.5 py-2 text-left transition-colors"
         >
           <div className="flex items-center gap-2 min-w-0">
             <SquareKanban className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -1838,7 +1840,7 @@ export function RequestsView({
         </button>
 
         {isWorkspaceSwitcherOpen && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 border border-border/60 bg-popover p-1 shadow-xl">
+          <div className="kivo-glass absolute left-0 right-0 top-full z-50 mt-1 p-1 shadow-xl">
             {workspaces.map((w) => (
               <button
                 key={w.name}
@@ -1894,10 +1896,10 @@ export function RequestsView({
 
       {activeWorkspace && (
         <>
-          <div className="flex items-center justify-between px-1 mb-2">
+          <div className="mb-2 flex items-center justify-between px-1">
             <div className="flex items-center gap-2">
               <Layers className="h-4 w-4 text-muted-foreground" />
-              <span className="text-[12px] font-semibold text-foreground">Collections</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Collections</span>
             </div>
             <div className="relative flex items-center gap-1" ref={sidebarOptionsRef}>
               <button
@@ -1925,7 +1927,7 @@ export function RequestsView({
                 <MoreVertical className="h-4 w-4" />
               </button>
               {sidebarOptionsOpen && (
-                <div className="absolute right-0 top-[calc(100%+6px)] z-30 min-w-[210px] border border-border/60 bg-popover p-1 shadow-2xl">
+                <div className="kivo-glass absolute right-0 top-[calc(100%+6px)] z-30 min-w-[210px] p-1 shadow-2xl">
                   <button
                     type="button"
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] text-foreground hover:bg-accent/45"
@@ -1969,7 +1971,7 @@ export function RequestsView({
       )}
 
 
-      <div className="flex-1 thin-scrollbar overflow-auto pr-1">
+      <div className="thin-scrollbar flex-1 overflow-auto pr-1">
         {!activeWorkspace ? (
           <div className="flex flex-col items-center justify-center h-full text-center px-4 space-y-4 opacity-80">
             <div className="border border-border/35 bg-accent/20 p-3">
@@ -2014,7 +2016,7 @@ export function RequestsView({
               return (
                 <div
                   key={`col-container-${col.name}`}
-                  className="space-y-0.5 rounded transition-colors"
+                  className="space-y-1 transition-colors"
                 >
                   {isColEditing ? (
                     <RenameField value={col.name} onSubmit={(n) => { onRenameCollection(effectiveWorkspaceName, col.name, n); setEditingItemId(null); }} onCancel={() => setEditingItemId(null)} />
@@ -2031,8 +2033,8 @@ export function RequestsView({
                       onContextMenu={(e) => openCollectionContextMenu(e, effectiveWorkspaceName, col.name)}
                       data-active={isActive}
                       className={cn(
-                        "kivo-nav-item group flex items-center gap-1 px-1 py-1 transition-colors cursor-pointer select-none",
-                        isActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]" : "text-foreground/80 hover:bg-accent/18"
+                        "kivo-nav-item group flex min-h-[32px] items-center gap-1 px-1.5 py-1 transition-colors cursor-pointer select-none",
+                        isActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.16)]" : "text-foreground/80 hover:bg-accent/20"
                       )}
                     >
                       <button
@@ -2068,7 +2070,7 @@ export function RequestsView({
                     </div>
                   )}
                   {isColExpanded && (
-                    <div className="ml-3 space-y-0.5 pl-2">
+                    <div className="ml-3 space-y-1 border-l border-border/15 pl-2">
                       {(() => {
                         const folders = Array.from(
                           new Set([
@@ -2127,8 +2129,8 @@ export function RequestsView({
                                     setEditingItemId(`req:${col.name}:${req.name}`);
                                   }}
                                   className={cn(
-                                    "kivo-nav-item group flex items-center gap-2 px-2 py-1 text-[12px] transition-colors cursor-pointer select-none",
-                                    isReqActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]" : "text-muted-foreground hover:bg-accent/24 hover:text-foreground"
+                                    "kivo-nav-item group flex min-h-[30px] items-center gap-2 px-2 py-1 text-[12px] transition-colors cursor-pointer select-none",
+                                    isReqActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.18)]" : "text-muted-foreground hover:bg-accent/25 hover:text-foreground"
                                   )}
                                   data-active={isReqActive}
                                   onContextMenu={(e) => openRequestContextMenu(e, effectiveWorkspaceName, col.name, req)}
@@ -2171,7 +2173,7 @@ export function RequestsView({
                                       />
                                     ) : (
                                       <div
-                                        className="group flex items-center gap-1 px-1.5 py-1 text-[11.5px] text-muted-foreground hover:bg-accent/20"
+                                        className="group flex min-h-[28px] items-center gap-1 px-1.5 py-1 text-[11.5px] text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground"
                                         onContextMenu={(event) => openFolderContextMenu(event, effectiveWorkspaceName, col.name, folderPath)}
                                         onDoubleClick={(event) => {
                                           event.stopPropagation();
@@ -2222,7 +2224,7 @@ export function RequestsView({
                                     )}
 
                                     {isFolderExpanded ? (
-                                      <div className="ml-3 space-y-0.5 pl-2">
+                                      <div className="ml-3 space-y-1 border-l border-border/12 pl-2">
                                         {childFolders.map((childPath) => renderFolderNode(childPath))}
                                         {folderRequests.map((request, index) => renderRequestRow(request, index))}
 
@@ -2317,6 +2319,21 @@ export function RequestsView({
             )}
           </div>
         )}
+      </div>
+
+      <div className="kivo-sidebar-footer mt-3 border-t border-border/15 pt-3">
+        <button
+          type="button"
+          onClick={() => onOpenAppSettings?.("Storage")}
+          data-active={settingsActive}
+          className={cn(
+            "kivo-nav-item flex h-9 w-full items-center gap-2 px-2.5 text-left text-[12px] font-medium transition-colors",
+            settingsActive ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/22 hover:text-foreground"
+          )}
+        >
+          <Settings className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">Settings</span>
+        </button>
       </div>
 
       <RequestContextMenu
@@ -2450,6 +2467,7 @@ export function RequestsView({
 
 export function Sidebar({
   workspaces, activeWorkspaceName, activeCollectionName, activeRequestName,
+  settingsActive,
   onSelectWorkspace, onSelectCollection, onSelectRequest,
   onCreateWorkspace, onRenameWorkspace, onDeleteWorkspace,
   onCreateCollection, onRenameCollection, onDeleteCollection, onDuplicateCollection, onImportCollection,
@@ -2459,10 +2477,11 @@ export function Sidebar({
   onUpdateFolderSettings,
   onCreateRequest, onRenameRequest, onDeleteRequest, onDuplicateRequest, onImportRequests, onPasteRequest, onPasteFolder, onTogglePinRequest,
   onOpenCollectionSettings,
+  onOpenAppSettings,
 }) {
   return (
-    <aside className="h-full min-h-0 overflow-hidden border-r border-border/10 bg-[hsl(var(--sidebar))]">
-      <Card className="flex h-full min-h-0 flex-col gap-3 overflow-hidden border-0 bg-transparent p-3 text-[12px] text-[hsl(var(--sidebar-foreground))] shadow-none">
+    <aside className="kivo-sidebar h-full min-h-0 overflow-hidden border-r border-border/10 bg-[hsl(var(--sidebar))]">
+      <Card className="kivo-sidebar-card flex h-full min-h-0 flex-col gap-3 overflow-hidden border-0 bg-transparent p-3 text-[12px] text-[hsl(var(--sidebar-foreground))] shadow-none">
         <RequestsView
           workspaces={workspaces}
           activeWorkspaceName={activeWorkspaceName}
@@ -2472,6 +2491,8 @@ export function Sidebar({
           onSelectCollection={onSelectCollection}
           onSelectRequest={onSelectRequest}
           onOpenCollectionSettings={onOpenCollectionSettings}
+          onOpenAppSettings={onOpenAppSettings}
+          settingsActive={settingsActive}
           onCreateWorkspace={onCreateWorkspace}
           onRenameWorkspace={onRenameWorkspace}
           onDeleteWorkspace={onDeleteWorkspace}

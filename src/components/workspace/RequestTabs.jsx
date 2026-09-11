@@ -142,7 +142,7 @@ export function RequestTabs({
   }
 
   return (
-    <div className="thin-scrollbar flex items-stretch overflow-x-auto overflow-y-hidden px-1 lg:h-[44px]">
+    <div className="thin-scrollbar flex items-center gap-1 overflow-x-auto overflow-y-hidden px-2 py-1.5 lg:h-[48px]">
       {requestTabs.map((request) => (
         (() => {
           const isWebSocket = request.requestMode === REQUEST_MODES.WEBSOCKET;
@@ -175,10 +175,10 @@ export function RequestTabs({
               onClick={() => selectRequest(activeWorkspaceName, activeCollectionName, request.name)}
 
               className={cn(
-                "group relative flex min-w-[120px] items-center gap-2 px-3 text-[12px] transition-colors lg:text-[13.5px]",
+                "group relative flex h-9 min-w-[132px] items-center gap-2 px-3 text-[12px] transition-colors lg:text-[13px]",
                 request.name === activeRequestName
-                  ? "bg-primary/10 text-foreground shadow-[inset_0_-1px_0_hsl(var(--primary)/0.72),inset_0_0_0_1px_hsl(var(--primary)/0.1)]"
-                  : "bg-transparent text-muted-foreground hover:bg-accent/18 hover:text-foreground"
+                  ? "border border-primary/25 bg-primary/10 text-foreground shadow-[0_8px_22px_hsl(var(--primary)/0.08),inset_0_-2px_0_hsl(var(--primary)/0.68)]"
+                  : "border border-transparent bg-transparent text-muted-foreground hover:border-border/25 hover:bg-accent/20 hover:text-foreground"
               )}
             >
               <span className={cn("px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] lg:text-[11px]", methodTone)}>{displayMethod}</span>
@@ -203,7 +203,7 @@ export function RequestTabs({
         type="button"
         onClick={openCreateRequestMenu}
         className={cn(
-          "flex w-9 items-center justify-center bg-transparent text-muted-foreground hover:text-foreground transition-opacity",
+          "flex h-9 w-9 shrink-0 items-center justify-center border border-dashed border-border/30 bg-card/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground",
           !activeWorkspaceName && "opacity-0 pointer-events-none"
         )}
       >

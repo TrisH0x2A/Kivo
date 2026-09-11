@@ -19,7 +19,6 @@ import {
   Beaker,
   Building2,
   Code2,
-  FolderTree,
   Flame,
   FlaskConical,
   GitBranch,
@@ -27,7 +26,6 @@ import {
   Globe,
   Layers,
   MoonStar,
-  Settings,
   Snowflake,
   SquareKanban,
   Star,
@@ -93,13 +91,10 @@ function EnvChip({ globalCount, collectionCount, onClick }) {
   );
 }
 
-function BottomDock({
-  activeView,
+function ChromeActions({
   activeThemeMeta,
   ActiveThemeIcon,
   githubStars,
-  onOpenCollections,
-  onOpenSettings,
   onOpenGithub,
   onToggleTheme,
 }) {
@@ -111,54 +106,29 @@ function BottomDock({
       : "GitHub";
 
   return (
-    <nav className="kivo-bottom-dock shrink-0 px-3 py-2" aria-label="Primary navigation">
-      <div className="mx-auto flex h-11 max-w-[760px] items-center justify-center gap-1 border border-border/14 bg-card px-1.5 shadow-[0_-12px_36px_hsl(0_0%_0%/0.12)]">
-        <button
-          type="button"
-          className={`kivo-dock-item ${activeView === "collections" ? "is-active" : ""}`}
-          onClick={onOpenCollections}
-          title="Collections"
-          aria-label="Open collections"
-          aria-current={activeView === "collections" ? "page" : undefined}
-        >
-          <FolderTree className="h-4 w-4" />
-          <span>Collections</span>
-        </button>
-        <button
-          type="button"
-          className={`kivo-dock-item ${activeView === "settings" ? "is-active" : ""}`}
-          onClick={onOpenSettings}
-          title="App settings"
-          aria-label="Open app settings"
-          aria-current={activeView === "settings" ? "page" : undefined}
-        >
-          <Settings className="h-4 w-4" />
-          <span>Settings</span>
-        </button>
-        <div className="mx-1 h-5 w-px bg-border/16" />
-        <button
-          type="button"
-          className="kivo-dock-item"
-          onClick={onOpenGithub}
-          title="Open GitHub"
-          aria-label="Open Kivo on GitHub"
-        >
-          <Github className="h-4 w-4" />
-          <span>{formattedStars}</span>
-          <Star className="h-3.5 w-3.5 fill-current text-yellow-500/90" />
-        </button>
-        <button
-          type="button"
-          className="kivo-dock-item"
-          onClick={onToggleTheme}
-          title={`Switch theme (current: ${activeThemeMeta.label})`}
-          aria-label={`Switch theme. Current theme: ${activeThemeMeta.label}`}
-        >
-          <ActiveThemeIcon className="h-4 w-4" />
-          <span>{activeThemeMeta.label}</span>
-        </button>
-      </div>
-    </nav>
+    <div className="kivo-chrome-actions" aria-label="App utilities">
+      <button
+        type="button"
+        className="kivo-chrome-action"
+        onClick={onOpenGithub}
+        title="Open GitHub"
+        aria-label="Open Kivo on GitHub"
+      >
+        <Github className="h-3.5 w-3.5" />
+        <span>{formattedStars}</span>
+        <Star className="h-3 w-3 fill-current text-yellow-500/90" />
+      </button>
+      <button
+        type="button"
+        className="kivo-chrome-action"
+        onClick={onToggleTheme}
+        title={`Switch theme (current: ${activeThemeMeta.label})`}
+        aria-label={`Switch theme. Current theme: ${activeThemeMeta.label}`}
+      >
+        <ActiveThemeIcon className="h-3.5 w-3.5" />
+        <span>{activeThemeMeta.label}</span>
+      </button>
+    </div>
   );
 }
 
@@ -447,11 +417,6 @@ export default function App() {
     }
   }
 
-  function openCollectionsView() {
-    handleSidebarTabChange("requests");
-    setForcedView(null);
-  }
-
   if (!isSetupComplete) {
     return (
       <Suspense fallback={<WorkspaceFallback />}>
@@ -523,6 +488,7 @@ export default function App() {
                 }}
                 onOpenCollectionSettings={() => openCollectionSettings("Overview")}
                 onOpenAppSettings={openAppSettings}
+                settingsActive={showAppSettings}
                 onSelectRequest={handleSelectRequest}
                 onCreateWorkspace={createWorkspaceRecord}
                 onRenameWorkspace={renameWorkspaceRecord}
@@ -621,6 +587,13 @@ export default function App() {
                       />
                     </>
                   )}
+                  <ChromeActions
+                    activeThemeMeta={activeThemeMeta}
+                    ActiveThemeIcon={ActiveThemeIcon}
+                    githubStars={githubStars}
+                    onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
+                    onToggleTheme={toggleTheme}
+                  />
                 </div>
               </div>
 
@@ -643,10 +616,16 @@ export default function App() {
             <>
               <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b px-5 py-3.5 backdrop-blur-md">
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-3">
-                    <div className="text-[18px] font-semibold tracking-tight text-foreground">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="min-w-0 truncate text-[18px] font-semibold tracking-tight text-foreground">
                       {activeCollection?.name ?? "No Collection"}
                     </div>
+                    {activeRequest ? (
+                      <div className="hidden min-w-0 items-center gap-2 text-[12px] text-muted-foreground md:flex">
+                        <span className="h-1 w-1 rounded-full bg-primary/70" aria-hidden="true" />
+                        <span className="truncate">{activeRequest.name}</span>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 { }
@@ -660,6 +639,13 @@ export default function App() {
                       />
                     </>
                   )}
+                  <ChromeActions
+                    activeThemeMeta={activeThemeMeta}
+                    ActiveThemeIcon={ActiveThemeIcon}
+                    githubStars={githubStars}
+                    onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
+                    onToggleTheme={toggleTheme}
+                  />
                 </div>
               </div>
 
@@ -675,7 +661,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden bg-background p-2 pl-0">
+              <div className="min-h-0 flex-1 overflow-hidden bg-background p-4">
                 <Suspense fallback={<WorkspaceFallback />}>
                   <WorkspaceView
                     request={activeRequest}
@@ -703,16 +689,6 @@ export default function App() {
           ) : null}
           </main>
         </div>
-        <BottomDock
-          activeView={showAppSettings ? "settings" : "collections"}
-          activeThemeMeta={activeThemeMeta}
-          ActiveThemeIcon={ActiveThemeIcon}
-          githubStars={githubStars}
-          onOpenCollections={openCollectionsView}
-          onOpenSettings={() => openAppSettings("Storage")}
-          onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
-          onToggleTheme={toggleTheme}
-        />
       </div>
     </div>
   );

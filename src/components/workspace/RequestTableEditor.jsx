@@ -103,11 +103,11 @@ export function TableEditor({
     : "grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_36px]";
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-background/5">
-      <div className="flex items-center justify-between gap-3 border-b border-border/12 px-3 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
+    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-card/35">
+      <div className="flex items-center justify-between gap-3 border-b border-border/15 bg-card/70 px-3 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate font-medium text-foreground">{title}</span>
-          <span className="shrink-0 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-primary">
+          <span className="shrink-0 rounded-sm bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-primary">
             {activeCount} active
           </span>
         </div>

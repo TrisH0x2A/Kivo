@@ -25,7 +25,7 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
   }, [menuOpen]);
 
   return (
-    <div className="kivo-quiet-divider border-b bg-background/8 px-2 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
+    <div className="kivo-quiet-divider border-b bg-card/75 px-2 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
       <div className="flex items-center gap-1">
         {mainTabs.map((tab) => (
           <button

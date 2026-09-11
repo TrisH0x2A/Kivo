@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { BookOpen, Cookie, ExternalLink, FileText, FolderOpen, Github, HardDrive, Heart, Keyboard, Lightbulb, Palette, Plus, RefreshCw, Settings2, ShieldCheck, Siren, Star, Trash2, X } from "lucide-react";
+import { BookOpen, Cookie, ExternalLink, FileText, FolderOpen, Github, HardDrive, Heart, Keyboard, Lightbulb, Network, Palette, Plus, RefreshCw, Settings2, ShieldCheck, Siren, Star, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -28,7 +28,19 @@ const EMPTY_COOKIE_DRAFT = {
   collectionName: "",
 };
 
-const SETTINGS_TABS = ["Storage", "Theme", "Security", "Keybindings", "Proxy", "Cookie Jar", "History", "Updates", "Resources"];
+const SETTINGS_SECTIONS = [
+  { id: "Storage", label: "Storage", description: "Data root and migration", icon: HardDrive },
+  { id: "Theme", label: "Theme", description: "Appearance and editor skin", icon: Palette },
+  { id: "Security", label: "Security", description: "TLS, OAuth, and certificates", icon: ShieldCheck },
+  { id: "Keybindings", label: "Keybindings", description: "Command shortcuts", icon: Keyboard },
+  { id: "Proxy", label: "Proxy", description: "Network routing", icon: Network },
+  { id: "Cookie Jar", label: "Cookie Jar", description: "Stored sessions", icon: Cookie },
+  { id: "History", label: "History", description: "Request archive", icon: FileText },
+  { id: "Updates", label: "Updates", description: "Version and releases", icon: RefreshCw },
+  { id: "Resources", label: "Resources", description: "Docs and project links", icon: BookOpen },
+];
+
+const SETTINGS_TABS = SETTINGS_SECTIONS.map((section) => section.id);
 
 const DEFAULT_APP_SETTINGS = {
   clearOAuthSessionOnStart: false,
@@ -319,9 +331,9 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
   const statusTone =
     updaterStatus === "available"
-      ? "bg-emerald-500/12 text-emerald-400 border-emerald-500/30"
+      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
       : updaterStatus === "downloading"
-        ? "bg-blue-500/12 text-blue-400 border-blue-500/30"
+        ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
         : "bg-muted/35 text-muted-foreground border-border/30";
 
   const reportIssueUrl = useMemo(() => {
@@ -420,6 +432,11 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
   const lightThemes = useMemo(() => THEME_OPTIONS.filter((item) => item.appearance === "light"), []);
   const darkThemes = useMemo(() => THEME_OPTIONS.filter((item) => item.appearance !== "light"), []);
+  const activeSettingsMeta = useMemo(
+    () => SETTINGS_SECTIONS.find((section) => section.id === activeSettingsTab) ?? SETTINGS_SECTIONS[0],
+    [activeSettingsTab]
+  );
+  const ActiveSettingsIcon = activeSettingsMeta.icon;
 
   function findShortcutConflict(actionId, shortcutValue) {
     const normalized = String(shortcutValue || "").trim();
@@ -607,42 +624,70 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
   }
 
   return (
-    <div className="thin-scrollbar flex h-full min-h-0 flex-col overflow-y-auto overflow-x-hidden bg-[hsl(var(--sidebar))]/98 p-6 lg:p-7 [&_button]:!rounded-none [&_input]:!rounded-none [&_input]:!bg-transparent">
-      <div className="mb-6 flex items-start gap-4">
-        <div className="flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center border border-primary/35 bg-primary/12 text-primary shadow-sm shadow-primary/10">
-          <Settings2 className="h-4.5 w-4.5" />
+    <div className="grid h-full min-h-0 grid-cols-[236px_minmax(0,1fr)] overflow-hidden bg-background">
+      <aside className="kivo-settings-rail kivo-scrollbar-none flex min-h-0 flex-col overflow-y-auto overflow-x-hidden px-3 py-4">
+        <div className="mb-4 flex items-center gap-3 px-2">
+          <div className="flex h-9 w-9 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
+            <Settings2 className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate text-[15px] font-semibold tracking-tight text-foreground">App Settings</h2>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground/75">Preferences and runtime</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">App Settings</h2>
-          <p className="mt-0.5 text-[12px] text-muted-foreground/75">Manage app preferences</p>
-        </div>
-        </div>
-      </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-border/25 pb-3">
-        {SETTINGS_TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveSettingsTab(tab)}
-            className={`h-9 border px-3.5 text-[12px] transition-colors ${activeSettingsTab === tab ? "border-primary/45 bg-primary/12 font-medium text-foreground" : "border-border/30 bg-transparent text-muted-foreground hover:border-border/45 hover:text-foreground"}`}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+        <div className="grid gap-1">
+          {SETTINGS_SECTIONS.map((section) => {
+            const SectionIcon = section.icon;
+            const selected = activeSettingsTab === section.id;
+            return (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSettingsTab(section.id)}
+                data-active={selected}
+                className="kivo-settings-nav-item group flex w-full items-center gap-3 px-2.5 py-2.5 text-left"
+              >
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-border/15 bg-background/25 text-muted-foreground transition-colors group-hover:text-foreground group-data-[active=true]:border-primary/25 group-data-[active=true]:bg-primary/10 group-data-[active=true]:text-primary">
+                  <SectionIcon className="h-3.5 w-3.5" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-medium text-foreground">{section.label}</span>
+                  <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{section.description}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </aside>
 
-      <div className="flex w-full max-w-5xl flex-col gap-4">
+      <section className="flex min-h-0 flex-col overflow-hidden">
+        <div className="kivo-settings-header flex shrink-0 items-center justify-between gap-4 px-6 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
+              <ActiveSettingsIcon className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-[20px] font-semibold tracking-tight text-foreground">{activeSettingsMeta.label}</h2>
+              <p className="mt-0.5 truncate text-[12px] text-muted-foreground">{activeSettingsMeta.description}</p>
+            </div>
+          </div>
+          <div className="kivo-settings-pill">
+            {isSavingSettings ? "Saving..." : "Saved"}
+          </div>
+        </div>
+
+        <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+          <div className="flex w-full max-w-6xl flex-col gap-4">
         {activeSettingsTab === "Storage" ? (
           <>
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_10px_24px_hsl(var(--background)/0.28)]">
+          <Card className="kivo-soft-panel p-5">
           <div className="mb-4 flex items-start justify-between gap-3">
             <div className="flex items-center gap-2 text-foreground">
               <HardDrive className="h-4 w-4 text-primary" />
               <h3 className="text-[14px] font-semibold">Storage Path</h3>
             </div>
-            <div className="border border-border/35 bg-transparent px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+            <div className="border border-border/10 bg-background/35 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
               Active data root
             </div>
           </div>
@@ -657,15 +702,15 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                   setPathValidation(null);
                 }}
                 placeholder="Select storage folder"
-                className="h-10 border-border/35 bg-background/35 text-[13px]"
+                className="kivo-field h-10 border-border/15 bg-input/60 text-[13px]"
               />
-              <Button type="button" variant="outline" size="icon" className="h-10 w-10 border-border/45 bg-background/35" onClick={handleBrowse}>
+              <Button type="button" variant="outline" size="icon" className="h-10 w-10 border-border/20 bg-input/60" onClick={handleBrowse}>
                 <FolderOpen className="h-4 w-4" />
               </Button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-[12px]">
-              <Button type="button" variant="secondary" size="sm" className="h-8 border border-border/40 bg-background/35" onClick={handleValidate}>
+              <Button type="button" variant="secondary" size="sm" className="h-8 border border-border/15 bg-accent/30" onClick={handleValidate}>
                 Validate Path
               </Button>
               {pathValidation ? (
@@ -677,14 +722,14 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
               ) : null}
             </div>
 
-            <div className="border border-border/35 bg-transparent px-3 py-2.5">
+            <div className="border border-border/10 bg-background/30 px-3 py-2.5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Resolved path</div>
               <div className="mt-1 break-all font-mono text-[11px] text-foreground/90">{resolvedTargetPath || "-"}</div>
             </div>
 
-            <div className="space-y-2 border border-border/35 bg-transparent p-3.5">
+            <div className="space-y-2 border border-border/10 bg-background/30 p-3.5">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">When switching</div>
-              <label className="flex items-center gap-2 text-[12px] text-foreground">
+              <label className="kivo-setting-check text-[12px]">
                 <input
                   type="radio"
                   name="migration-mode"
@@ -694,7 +739,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 />
                 Copy all existing data to new path
               </label>
-              <label className="flex items-center gap-2 text-[12px] text-foreground">
+              <label className="kivo-setting-check text-[12px]">
                 <input
                   type="radio"
                   name="migration-mode"
@@ -711,7 +756,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             ) : null}
             {pathError ? <div className="border border-[hsl(var(--danger)/0.55)] bg-[hsl(var(--danger)/0.16)] px-2.5 py-2 text-[12px] font-medium text-[hsl(var(--danger))]">{pathError}</div> : null}
 
-            <div className="flex items-center justify-between gap-4 border-t border-border/20 pt-3">
+            <div className="flex items-center justify-between gap-4 pt-2">
               <div className="text-[11px] text-muted-foreground min-w-0">
                 Current: <span className="font-mono">{storagePath || "-"}</span>
               </div>
@@ -726,7 +771,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
       {activeSettingsTab === "Keybindings" ? (
         <>
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+          <Card className="kivo-soft-panel p-5">
             <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
               <div className="flex items-center gap-2">
                 <Keyboard className="h-4 w-4 text-primary" />
@@ -745,7 +790,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
             <div className="space-y-4 text-[12px]">
               {Object.entries(keybindingSections).map(([sectionName, items]) => (
-                <div key={sectionName} className="border border-border/25 bg-transparent p-3">
+                <div key={sectionName} className="border border-border/20 bg-background/25 p-3">
                   <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                     {sectionName}
                   </div>
@@ -782,7 +827,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
       ) : null}
 
       {activeSettingsTab === "Theme" ? (
-        <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+        <Card className="kivo-soft-panel p-5">
           <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
             <div className="flex items-center gap-2">
               <Palette className="h-4 w-4 text-primary" />
@@ -804,7 +849,8 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                       key={item.id}
                       type="button"
                       onClick={() => onThemeChange?.(item.id)}
-                      className={`border p-3 text-left transition-colors ${selected ? "border-primary/55 bg-primary/12 text-foreground" : "border-border/35 bg-background/20 text-foreground hover:border-border/50"}`}
+                      data-active={selected}
+                      className="kivo-theme-tile p-3 text-left text-foreground"
                     >
                       <div className="mb-2 grid h-8 grid-cols-3 overflow-hidden border border-border/30">
                         <span style={{ backgroundColor: item.preview?.bg }} />
@@ -828,7 +874,8 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                       key={item.id}
                       type="button"
                       onClick={() => onThemeChange?.(item.id)}
-                      className={`border p-3 text-left transition-colors ${selected ? "border-primary/55 bg-primary/12 text-foreground" : "border-border/35 bg-background/20 text-foreground hover:border-border/50"}`}
+                      data-active={selected}
+                      className="kivo-theme-tile p-3 text-left text-foreground"
                     >
                       <div className="mb-2 grid h-8 grid-cols-3 overflow-hidden border border-border/30">
                         <span style={{ backgroundColor: item.preview?.bg }} />
@@ -846,7 +893,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
       ) : null}
 
       {activeSettingsTab === "Proxy" ? (
-        <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_10px_24px_hsl(var(--background)/0.28)]">
+        <Card className="kivo-soft-panel p-5">
           <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
             <h3 className="text-[14px] font-semibold">Network Proxy</h3>
             <div className="text-[10px] text-muted-foreground uppercase tracking-[0.12em]">
@@ -855,7 +902,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
           </div>
 
           <div className="grid gap-3 text-[12px]">
-            <label className="inline-flex items-center gap-2 text-foreground">
+            <label className="kivo-setting-check text-foreground">
               <input
                 type="checkbox"
                 className="accent-primary"
@@ -925,7 +972,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
       ) : null}
 
         {activeSettingsTab === "Cookie Jar" ? (
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+          <Card className="kivo-soft-panel p-5">
           <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
             <div className="flex items-center gap-2">
               <Cookie className="h-4 w-4 text-primary" />
@@ -954,7 +1001,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
               </Button>
             </div>
 
-            <div className="max-h-[280px] thin-scrollbar overflow-auto border border-border/25 bg-transparent">
+            <div className="thin-scrollbar max-h-[280px] overflow-auto border border-border/20 bg-background/25">
               {isCookieLoading ? (
                 <div className="px-3 py-3 text-muted-foreground">Loading cookies...</div>
               ) : filteredCookies.length === 0 ? (
@@ -1008,7 +1055,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
         {activeSettingsTab === "Security" ? (
           <>
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_10px_24px_hsl(var(--background)/0.28)]">
+          <Card className="kivo-soft-panel p-5">
             <div className="mb-4 flex items-start justify-between gap-3">
               <div className="flex items-center gap-2 text-foreground">
                 <ShieldCheck className="h-4 w-4 text-primary" />
@@ -1020,7 +1067,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             </div>
 
             <div className="grid gap-2 text-[12px]">
-              <label className="inline-flex items-center gap-2 text-foreground">
+              <label className="kivo-setting-check text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1030,7 +1077,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 Clear OAuth sessions on app start
               </label>
 
-              <label className="inline-flex items-center gap-2 text-foreground">
+              <label className="kivo-setting-check text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1040,7 +1087,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 Validate certificates during authentication
               </label>
 
-              <label className="inline-flex items-center gap-2 text-foreground">
+              <label className="kivo-setting-check text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1052,14 +1099,14 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             </div>
           </Card>
 
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_10px_24px_hsl(var(--background)/0.28)]">
+          <Card className="kivo-soft-panel p-5">
             <div className="mb-4 flex items-center gap-2 text-foreground">
               <ShieldCheck className="h-4 w-4 text-primary" />
               <h3 className="text-[14px] font-semibold">Certificate Trust</h3>
             </div>
 
             <div className="grid gap-2 text-[12px]">
-              <label className="inline-flex items-center gap-2 text-foreground">
+              <label className="kivo-setting-check text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1069,7 +1116,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 SSL/TLS certificate verification for requests
               </label>
 
-              <label className="inline-flex items-center gap-2 text-foreground">
+              <label className="kivo-setting-check text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1092,7 +1139,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 />
               </div>
 
-              <label className="inline-flex items-center gap-2 pl-6 text-foreground">
+              <label className="kivo-setting-check ml-6 text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1103,7 +1150,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
                 Keep default CA certificates
               </label>
 
-              <label className="inline-flex items-center gap-2 pt-2 text-foreground">
+              <label className="kivo-setting-check mt-2 text-foreground">
                 <input
                   type="checkbox"
                   className="accent-primary"
@@ -1135,7 +1182,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
         ) : null}
 
         {activeSettingsTab === "Updates" ? (
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+          <Card className="kivo-soft-panel p-5">
           <div className="mb-4 flex items-center justify-between gap-2 text-foreground">
             <div className="flex items-center gap-2">
               <RefreshCw className="h-4 w-4 text-primary" />
@@ -1147,7 +1194,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
           </div>
 
           <div className="space-y-3 text-[12px]">
-            <div className="border border-border/30 bg-transparent px-3 py-2.5 text-muted-foreground">
+            <div className="border border-border/20 bg-background/25 px-3 py-2.5 text-muted-foreground">
               Current version: <span className="font-semibold text-foreground">v{appVersion}</span>
             </div>
             <div className="flex flex-wrap gap-2 pt-1">
@@ -1178,7 +1225,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
         ) : null}
 
         {activeSettingsTab === "Resources" ? (
-          <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+          <Card className="kivo-soft-panel p-5">
           <div className="mb-4 flex items-center gap-2 text-foreground">
             <BookOpen className="h-4 w-4 text-primary" />
             <h3 className="text-[14px] font-semibold">Resources & Support</h3>
@@ -1188,7 +1235,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             <button
               type="button"
               onClick={() => handleOpenExternal("https://github.com/TrisH0x2A/Kivo/blob/main/CHANGELOG.md", "changelog")}
-              className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
+              className="kivo-link-row flex items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="flex items-center gap-2 text-foreground"><BookOpen className="h-3.5 w-3.5 text-primary" />View Changelog</span>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1197,7 +1244,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             <button
               type="button"
               onClick={() => handleOpenExternal("https://github.com/TrisH0x2A/Kivo/blob/main/LICENSE", "license")}
-              className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
+              className="kivo-link-row flex items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="flex items-center gap-2 text-foreground"><FileText className="h-3.5 w-3.5 text-primary" />View License</span>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1206,7 +1253,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             <button
               type="button"
               onClick={() => handleOpenExternal("https://github.com/TrisH0x2A/Kivo", "GitHub")}
-              className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
+              className="kivo-link-row flex items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="flex items-center gap-2 text-foreground"><Star className="h-3.5 w-3.5 text-amber-400" />Give a Star on GitHub</span>
               <Github className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1215,7 +1262,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             <button
               type="button"
               onClick={() => handleOpenExternal("https://github.com/sponsors/TrisH0x2A", "sponsorship page")}
-              className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
+              className="kivo-link-row flex items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="flex items-center gap-2 text-foreground"><Heart className="h-3.5 w-3.5 text-rose-400" />Sponsor this Project</span>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1224,7 +1271,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             <button
               type="button"
               onClick={() => handleOpenExternal(reportIssueUrl, "issue form")}
-              className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
+              className="kivo-link-row flex items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="flex items-center gap-2 text-foreground"><Siren className="h-3.5 w-3.5 text-orange-400" />Report Issue</span>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1233,7 +1280,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
             <button
               type="button"
               onClick={() => handleOpenExternal(featureRequestUrl, "feature request form")}
-              className="flex items-center justify-between border border-border/35 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-background/20"
+              className="kivo-link-row flex items-center justify-between px-3 py-2.5 text-left"
             >
               <span className="flex items-center gap-2 text-foreground"><Lightbulb className="h-3.5 w-3.5 text-cyan-400" />Request a Feature</span>
               <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1241,11 +1288,13 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
           </div>
           </Card>
         ) : null}
-      </div>
+          </div>
+        </div>
+      </section>
 
       {isCookieEditorOpen ? createPortal(
         <div className="fixed inset-0 z-[330] flex items-center justify-center bg-black/70 p-4" onMouseDown={(event) => event.target === event.currentTarget && closeCookieEditor()}>
-          <Card className="w-full max-w-4xl rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-2xl">
+          <Card className="kivo-glass w-full max-w-4xl p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-foreground">{cookieDraft.id ? "Edit Cookie" : "Add Cookie"}</h3>
               <button type="button" onClick={closeCookieEditor} className="text-muted-foreground transition-colors hover:text-foreground">
@@ -1341,7 +1390,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
           className="fixed inset-0 z-[340] flex items-center justify-center bg-black/70 p-4"
           onMouseDown={(event) => event.target === event.currentTarget && closeShortcutEditor()}
         >
-          <Card className="w-full max-w-2xl rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-2xl">
+          <Card className="kivo-glass w-full max-w-2xl p-5">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-foreground">Edit Shortcut</h3>
               <button type="button" onClick={closeShortcutEditor} className="text-muted-foreground transition-colors hover:text-foreground">

@@ -31,7 +31,7 @@ export function HistorySettingsPanel({ requestHistory = [], onClearHistory }) {
   }
 
   return (
-    <Card className="rounded-none border border-border/35 bg-[hsl(var(--sidebar))]/98 p-5 shadow-[0_8px_20px_hsl(var(--background)/0.2)]">
+    <Card className="kivo-soft-panel p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-foreground">
         <div>
           <h3 className="text-[14px] font-semibold">Request History</h3>
@@ -44,7 +44,7 @@ export function HistorySettingsPanel({ requestHistory = [], onClearHistory }) {
               value={historySearch}
               onChange={(event) => setHistorySearch(event.target.value)}
               placeholder="Search history"
-              className="h-8 w-48 border-border/40 bg-background/35 pl-7 text-[12px]"
+              className="kivo-field h-8 w-48 border-border/25 bg-background/35 pl-7 text-[12px]"
             />
           </div>
           <Button
@@ -74,12 +74,12 @@ export function HistorySettingsPanel({ requestHistory = [], onClearHistory }) {
           </Button>
         </div>
       </div>
-      <div className="thin-scrollbar max-h-[520px] overflow-auto border border-border/20">
+      <div className="thin-scrollbar max-h-[520px] overflow-auto border border-border/20 bg-background/20">
         {filteredHistory.length === 0 ? (
           <div className="p-4 text-[12px] text-muted-foreground">No requests sent yet.</div>
         ) : (
           filteredHistory.map((entry) => (
-            <div key={entry.id || `${entry.sentAt}-${entry.url}`} className="grid grid-cols-[88px_minmax(0,1fr)_92px_120px] gap-3 border-b border-border/10 px-3 py-2 text-[12px]">
+            <div key={entry.id || `${entry.sentAt}-${entry.url}`} className="grid grid-cols-[88px_minmax(0,1fr)_92px_120px] gap-3 border-b border-border/10 px-3 py-2 text-[12px] transition-colors hover:bg-accent/20">
               <div className={entry.ok ? "text-emerald-400" : "text-red-400"}>{entry.status || "ERR"}</div>
               <div className="min-w-0">
                 <div className="truncate text-foreground">{entry.method} {entry.url}</div>

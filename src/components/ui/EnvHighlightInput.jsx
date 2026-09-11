@@ -208,7 +208,7 @@ export function EnvHighlightInput({
   }, [selectedIdx, showSuggestions]);
 
   const finalInputClass = cn(
-    "flex h-10 w-full border border-border/40 bg-transparent px-2.5 py-2 text-[13px] font-mono outline-none transition-colors",
+    "kivo-field flex h-10 w-full border border-border/30 bg-background/35 px-2.5 py-2 text-[13px] font-mono outline-none transition-colors",
     "focus-visible:border-primary/50 focus-visible:ring-1 focus-visible:ring-primary/20",
     "placeholder:text-muted-foreground/50",
     "[&::-ms-reveal]:hidden [&::-webkit-contacts-auto-fill-button]:hidden [&::-webkit-credentials-auto-fill-button]:hidden",

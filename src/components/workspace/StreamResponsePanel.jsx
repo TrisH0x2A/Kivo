@@ -224,7 +224,7 @@ export function StreamResponsePanel({
   }
 
   return (
-    <Card className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden rounded-none border-border/40 bg-card/40">
+    <Card className="kivo-panel grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
       <header className="flex flex-col gap-2 border-b border-border/40 px-3 py-2">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Radio className="h-4 w-4 shrink-0 text-primary" />
