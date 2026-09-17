@@ -1086,6 +1086,7 @@ pub fn build_export_value(
                 Ok(kivo_request_export_value(&export_requests[0]))
             } else {
                 Ok(kivo_collection_export_value(&CollectionRecord {
+                    id: String::new(),
                     name: name.to_string(),
                     folders: vec![],
                     folder_settings: vec![],

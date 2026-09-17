@@ -57,6 +57,8 @@ pub struct SavePlan {
 struct Journal {
     writes: Vec<PreviousFile>,
     removals: Vec<PathBuf>,
+    #[serde(default)]
+    created_directories: Vec<PathBuf>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -65,7 +67,7 @@ struct PreviousFile {
     existed: bool,
 }
 
-fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn relative_path(root: &Path, path: &Path) -> Result<PathBuf, String> {
     let relative = path
         .strip_prefix(root)
         .map_err(|_| "Storage path leaves its root")?;
@@ -117,9 +119,21 @@ fn prepare(root: &Path, plan: SavePlan) -> Result<Option<(PathBuf, Journal)>, St
         return Err("Recovery directory must not be a symbolic link".to_string());
     }
     let directory = recovery.join(Uuid::new_v4().to_string());
+    let mut created_directories = std::collections::BTreeSet::new();
+    for (path, _, _) in &writes {
+        let mut parent = root.join(path);
+        parent.pop();
+        while parent != root && !parent.exists() {
+            created_directories.insert(relative_path(root, &parent)?);
+            if !parent.pop() {
+                break;
+            }
+        }
+    }
     let mut journal = Journal {
         writes: Vec::new(),
         removals,
+        created_directories: created_directories.into_iter().collect(),
     };
     // Stage every replacement and before-image before changing any live file.
     for (index, (path, data, previous)) in writes.into_iter().enumerate() {
@@ -167,6 +181,21 @@ fn rollback(root: &Path, directory: &Path, journal: &Journal) -> Result<(), Stri
             atomic_write(&target, bytes)?;
         } else if target.exists() {
             fs::remove_file(&target).map_err(|e| e.to_string())?;
+        }
+    }
+    let mut created = journal.created_directories.iter().collect::<Vec<_>>();
+    created.sort_by_key(|path| std::cmp::Reverse(path.components().count()));
+    for path in created {
+        let target = root.join(path);
+        relative_path(root, &target)?;
+        match fs::remove_dir(&target) {
+            Ok(()) => {}
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::DirectoryNotEmpty
+                ) => {}
+            Err(error) => return Err(error.to_string()),
         }
     }
     atomic_write(&directory.join("rolled-back"), b"ok")
@@ -326,6 +355,27 @@ mod tests {
         fs::rename(root.path().join("workspace"), directory.join("deleted/0")).unwrap();
         recover(root.path()).unwrap();
         assert_eq!(fs::read(original).unwrap(), b"secret fixture");
+    }
+
+    #[test]
+    fn interrupted_rename_restores_source_and_removes_new_directories() {
+        let root = TempDir::new().unwrap();
+        atomic_write(&root.path().join("original/.env"), b"secret").unwrap();
+        let mut plan = SavePlan::default();
+        plan.writes
+            .insert(root.path().join("renamed/.env"), b"secret".to_vec());
+        plan.removals.push(root.path().join("original"));
+        let (directory, _) = prepare(root.path(), plan).unwrap().unwrap();
+        fs::create_dir(root.path().join("renamed")).unwrap();
+        fs::rename(directory.join("new/0"), root.path().join("renamed/.env")).unwrap();
+        fs::create_dir_all(directory.join("deleted")).unwrap();
+        fs::rename(root.path().join("original"), directory.join("deleted/0")).unwrap();
+        recover(root.path()).unwrap();
+        assert_eq!(
+            fs::read(root.path().join("original/.env")).unwrap(),
+            b"secret"
+        );
+        assert!(!root.path().join("renamed").exists());
     }
 
     #[test]

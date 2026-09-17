@@ -249,6 +249,8 @@ pub struct RequestRuntimeState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceRecord {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
     pub name: String,
     pub description: Option<String>,
     #[serde(default)]
@@ -258,6 +260,8 @@ pub struct WorkspaceRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkspaceInfo {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
     pub name: String,
     #[serde(rename = "type")]
     pub resource_type: String,
@@ -267,6 +271,8 @@ pub struct WorkspaceInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionMeta {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
     pub name: String,
     pub path: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -285,6 +291,8 @@ pub struct WorkspaceFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionRecord {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub id: String,
     pub name: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub folders: Vec<String>,

@@ -7,6 +7,8 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use super::durable::{self, SavePlan};
+mod identity;
+use identity::*;
 
 pub const WORKSPACE_FILE_NAME: &str = "workspace.json";
 pub const COLLECTION_CONFIG_FILE_NAME: &str = "collection.json";
@@ -297,22 +299,6 @@ pub fn write_env_file(path: &Path, vars: &[EnvVar]) -> Result<(), String> {
     durable::atomic_write(path, content)
 }
 
-pub fn ensure_env_and_gitignore(dir: &Path) {
-    let env_path = dir.join(".env");
-    if !env_path.exists() {
-        let _ = fs::write(&env_path, "");
-    }
-    let gitignore_path = dir.join(".gitignore");
-    if !gitignore_path.exists() {
-        let _ = fs::write(&gitignore_path, ".env\n");
-    } else if let Ok(content) = fs::read_to_string(&gitignore_path) {
-        if !content.lines().any(|l| l.trim() == ".env") {
-            let appended = format!("{}\n.env\n", content.trim_end());
-            let _ = fs::write(&gitignore_path, appended);
-        }
-    }
-}
-
 pub fn sanitize_name(name: &str) -> String {
     name.chars()
         .map(|c| match c {
@@ -482,6 +468,7 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
         let mut collections = Vec::new();
         for col_meta in ws_file.collections {
             let CollectionMeta {
+                id,
                 name: collection_name,
                 path: collection_path,
                 folders: mut collection_folders,
@@ -528,6 +515,7 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
             }
 
             collections.push(CollectionRecord {
+                id: storage_identity(&id, &collection_name),
                 name: collection_name,
                 folders: collection_folders,
                 folder_settings: collection_folder_settings,
@@ -535,6 +523,7 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
             });
         }
         workspaces.push(WorkspaceRecord {
+            id: storage_identity(&ws_file.info.id, &ws_file.info.name),
             name: ws_file.info.name,
             description: ws_file.info.description,
             collections,
@@ -547,6 +536,8 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
     let _guard = durable::storage_lock()?;
     durable::recover(root)?;
     let mut plan = SavePlan::default();
+    validate_identities(root, workspaces)?;
+    let existing = existing_workspaces(root)?;
     if !root.exists() {
         fs::create_dir_all(root).map_err(|e| format!("Failed to create storage root: {e}"))?;
     }
@@ -565,16 +556,13 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
     }
     for workspace in workspaces {
         let ws_path = root.join(&workspace.name);
-        if !ws_path.exists() {
-            fs::create_dir_all(&ws_path)
-                .map_err(|e| format!("Failed to create workspace directory: {e}"))?;
+        let ws_id = storage_identity(&workspace.id, &workspace.name);
+        let previous = existing.get(&ws_id);
+        if let Some(previous) = previous {
+            stage_rename(root, &previous.path, &ws_path, true, &mut plan)?;
         }
-        ensure_env_and_gitignore(&ws_path);
+        stage_defaults(&ws_path, &mut plan)?;
         let collections_root = ws_path.join("collections");
-        if !collections_root.exists() {
-            fs::create_dir_all(&collections_root)
-                .map_err(|e| format!("Failed to create collections dir: {e}"))?;
-        }
         if let Ok(entries) = fs::read_dir(&collections_root) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -595,57 +583,54 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
             let safe_col = sanitize_name(&collection.name);
             let col_dir_name = format!("collections/{}", safe_col);
             let col_path = ws_path.join(&col_dir_name);
-            if !col_path.exists() {
-                fs::create_dir_all(&col_path)
-                    .map_err(|e| format!("Failed to create collection directory: {e}"))?;
+            let col_id = storage_identity(&collection.id, &collection.name);
+            let source = previous.and_then(|workspace| workspace.collections.get(&col_id)).unwrap_or(&col_path);
+            stage_rename(root, source, &col_path, false, &mut plan)?;
+            if source != &col_path && source.parent() == Some(collections_root.as_path()) {
+                plan.removals.push(source.clone());
             }
-            ensure_env_and_gitignore(&col_path);
+            stage_defaults(&col_path, &mut plan)?;
             let expected_paths = collection.requests.iter().map(|request| {
                 collection_subdir_path(&col_path, &request.folder_path)
                     .join(format!("{}.json", sanitize_name(&request.name)))
             }).collect::<std::collections::HashSet<_>>();
-            for req_path in collect_request_json_files(&col_path)? {
+            if expected_paths.len() != collection.requests.len() {
+                return Err("Request names resolve to the same file. Rename one before saving.".to_string());
+            }
+            let files = if source.exists() { collect_request_json_files(source)? } else { vec![] };
+            for req_path in files {
+                let target = col_path.join(req_path.strip_prefix(source).map_err(|e| e.to_string())?);
                 let content = fs::read_to_string(&req_path).map_err(|e| format!("Cannot read existing request: {e}"))?;
                 if serde_json::from_str::<RequestRecord>(&content).is_err() {
-                    if expected_paths.contains(&req_path) {
+                    if expected_paths.contains(&target) {
                         return Err(format!("Cannot overwrite malformed request {}. Recover or rename the file first.", req_path.display()));
                     }
                     continue;
                 }
-                if !expected_paths.contains(&req_path) {
-                    plan.removals.push(req_path);
-                }
-            }
-
-            for folder_path in &collection.folders {
-                let dir_path = collection_subdir_path(&col_path, folder_path);
-                if !dir_path.exists() {
-                    fs::create_dir_all(&dir_path)
-                        .map_err(|e| format!("Failed to create folder directory: {e}"))?;
+                if !expected_paths.contains(&target) {
+                    if source == &col_path { plan.removals.push(req_path); }
+                    else { plan.writes.remove(&target); }
                 }
             }
 
             for request in &collection.requests {
                 let safe_req = sanitize_name(&request.name);
                 let req_dir = collection_subdir_path(&col_path, &request.folder_path);
-                if !req_dir.exists() {
-                    fs::create_dir_all(&req_dir)
-                        .map_err(|e| format!("Failed to create request directory: {e}"))?;
-                }
                 let req_path = req_dir.join(format!("{}.json", safe_req));
                 let req_json = serde_json::to_string_pretty(request)
                     .map_err(|e| format!("Failed to serialize request: {e}"))?;
-                if plan.writes.insert(req_path, req_json.into_bytes()).is_some() {
-                    return Err("Request names resolve to the same file. Rename one before saving.".to_string());
-                }
+                plan.writes.insert(req_path, req_json.into_bytes());
             }
 
             let legacy_state_path = col_path.join(COLLECTION_STATE_FILE_NAME);
             if legacy_state_path.exists() {
                 plan.removals.push(legacy_state_path);
+            } else {
+                plan.writes.remove(&legacy_state_path);
             }
 
             collections_meta.push(CollectionMeta {
+                id: col_id,
                 name: collection.name.clone(),
                 path: col_dir_name,
                 folders: collection.folders.clone(),
@@ -654,6 +639,7 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
         }
         let ws_file = WorkspaceFile {
             info: WorkspaceInfo {
+                id: ws_id,
                 name: workspace.name.clone(),
                 resource_type: "workspace".to_string(),
                 description: workspace.description.clone(),
@@ -664,6 +650,8 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
             .map_err(|e| format!("Failed to serialize workspace.json: {e}"))?;
         plan.writes.insert(ws_path.join(WORKSPACE_FILE_NAME), ws_json.into_bytes());
     }
+    plan.removals.sort();
+    plan.removals.dedup();
     durable::commit(root, plan)?;
     for workspace in workspaces {
         for collection in &workspace.collections {

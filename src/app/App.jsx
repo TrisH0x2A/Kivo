@@ -163,6 +163,7 @@ export default function App() {
     sendStartedAt,
     isSetupComplete,
     isHydrated,
+    isRenaming,
     loadError,
     retryLoad,
     resizeRef,
@@ -351,7 +352,7 @@ export default function App() {
     }
 
     function handleGlobalKeydown(event) {
-      if (!isHydrated) return;
+      if (!isHydrated || isRenaming) return;
       for (const action of KEYBINDING_ACTIONS) {
         const shortcut = keybindingMap[action.id];
         if (!shortcut) continue;
@@ -382,6 +383,7 @@ export default function App() {
     handleSend,
     isSending,
     isHydrated,
+    isRenaming,
     keybindingMap,
     pasteRequestRecord,
     requestTabs,
@@ -491,7 +493,12 @@ export default function App() {
           onCancel={() => setShowWorkspaceModal(false)}
         />
       )}
-      <div className="kivo-app-shell flex h-full min-h-0 flex-col overflow-hidden border border-border/10">
+      {isRenaming && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60" role="status" aria-live="polite">
+          <span className="flex items-center gap-2 text-sm text-foreground"><RefreshCw className="h-4 w-4 animate-spin motion-reduce:animate-none" />Renaming...</span>
+        </div>
+      )}
+      <div inert={isRenaming || undefined} aria-busy={isRenaming} className="kivo-app-shell flex h-full min-h-0 flex-col overflow-hidden border border-border/10">
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div style={{ width: `${sidebarWidth}px` }} className="min-h-0 shrink-0 overflow-hidden">
             <Suspense fallback={<WorkspaceFallback />}>

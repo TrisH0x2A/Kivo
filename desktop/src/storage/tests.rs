@@ -452,6 +452,7 @@ fn make_request_with_response(name: &str) -> RequestRecord {
 
 fn ws(name: &str, collections: Vec<CollectionRecord>) -> WorkspaceRecord {
     WorkspaceRecord {
+        id: String::new(),
         name: name.to_string(),
         description: None,
         collections,
@@ -460,10 +461,124 @@ fn ws(name: &str, collections: Vec<CollectionRecord>) -> WorkspaceRecord {
 
 fn col(name: &str, requests: Vec<RequestRecord>) -> CollectionRecord {
     CollectionRecord {
+        id: String::new(),
         name: name.to_string(),
         folders: vec![],
         folder_settings: vec![],
         requests,
+    }
+}
+
+#[cfg(test)]
+mod rename_tests {
+    use super::*;
+
+    fn fixture(root: &Path) {
+        fs_save_workspaces(root, &[ws("Original", vec![col("API", vec![make_request("GET users")])])]).unwrap();
+        for (path, content) in [
+            ("Original/.env", "TOKEN=workspace"),
+            ("Original/.env.staging", "TOKEN=staging"),
+            ("Original/.kivo-envs.json", "{\"activeEnvironmentId\":\"staging\"}"),
+            ("Original/notes.txt", "workspace notes"),
+            ("Original/collections/API/.env", "TOKEN=collection"),
+            ("Original/collections/API/.env.staging", "TOKEN=collection staging"),
+            ("Original/collections/API/collection.json", "{\"defaultHeaders\":[{\"key\":\"X-Test\",\"value\":\"kept\",\"enabled\":true}]}"),
+            ("Original/collections/API/notes.txt", "collection notes"),
+            ("Original/collections/API/broken.json", "malformed but preserved"),
+        ] {
+            fs::write(root.join(path), content).unwrap();
+        }
+    }
+
+    #[test]
+    fn renames_preserve_sidecars_and_identity_across_repeated_saves() {
+        let root = TempDir::new().unwrap();
+        fixture(root.path());
+        let mut loaded = fs_load_workspaces(root.path()).unwrap();
+        let workspace_id = loaded[0].id.clone();
+        let collection_id = loaded[0].collections[0].id.clone();
+        loaded[0].name = "Renamed".into();
+        loaded[0].collections[0].name = "New API".into();
+        fs_save_workspaces(root.path(), &loaded).unwrap();
+        fs_save_workspaces(root.path(), &loaded).unwrap();
+        assert!(!root.path().join("Original").exists());
+        for (path, expected) in [
+            ("Renamed/.env", "TOKEN=workspace"),
+            ("Renamed/.env.staging", "TOKEN=staging"),
+            ("Renamed/notes.txt", "workspace notes"),
+            ("Renamed/collections/New API/.env", "TOKEN=collection"),
+            ("Renamed/collections/New API/.env.staging", "TOKEN=collection staging"),
+            ("Renamed/collections/New API/notes.txt", "collection notes"),
+            ("Renamed/collections/New API/broken.json", "malformed but preserved"),
+        ] {
+            assert_eq!(fs::read_to_string(root.path().join(path)).unwrap(), expected);
+        }
+        assert!(root.path().join("Renamed/.kivo-envs.json").exists());
+        assert!(fs::read_to_string(root.path().join("Renamed/collections/New API/collection.json")).unwrap().contains("X-Test"));
+        let reloaded = fs_load_workspaces(root.path()).unwrap();
+        assert_eq!(reloaded[0].id, workspace_id);
+        assert_eq!(reloaded[0].collections[0].id, collection_id);
+        assert_eq!(reloaded[0].collections[0].requests.len(), 1);
+    }
+
+    #[test]
+    fn collection_rename_preserves_config_and_applies_request_edits() {
+        let root = TempDir::new().unwrap();
+        fixture(root.path());
+        let mut loaded = fs_load_workspaces(root.path()).unwrap();
+        let collection = &mut loaded[0].collections[0];
+        collection.name = "New API".into();
+        collection.requests[0].name = "Updated".into();
+        collection.requests[0].url = "https://example.com/new".into();
+        fs_save_workspaces(root.path(), &loaded).unwrap();
+        let path = root.path().join("Original/collections/New API");
+        assert!(!root.path().join("Original/collections/API").exists());
+        assert!(!path.join("GET users.json").exists());
+        assert!(path.join("Updated.json").exists());
+        assert!(path.join("collection.json").exists());
+        assert_eq!(fs_load_workspaces(root.path()).unwrap()[0].collections[0].requests[0].url, "https://example.com/new");
+    }
+
+    #[test]
+    fn rename_rejects_existing_destination_without_mutating_source() {
+        let root = TempDir::new().unwrap();
+        fixture(root.path());
+        let mut loaded = fs_load_workspaces(root.path()).unwrap();
+        loaded[0].name = "Occupied".into();
+        fs::create_dir(root.path().join("Occupied")).unwrap();
+        fs::write(root.path().join("Occupied/private.txt"), "untouched").unwrap();
+        assert!(fs_save_workspaces(root.path(), &loaded).unwrap_err().contains("destination already exists"));
+        assert_eq!(fs::read_to_string(root.path().join("Original/.env")).unwrap(), "TOKEN=workspace");
+        assert_eq!(fs::read_to_string(root.path().join("Occupied/private.txt")).unwrap(), "untouched");
+        assert_eq!(fs_load_workspaces(root.path()).unwrap()[0].name, "Original");
+    }
+
+    #[test]
+    fn duplicate_identities_are_rejected_before_writing() {
+        let root = TempDir::new().unwrap();
+        fixture(root.path());
+        let mut loaded = fs_load_workspaces(root.path()).unwrap();
+        let mut duplicate = loaded[0].collections[0].clone();
+        duplicate.name = "Another".into();
+        loaded[0].collections.push(duplicate);
+        assert!(fs_save_workspaces(root.path(), &loaded).unwrap_err().contains("Duplicate collection identity"));
+        assert!(!root.path().join("Original/collections/Another").exists());
+    }
+
+    #[test]
+    fn legacy_metadata_gets_stable_identities_before_first_rename() {
+        let root = TempDir::new().unwrap();
+        fixture(root.path());
+        let metadata_path = root.path().join("Original/workspace.json");
+        let mut metadata: serde_json::Value = serde_json::from_slice(&fs::read(&metadata_path).unwrap()).unwrap();
+        metadata["info"].as_object_mut().unwrap().remove("id");
+        metadata["collections"][0].as_object_mut().unwrap().remove("id");
+        fs::write(&metadata_path, serde_json::to_vec(&metadata).unwrap()).unwrap();
+        let mut loaded = fs_load_workspaces(root.path()).unwrap();
+        assert!(!loaded[0].id.is_empty());
+        loaded[0].name = "Migrated".into();
+        fs_save_workspaces(root.path(), &loaded).unwrap();
+        assert_eq!(fs::read_to_string(root.path().join("Migrated/collections/API/.env")).unwrap(), "TOKEN=collection");
     }
 }
 
@@ -1031,6 +1146,7 @@ mod save_load_tests {
     fn save_and_load_single_workspace_no_collections() {
         let dir = TempDir::new().unwrap();
         let workspaces = vec![WorkspaceRecord {
+            id: String::new(),
             name: "MyWorkspace".to_string(),
             description: Some("desc".to_string()),
             collections: vec![],

@@ -245,6 +245,7 @@ export function createRequest(name = "New Request", mode = REQUEST_MODES.HTTP) {
 
 export function createCollection(name = "New Collection") {
   return {
+    id: crypto.randomUUID(),
     name,
     folders: [],
     folderSettings: [],
@@ -255,6 +256,7 @@ export function createCollection(name = "New Collection") {
 
 export function createWorkspace(name, description = "") {
   return {
+    id: crypto.randomUUID(),
     name,
     description,
     collections: [],

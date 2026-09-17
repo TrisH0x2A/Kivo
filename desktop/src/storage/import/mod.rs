@@ -385,6 +385,7 @@ fn import_kivo(value: &Value) -> Result<CollectionRecord, String> {
             }
             let folder_path = request.folder_path.trim().to_string();
             return Ok(CollectionRecord {
+                id: String::new(),
                 name: "Kivo Request Import".to_string(),
                 folders: if folder_path.is_empty() {
                     vec![]
@@ -414,6 +415,7 @@ fn import_kivo(value: &Value) -> Result<CollectionRecord, String> {
             }
             let folder_path = request.folder_path.trim().to_string();
             return Ok(CollectionRecord {
+                id: String::new(),
                 name: "Kivo Request Import".to_string(),
                 folders: if folder_path.is_empty() {
                     vec![]
@@ -432,6 +434,7 @@ fn import_kivo(value: &Value) -> Result<CollectionRecord, String> {
         }
         let folder_path = request.folder_path.trim().to_string();
         return Ok(CollectionRecord {
+            id: String::new(),
             name: "Kivo Request Import".to_string(),
             folders: if folder_path.is_empty() {
                 vec![]
@@ -562,6 +565,7 @@ fn import_openapi_like(value: &Value, format: &str) -> CollectionRecord {
 
     CollectionRecord {
         name,
+        id: String::new(),
         folders: vec![],
         folder_settings: vec![],
         requests,
@@ -764,6 +768,7 @@ fn import_bruno(value: &Value) -> CollectionRecord {
 
     CollectionRecord {
         name,
+        id: String::new(),
         folders: folders.into_iter().collect(),
         folder_settings: vec![],
         requests,
@@ -858,6 +863,7 @@ fn import_insomnia(value: &Value) -> CollectionRecord {
 
     CollectionRecord {
         name,
+        id: String::new(),
         folders: folders.into_iter().collect(),
         folder_settings: vec![],
         requests,
@@ -889,6 +895,7 @@ pub fn import_collection_value(value: &Value) -> Result<ImportedCollectionResult
                 import_postman_items(items, "", &mut requests, &mut folders);
             }
             CollectionRecord {
+                id: String::new(),
                 name: value
                     .get("info")
                     .and_then(|v| v.get("name"))

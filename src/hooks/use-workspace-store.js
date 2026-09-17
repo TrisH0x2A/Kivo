@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
+import { toast } from "sonner";
 
 import {
   cancelHttpRequest,
@@ -567,6 +568,8 @@ export function useWorkspaceStore() {
   const [isSetupComplete, setIsSetupComplete] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const renamePendingRef = useRef(false);
   const saveTimerRef = useRef(null);
   const saveFingerprintRef = useRef("");
   const resizeRef = useRef({ active: false, startX: 0, startWidth: 304 });
@@ -703,7 +706,7 @@ export function useWorkspaceStore() {
   }, []);
 
   useEffect(() => {
-    if (!isHydrated) {
+    if (!isHydrated || isRenaming) {
       return undefined;
     }
 
@@ -730,7 +733,7 @@ export function useWorkspaceStore() {
     return () => {
       window.clearTimeout(saveTimerRef.current);
     };
-  }, [isHydrated, store]);
+  }, [isHydrated, isRenaming, store]);
 
   useEffect(() => {
     function handleAppSettingsUpdated(event) {
@@ -1431,6 +1434,7 @@ export function useWorkspaceStore() {
       const nextCollection = {
         ...createCollection(nextName),
         ...importedCollection,
+        id: crypto.randomUUID(),
         name: nextName,
         requests: orderedRequests,
         folders: Array.from(folderSet),
@@ -1607,8 +1611,27 @@ export function useWorkspaceStore() {
     });
   }
 
+  async function persistRename(transform) {
+    if (!isHydrated || renamePendingRef.current) return;
+    const next = transform(store);
+    if (next === store) return;
+    renamePendingRef.current = true;
+    setIsRenaming(true);
+    window.clearTimeout(saveTimerRef.current);
+    try {
+      // Publish new names only after their files and configuration are available.
+      await saveAppState(next);
+      updateStore(transform);
+    } catch (error) {
+      toast.error("Rename failed", { description: toErrorText(error) });
+    } finally {
+      renamePendingRef.current = false;
+      setIsRenaming(false);
+    }
+  }
+
   function renameWorkspaceRecord(oldName, values) {
-    updateStore((current) => {
+    return persistRename((current) => {
       const nextName = values.name.trim();
       if (!nextName) return current;
 
@@ -1672,7 +1695,7 @@ export function useWorkspaceStore() {
   }
 
   function renameCollectionRecord(workspaceName, oldName, newName) {
-    updateStore((current) => {
+    return persistRename((current) => {
       const nextName = newName.trim();
       if (!nextName) return current;
 
@@ -1685,7 +1708,7 @@ export function useWorkspaceStore() {
 
       return {
         ...current,
-        activeCollectionName: current.activeCollectionName === oldName ? nextName : current.activeCollectionName,
+        activeCollectionName: current.activeWorkspaceName === workspaceName && current.activeCollectionName === oldName ? nextName : current.activeCollectionName,
         workspaces: current.workspaces.map((workspace) =>
           workspace.name === workspaceName
             ? {
@@ -1742,6 +1765,7 @@ export function useWorkspaceStore() {
 
         const duplicated = {
           ...source,
+          id: crypto.randomUUID(),
           name: uniqueName,
           requests: source.requests.map(r => cloneRequest(r))
         };
@@ -2875,6 +2899,7 @@ export function useWorkspaceStore() {
     isSending,
     sendStartedAt,
     isHydrated,
+    isRenaming,
     isSetupComplete,
     loadError,
     retryLoad: () => setLoadAttempt((attempt) => attempt + 1),
