@@ -727,7 +727,9 @@ export function useWorkspaceStore() {
         .then(() => {
           saveFingerprintRef.current = fingerprint;
         })
-        .catch((err) => { console.error("saveAppState failed:", err); });
+        .catch((error) => {
+          toast.error("Changes not saved", { id: "workspace-save-error", description: toErrorText(error), duration: 10000 });
+        });
     }, 300);
 
     return () => {

@@ -33,7 +33,7 @@ use super::models::{
 };
 use crate::http::dynamic_vars::resolve_template_variables;
 use crate::storage::{
-    get_app_config, get_collection_dir, get_storage_root, load_collection_config_from_path,
+    get_app_config, get_storage_root, load_collection_config_from_path, paths,
     load_env_vars, AppSettings, GrpcMethodOption,
 };
 
@@ -1316,15 +1316,16 @@ pub(crate) fn build_cookie_header_from_store(
     }
 }
 
-fn get_env_context(app: &AppHandle, workspace_name: &str, collection_name: &str) -> HashMap<String, String> {
-    let storage_root = get_storage_root(app).unwrap_or_default();
-    let workspace_path = storage_root.join(workspace_name);
+fn get_env_context(app: &AppHandle, workspace_name: &str, collection_name: &str) -> Result<HashMap<String, String>, String> {
+    if workspace_name.is_empty() && collection_name.is_empty() { return Ok(HashMap::new()); }
+    let storage_root = get_storage_root(app)?;
+    let workspace_path = paths::workspace_dir(&storage_root, workspace_name)?;
     let collection_path = if collection_name.is_empty() {
         None
     } else {
-        Some(get_collection_dir(&storage_root, workspace_name, collection_name))
+        Some(paths::collection_dir(&storage_root, workspace_name, collection_name)?)
     };
-    load_env_vars(&workspace_path, collection_path.as_deref())
+    Ok(load_env_vars(&workspace_path, collection_path.as_deref()))
 }
 
 fn resolve_payload_value(input: &str, env_vars: &HashMap<String, String>) -> String {
@@ -1638,7 +1639,7 @@ pub async fn send_grpc_request(
     app: AppHandle,
     payload: GrpcRequestPayload,
 ) -> Result<ResponsePayload, String> {
-    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name);
+    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name)?;
 
     let target = normalize_grpc_target(&resolve_payload_value(&payload.url, &env_vars))?;
     let proto_path = resolve_payload_value(&payload.grpc_proto_file_path, &env_vars);
@@ -1815,7 +1816,7 @@ pub async fn oauth_exchange_token(
     let _cancel_guard = OAuthCancelGuard::new(request_id.clone());
     let mut cancel_rx = register_oauth_cancel(&request_id);
 
-    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name);
+    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name)?;
     let app_settings = get_app_config(app.clone())
         .map(|state| state.app_settings)
         .unwrap_or_default();
@@ -2048,17 +2049,16 @@ pub async fn send_http_request(
     let _cancel_guard = HttpCancelGuard::new(request_id.clone());
     let mut cancel_rx = register_http_cancel(&request_id);
 
-    let storage_root = get_storage_root(&app).unwrap_or_default();
-    let workspace_path = storage_root.join(&payload.workspace_name);
+    let storage_root = get_storage_root(&app)?;
     let collection_path = if payload.collection_name.is_empty() {
         None
     } else {
         Some(
-            get_collection_dir(&storage_root, &payload.workspace_name, &payload.collection_name),
+            paths::collection_dir(&storage_root, &payload.workspace_name, &payload.collection_name)?,
         )
     };
 
-    let env_vars = load_env_vars(&workspace_path, collection_path.as_deref());
+    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name)?;
     let app_settings = get_app_config(app.clone())
         .map(|state| state.app_settings)
         .unwrap_or_default();

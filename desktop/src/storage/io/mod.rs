@@ -133,7 +133,7 @@ fn write_workspace_environments_file(workspace_path: &Path, file: &WorkspaceEnvi
 }
 
 pub fn get_workspace_environments(root: &Path, workspace_name: &str) -> Result<WorkspaceEnvironmentsResult, String> {
-    let ws_path = root.join(workspace_name);
+    let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     if !ws_path.exists() {
         return Err(format!("Workspace '{}' does not exist", workspace_name));
     }
@@ -149,7 +149,7 @@ pub fn create_workspace_environment(
     workspace_name: &str,
     name: &str,
 ) -> Result<WorkspaceEnvironmentsResult, String> {
-    let ws_path = root.join(workspace_name);
+    let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     if !ws_path.exists() {
         return Err(format!("Workspace '{}' does not exist", workspace_name));
     }
@@ -190,7 +190,7 @@ pub fn set_active_workspace_environment(
     workspace_name: &str,
     environment_id: &str,
 ) -> Result<WorkspaceEnvironmentsResult, String> {
-    let ws_path = root.join(workspace_name);
+    let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     if !ws_path.exists() {
         return Err(format!("Workspace '{}' does not exist", workspace_name));
     }
@@ -214,7 +214,7 @@ pub fn delete_workspace_environment(
     workspace_name: &str,
     environment_id: &str,
 ) -> Result<WorkspaceEnvironmentsResult, String> {
-    let ws_path = root.join(workspace_name);
+    let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     if !ws_path.exists() {
         return Err(format!("Workspace '{}' does not exist", workspace_name));
     }
@@ -350,6 +350,9 @@ pub fn collect_request_json_files(collection_path: &Path) -> Result<Vec<PathBuf>
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read request entry: {e}"))?;
             let path = entry.path();
+            if entry.file_type().map_err(|e| e.to_string())?.is_symlink() {
+                return Err(format!("Linked request path is not supported: {}", path.display()));
+            }
             if path.is_dir() {
                 stack.push(path);
                 continue;
@@ -377,6 +380,9 @@ pub fn cleanup_empty_collection_dirs(collection_path: &Path) -> Result<(), Strin
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read directory entry: {e}"))?;
             let path = entry.path();
+            if entry.file_type().map_err(|e| e.to_string())?.is_symlink() {
+                return Err(format!("Linked collection directory is not supported: {}", path.display()));
+            }
             if path.is_dir() {
                 dirs.push(path.clone());
                 stack.push(path);
@@ -461,6 +467,7 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
         if !ws_file_path.exists() {
             continue;
         }
+        durable::relative_path(root, &ws_file_path)?;
         let ws_json = fs::read_to_string(&ws_file_path)
             .map_err(|e| format!("Failed to read workspace.json: {e}"))?;
         let ws_file: WorkspaceFile = serde_json::from_str(&ws_json)
@@ -474,12 +481,7 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
                 folders: mut collection_folders,
                 folder_settings: mut collection_folder_settings,
             } = col_meta;
-            let col_meta_path = PathBuf::from(&collection_path);
-            let col_path = if col_meta_path.is_absolute() {
-                col_meta_path
-            } else {
-                path.join(&collection_path)
-            };
+            let col_path = super::paths::metadata_collection_dir(root, &path, &collection_path)?;
             if !col_path.exists() || !col_path.is_dir() {
                 continue;
             }
@@ -536,6 +538,7 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
     let _guard = durable::storage_lock()?;
     durable::recover(root)?;
     let mut plan = SavePlan::default();
+    super::paths::validate_snapshot(root, workspaces)?;
     validate_identities(root, workspaces)?;
     let existing = existing_workspaces(root)?;
     if !root.exists() {
@@ -600,6 +603,9 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
             let files = if source.exists() { collect_request_json_files(source)? } else { vec![] };
             for req_path in files {
                 let target = col_path.join(req_path.strip_prefix(source).map_err(|e| e.to_string())?);
+                if expected_paths.iter().any(|expected| expected != &target && expected.to_string_lossy().to_lowercase() == target.to_string_lossy().to_lowercase()) {
+                    return Err(format!("Request path differs only by case: {}. Use a distinct intermediate name first.", target.display()));
+                }
                 let content = fs::read_to_string(&req_path).map_err(|e| format!("Cannot read existing request: {e}"))?;
                 if serde_json::from_str::<RequestRecord>(&content).is_err() {
                     if expected_paths.contains(&target) {
@@ -670,14 +676,14 @@ pub fn fs_get_env_vars(
     workspace_name: &str,
     collection_name: Option<&str>,
     workspace_environment_id: Option<&str>,
-) -> EnvVarsResult {
-    let ws_path = root.join(workspace_name);
+) -> Result<EnvVarsResult, String> {
+    let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     let effective_env_id = resolve_effective_environment_id(&ws_path, workspace_environment_id);
     let workspace_env_path = workspace_env_file_path(&ws_path, &effective_env_id);
     let workspace_vars = parse_env_file_ordered(&workspace_env_path);
     let collection_vars = match collection_name {
         Some(col) => {
-            let col_path = get_collection_dir(root, workspace_name, col);
+            let col_path = super::paths::collection_dir(root, workspace_name, col)?;
             let collection_env_path = collection_env_file_path(&col_path, &effective_env_id);
             parse_env_file_ordered(&collection_env_path)
         }
@@ -690,11 +696,11 @@ pub fn fs_get_env_vars(
     for v in &collection_vars {
         merged.insert(v.key.clone(), v.value.clone());
     }
-    EnvVarsResult {
+    Ok(EnvVarsResult {
         workspace: workspace_vars,
         collection: collection_vars,
         merged,
-    }
+    })
 }
 
 pub fn fs_save_env_vars(
@@ -704,11 +710,11 @@ pub fn fs_save_env_vars(
     workspace_environment_id: Option<&str>,
     vars: &[EnvVar],
 ) -> Result<(), String> {
-    let ws_path = root.join(workspace_name);
+    let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     let effective_env_id = resolve_effective_environment_id(&ws_path, workspace_environment_id);
     let env_path = match collection_name {
         Some(col) => {
-            let col_path = get_collection_dir(root, workspace_name, col);
+            let col_path = super::paths::collection_dir(root, workspace_name, col)?;
             if !col_path.exists() {
                 fs::create_dir_all(&col_path)
                     .map_err(|e| format!("Failed to create collection dir: {e}"))?;
@@ -731,7 +737,7 @@ pub fn fs_save_collection_config(
     collection_name: &str,
     config: &CollectionConfig,
 ) -> Result<(), String> {
-    let col_path = get_collection_dir(root, workspace_name, collection_name);
+    let col_path = super::paths::collection_dir(root, workspace_name, collection_name)?;
     if !col_path.exists() {
         fs::create_dir_all(&col_path)
             .map_err(|e| format!("Failed to create collection dir: {e}"))?;

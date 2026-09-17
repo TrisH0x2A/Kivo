@@ -34,7 +34,9 @@ pub(super) fn existing_workspaces(
         let mut collections = HashMap::new();
         for collection in file.collections {
             let id = storage_identity(&collection.id, &collection.name);
-            if collections.insert(id, path.join(collection.path)).is_some() {
+            let collection_path =
+                super::super::paths::metadata_collection_dir(root, &path, &collection.path)?;
+            if collections.insert(id, collection_path).is_some() {
                 return Err("Duplicate collection identity in workspace metadata".to_string());
             }
         }

@@ -583,6 +583,124 @@ mod rename_tests {
 }
 
 #[cfg(test)]
+mod path_safety_tests {
+    use super::*;
+
+    #[test]
+    fn unsafe_workspace_names_fail_before_creating_files() {
+        let root = TempDir::new().unwrap();
+        for name in ["", ".", "..", "../outside", "nested/name", "nested\\name", "C:\\outside", "/outside", "CON", "nul.txt", "LPT1", "COM9.txt", "trailing.", " leading", "control\nname", ".KIVO-RECOVERY"] {
+            assert!(fs_save_workspaces(root.path(), &[ws(name, vec![])]).is_err(), "accepted {name:?}");
+        }
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn reserved_request_names_cannot_overwrite_collection_metadata() {
+        let root = TempDir::new().unwrap();
+        for name in ["collection", "COLLECTION", "workspace", ".kivo-collection-state", "CON", "aux.txt", "..", "", "trailing."] {
+            assert!(fs_save_workspaces(root.path(), &[ws("ws", vec![col("api", vec![make_request(name)])])]).is_err(), "accepted {name:?}");
+        }
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn normalized_and_case_collisions_are_rejected_before_changes() {
+        let root = TempDir::new().unwrap();
+        let original = vec![ws("ws", vec![col("api", vec![make_request("original")])])];
+        fs_save_workspaces(root.path(), &original).unwrap();
+        let metadata = root.path().join("ws/workspace.json");
+        let before = fs::read(&metadata).unwrap();
+        for (first, second) in [("a:b", "a?b"), ("Users", "users")] {
+            assert!(fs_save_workspaces(root.path(), &[ws("ws", vec![col(first, vec![]), col(second, vec![])])]).is_err());
+            assert!(fs_save_workspaces(root.path(), &[ws("ws", vec![col("api", vec![make_request(first), make_request(second)])])]).is_err());
+        }
+        assert!(fs_save_workspaces(root.path(), &[ws("Example", vec![]), ws("example", vec![])]).is_err());
+        assert_eq!(fs::read(metadata).unwrap(), before);
+        assert!(root.path().join("ws/collections/api/original.json").exists());
+    }
+
+    #[test]
+    fn unsafe_and_aliased_folders_are_rejected() {
+        let root = TempDir::new().unwrap();
+        for folders in [vec!["../outside"], vec!["/absolute"], vec!["one/../../two"], vec!["CON/nested"], vec!["Users", "users"], vec!["a:b", "a?b"]] {
+            let mut collection = col("api", vec![]);
+            collection.folders = folders.into_iter().map(str::to_string).collect();
+            assert!(fs_save_workspaces(root.path(), &[ws("ws", vec![collection])]).is_err());
+        }
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn environment_and_config_operations_reject_workspace_traversal() {
+        let root = TempDir::new().unwrap();
+        assert!(fs_get_env_vars(root.path(), "../outside", None, None).is_err());
+        assert!(fs_save_env_vars(root.path(), "../outside", Some("api"), None, &[]).is_err());
+        assert!(fs_save_collection_config(root.path(), "../outside", "api", &CollectionConfig::default()).is_err());
+        assert!(create_workspace_environment(root.path(), "../outside", "prod").is_err());
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn case_only_replacements_cannot_delete_the_new_file() {
+        let root = TempDir::new().unwrap();
+        fs_save_workspaces(root.path(), &[ws("Workspace", vec![col("API", vec![make_request("Users")])])]).unwrap();
+        let original = fs_load_workspaces(root.path()).unwrap();
+        let mut next = original.clone();
+        next[0].name = "workspace".into();
+        assert!(fs_save_workspaces(root.path(), &next).is_err());
+        next = original.clone();
+        next[0].collections[0].name = "api".into();
+        assert!(fs_save_workspaces(root.path(), &next).is_err());
+        next = original;
+        next[0].collections[0].requests[0].name = "users".into();
+        assert!(fs_save_workspaces(root.path(), &next).is_err());
+        assert!(root.path().join("Workspace/collections/API/Users.json").exists());
+    }
+
+    #[test]
+    fn request_and_folder_cannot_share_a_path() {
+        let root = TempDir::new().unwrap();
+        let mut collection = col("api", vec![make_request("Users")]);
+        collection.folders = vec!["Users.json/nested".into()];
+        assert!(fs_save_workspaces(root.path(), &[ws("ws", vec![collection])]).is_err());
+        assert_eq!(fs::read_dir(root.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn metadata_cannot_redirect_collection_loading_outside_workspace() {
+        let root = TempDir::new().unwrap();
+        fs_save_workspaces(root.path(), &[ws("ws", vec![col("api", vec![])])]).unwrap();
+        let path = root.path().join("ws/workspace.json");
+        let mut metadata: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        metadata["collections"][0]["path"] = serde_json::json!("../../outside");
+        fs::write(&path, serde_json::to_vec(&metadata).unwrap()).unwrap();
+        assert!(fs_load_workspaces(root.path()).unwrap_err().contains("unsafe path"));
+    }
+
+    #[test]
+    fn valid_unicode_names_roundtrip() {
+        let root = TempDir::new().unwrap();
+        fs_save_workspaces(root.path(), &[ws("\u{65e5}\u{672c}", vec![col("caf\u{e9}", vec![make_request("\u{3bb} request")])])]).unwrap();
+        let loaded = fs_load_workspaces(root.path()).unwrap();
+        assert_eq!(loaded[0].name, "\u{65e5}\u{672c}");
+        assert_eq!(loaded[0].collections[0].requests[0].name, "\u{3bb} request");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linked_collection_is_never_traversed() {
+        let root = TempDir::new().unwrap();
+        let outside = TempDir::new().unwrap();
+        fs_save_workspaces(root.path(), &[ws("ws", vec![col("api", vec![])])]).unwrap();
+        std::os::unix::fs::symlink(outside.path(), root.path().join("ws/collections/api/link")).unwrap();
+        assert!(fs_load_workspaces(root.path()).is_err());
+        assert!(fs_save_workspaces(root.path(), &[ws("ws", vec![col("api", vec![])])]).is_err());
+        assert_eq!(fs::read_dir(outside.path()).unwrap().count(), 0);
+    }
+}
+
+#[cfg(test)]
 mod sanitize_tests {
     use super::*;
 
@@ -805,7 +923,7 @@ mod fs_env_vars_tests {
             },
         ];
         fs_save_env_vars(dir.path(), "ws", None, None, &vars).unwrap();
-        let result = fs_get_env_vars(dir.path(), "ws", None, None);
+        let result = fs_get_env_vars(dir.path(), "ws", None, None).unwrap();
         assert_eq!(result.workspace.len(), 2);
         assert_eq!(result.workspace[0].key, "BASE_URL");
         assert!(result.collection.is_empty());
@@ -821,7 +939,7 @@ mod fs_env_vars_tests {
             value: "xyz".to_string(),
         }];
         fs_save_env_vars(dir.path(), "ws", Some("api"), None, &vars).unwrap();
-        let result = fs_get_env_vars(dir.path(), "ws", Some("api"), None);
+        let result = fs_get_env_vars(dir.path(), "ws", Some("api"), None).unwrap();
         assert_eq!(result.collection.len(), 1);
         assert_eq!(result.collection[0].key, "API_KEY");
     }
@@ -854,7 +972,7 @@ mod fs_env_vars_tests {
             }],
         )
         .unwrap();
-        let result = fs_get_env_vars(dir.path(), "ws", Some("api"), None);
+        let result = fs_get_env_vars(dir.path(), "ws", Some("api"), None).unwrap();
         assert_eq!(result.merged["HOST"], "collection.example.com");
     }
 
@@ -955,13 +1073,13 @@ mod fs_env_vars_tests {
         )
         .unwrap();
 
-        let default_vars = fs_get_env_vars(dir.path(), "ws", None, Some("default"));
-        let prod_vars = fs_get_env_vars(dir.path(), "ws", None, Some("prod"));
+        let default_vars = fs_get_env_vars(dir.path(), "ws", None, Some("default")).unwrap();
+        let prod_vars = fs_get_env_vars(dir.path(), "ws", None, Some("prod")).unwrap();
         assert_eq!(default_vars.merged.get("BASE_URL"), Some(&"https://dev.example.com".to_string()));
         assert_eq!(prod_vars.merged.get("BASE_URL"), Some(&"https://prod.example.com".to_string()));
 
-        let default_collection_vars = fs_get_env_vars(dir.path(), "ws", Some("api"), Some("default"));
-        let prod_collection_vars = fs_get_env_vars(dir.path(), "ws", Some("api"), Some("prod"));
+        let default_collection_vars = fs_get_env_vars(dir.path(), "ws", Some("api"), Some("default")).unwrap();
+        let prod_collection_vars = fs_get_env_vars(dir.path(), "ws", Some("api"), Some("prod")).unwrap();
         assert_eq!(default_collection_vars.merged.get("TOKEN"), Some(&"dev-token".to_string()));
         assert_eq!(prod_collection_vars.merged.get("TOKEN"), Some(&"prod-token".to_string()));
     }
@@ -995,14 +1113,14 @@ mod fs_env_vars_tests {
         )
         .unwrap();
 
-        let default_result = fs_get_env_vars(dir.path(), "ws", Some("api"), None);
+        let default_result = fs_get_env_vars(dir.path(), "ws", Some("api"), None).unwrap();
         assert_eq!(
             default_result.merged.get("COL_HOST"),
             Some(&"dev.collection.example.com".to_string())
         );
 
         set_active_workspace_environment(dir.path(), "ws", "prod").unwrap();
-        let prod_result = fs_get_env_vars(dir.path(), "ws", Some("api"), None);
+        let prod_result = fs_get_env_vars(dir.path(), "ws", Some("api"), None).unwrap();
         assert_eq!(
             prod_result.merged.get("COL_HOST"),
             Some(&"prod.collection.example.com".to_string())

@@ -17,6 +17,7 @@ pub mod durable;
 pub mod import;
 pub mod io;
 pub mod models;
+pub mod paths;
 pub mod secrets;
 
 pub use models::{
@@ -46,7 +47,7 @@ pub use export::{
 pub use io::{
     create_workspace_environment, delete_workspace_environment, fs_get_env_vars,
     fs_load_workspaces, fs_save_collection_config, fs_save_env_vars, fs_save_workspaces,
-    get_collection_dir, get_workspace_environments, load_collection_config_from_path,
+    get_workspace_environments, load_collection_config_from_path,
     load_env_vars, set_active_workspace_environment, WORKSPACE_FILE_NAME,
 };
 
@@ -627,12 +628,12 @@ pub fn get_env_vars(
     workspace_environment_id: Option<String>,
 ) -> Result<EnvVarsResult, String> {
     let root = get_storage_root(&app)?;
-    Ok(fs_get_env_vars(
+    fs_get_env_vars(
         &root,
         &workspace_name,
         collection_name.as_deref(),
         workspace_environment_id.as_deref(),
-    ))
+    )
 }
 
 #[tauri::command]
@@ -699,7 +700,7 @@ pub fn get_collection_config(
     collection_name: String,
 ) -> Result<CollectionConfig, String> {
     let root = get_storage_root(&app)?;
-    let col_path = get_collection_dir(&root, &workspace_name, &collection_name);
+    let col_path = paths::collection_dir(&root, &workspace_name, &collection_name)?;
     Ok(load_collection_config_from_path(&col_path))
 }
 
@@ -863,7 +864,7 @@ pub fn reveal_item(
     request_name: Option<String>,
 ) -> Result<(), String> {
     let root = get_storage_root(&app)?;
-    let mut path = root.join(&workspace_name);
+    let mut path = paths::workspace_dir(&root, &workspace_name)?;
     if let Some(col_name) = collection_name {
         let ws_file_path = path.join(WORKSPACE_FILE_NAME);
         if ws_file_path.exists() {
@@ -872,14 +873,10 @@ pub fn reveal_item(
             let ws_file: WorkspaceFile = serde_json::from_str(&ws_json)
                 .map_err(|e| format!("Failed to parse workspace.json: {e}"))?;
             if let Some(col_meta) = ws_file.collections.iter().find(|c| c.name == col_name) {
-                let col_meta_path = PathBuf::from(&col_meta.path);
-                path = if col_meta_path.is_absolute() {
-                    col_meta_path
-                } else {
-                    path.join(&col_meta.path)
-                };
+                path = paths::metadata_collection_dir(&root, &path, &col_meta.path)?;
                 if let Some(req_name) = request_name {
-                    let req_path = path.join(format!("{}.json", req_name));
+                    let req_path = path.join(paths::request_filename(&req_name)?);
+                    durable::relative_path(&root, &req_path)?;
                     if req_path.exists() {
                         path = req_path;
                     }
