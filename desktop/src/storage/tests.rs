@@ -1463,6 +1463,8 @@ mod complex_scenario_tests {
             .requests
             .iter()
             .any(|r| r.name == "good"));
+        fs_save_workspaces(dir.path(), &loaded).unwrap();
+        assert_eq!(fs::read_to_string(col_path.join("broken.json")).unwrap(), "{ not valid json !!!");
     }
 }
 

@@ -13,6 +13,7 @@ use tauri::{AppHandle, Manager};
 mod tests;
 
 pub mod export;
+pub mod durable;
 pub mod import;
 pub mod io;
 pub mod models;
@@ -112,7 +113,7 @@ pub fn set_app_settings(app: AppHandle, settings: AppSettings) -> Result<AppSett
 
     let serialized = serde_json::to_string_pretty(&state)
         .map_err(|e| format!("Failed to serialize state: {e}"))?;
-    fs::write(&state_path, serialized).map_err(|e| format!("Failed to write state: {e}"))?;
+    durable::atomic_write(&state_path, serialized)?;
 
     Ok(state.app_settings)
 }
@@ -292,7 +293,7 @@ pub fn set_storage_path(app: AppHandle, path: String) -> Result<(), String> {
     state.storage_path = Some(PathBuf::from(path));
     let serialized = serde_json::to_string_pretty(&state)
         .map_err(|e| format!("Failed to serialize state: {e}"))?;
-    fs::write(&state_path, serialized).map_err(|e| format!("Failed to write state: {e}"))
+    durable::atomic_write(&state_path, serialized)
 }
 
 fn paths_equal(left: &Path, right: &Path) -> bool {
@@ -614,9 +615,8 @@ pub fn save_app_state(app: AppHandle, payload: PersistedAppState) -> Result<(), 
     }
     let state_json = serde_json::to_string_pretty(&state_to_save)
         .map_err(|e| format!("Failed to serialize state.json: {e}"))?;
-    fs::write(&state_file_path, state_json)
-        .map_err(|e| format!("Failed to write state.json: {e}"))?;
-    fs_save_workspaces(&root, &clean_workspaces)
+    fs_save_workspaces(&root, &clean_workspaces)?;
+    durable::atomic_write(&state_file_path, state_json)
 }
 
 #[tauri::command]

@@ -6,6 +6,7 @@ use crate::storage::models::{
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use super::durable::{self, SavePlan};
 
 pub const WORKSPACE_FILE_NAME: &str = "workspace.json";
 pub const COLLECTION_CONFIG_FILE_NAME: &str = "collection.json";
@@ -126,7 +127,7 @@ fn write_workspace_environments_file(workspace_path: &Path, file: &WorkspaceEnvi
     let path = workspace_env_meta_path(workspace_path);
     let json = serde_json::to_string_pretty(file)
         .map_err(|e| format!("Failed to serialize workspace environments metadata: {e}"))?;
-    fs::write(path, json).map_err(|e| format!("Failed to write workspace environments metadata: {e}"))
+    durable::atomic_write(&path, json)
 }
 
 pub fn get_workspace_environments(root: &Path, workspace_name: &str) -> Result<WorkspaceEnvironmentsResult, String> {
@@ -293,7 +294,7 @@ pub fn write_env_file(path: &Path, vars: &[EnvVar]) -> Result<(), String> {
     } else {
         lines.join("\n") + "\n"
     };
-    fs::write(path, content).map_err(|e| format!("Failed to write .env: {e}"))
+    durable::atomic_write(path, content)
 }
 
 pub fn ensure_env_and_gitignore(dir: &Path) {
@@ -457,6 +458,8 @@ pub fn load_collection_config_from_path(collection_path: &Path) -> CollectionCon
 }
 
 pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
+    let _guard = durable::storage_lock()?;
+    durable::recover(root)?;
     if !root.exists() {
         return Ok(vec![]);
     }
@@ -541,6 +544,9 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
 }
 
 pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result<(), String> {
+    let _guard = durable::storage_lock()?;
+    durable::recover(root)?;
+    let mut plan = SavePlan::default();
     if !root.exists() {
         fs::create_dir_all(root).map_err(|e| format!("Failed to create storage root: {e}"))?;
     }
@@ -552,7 +558,7 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
                 if path.join(WORKSPACE_FILE_NAME).exists()
                     && !workspaces.iter().any(|w| w.name == dir_name)
                 {
-                    let _ = fs::remove_dir_all(&path);
+                    plan.removals.push(path);
                 }
             }
         }
@@ -579,7 +585,7 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
                         .iter()
                         .any(|c| sanitize_name(&c.name) == dir_name)
                     {
-                        let _ = fs::remove_dir_all(&path);
+                        plan.removals.push(path);
                     }
                 }
             }
@@ -594,10 +600,22 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
                     .map_err(|e| format!("Failed to create collection directory: {e}"))?;
             }
             ensure_env_and_gitignore(&col_path);
+            let expected_paths = collection.requests.iter().map(|request| {
+                collection_subdir_path(&col_path, &request.folder_path)
+                    .join(format!("{}.json", sanitize_name(&request.name)))
+            }).collect::<std::collections::HashSet<_>>();
             for req_path in collect_request_json_files(&col_path)? {
-                let _ = fs::remove_file(req_path);
+                let content = fs::read_to_string(&req_path).map_err(|e| format!("Cannot read existing request: {e}"))?;
+                if serde_json::from_str::<RequestRecord>(&content).is_err() {
+                    if expected_paths.contains(&req_path) {
+                        return Err(format!("Cannot overwrite malformed request {}. Recover or rename the file first.", req_path.display()));
+                    }
+                    continue;
+                }
+                if !expected_paths.contains(&req_path) {
+                    plan.removals.push(req_path);
+                }
             }
-            cleanup_empty_collection_dirs(&col_path)?;
 
             for folder_path in &collection.folders {
                 let dir_path = collection_subdir_path(&col_path, folder_path);
@@ -617,13 +635,14 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
                 let req_path = req_dir.join(format!("{}.json", safe_req));
                 let req_json = serde_json::to_string_pretty(request)
                     .map_err(|e| format!("Failed to serialize request: {e}"))?;
-                fs::write(req_path, req_json)
-                    .map_err(|e| format!("Failed to write request file: {e}"))?;
+                if plan.writes.insert(req_path, req_json.into_bytes()).is_some() {
+                    return Err("Request names resolve to the same file. Rename one before saving.".to_string());
+                }
             }
 
             let legacy_state_path = col_path.join(COLLECTION_STATE_FILE_NAME);
             if legacy_state_path.exists() {
-                let _ = fs::remove_file(legacy_state_path);
+                plan.removals.push(legacy_state_path);
             }
 
             collections_meta.push(CollectionMeta {
@@ -643,8 +662,17 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
         };
         let ws_json = serde_json::to_string_pretty(&ws_file)
             .map_err(|e| format!("Failed to serialize workspace.json: {e}"))?;
-        fs::write(ws_path.join(WORKSPACE_FILE_NAME), ws_json)
-            .map_err(|e| format!("Failed to write workspace.json: {e}"))?;
+        plan.writes.insert(ws_path.join(WORKSPACE_FILE_NAME), ws_json.into_bytes());
+    }
+    durable::commit(root, plan)?;
+    for workspace in workspaces {
+        for collection in &workspace.collections {
+            let path = get_collection_dir(root, &workspace.name, &collection.name);
+            cleanup_empty_collection_dirs(&path)?;
+            for folder in &collection.folders {
+                fs::create_dir_all(collection_subdir_path(&path, folder)).map_err(|e| e.to_string())?;
+            }
+        }
     }
     Ok(())
 }
@@ -722,6 +750,5 @@ pub fn fs_save_collection_config(
     }
     let json = serde_json::to_string_pretty(config)
         .map_err(|e| format!("Failed to serialize collection config: {e}"))?;
-    fs::write(col_path.join(COLLECTION_CONFIG_FILE_NAME), json)
-        .map_err(|e| format!("Failed to write collection.json: {e}"))
+    durable::atomic_write(&col_path.join(COLLECTION_CONFIG_FILE_NAME), json)
 }

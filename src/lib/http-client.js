@@ -1,6 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { redactHistoryUrl } from "@/lib/history-utils.js";
+import { createSaveQueue } from "./save-queue.js";
+
+const stateSaveQueue = createSaveQueue();
 
 const AUTH_ENCRYPTION_PREFIX = "enc:v1:";
 const AUTH_SENSITIVE_KEYS = new Set([
@@ -501,8 +504,10 @@ export async function saveAppState(payload) {
     }))
   };
 
-  const encryptedPayload = await transformStateAuth(cleanPayload, "encrypt");
-  return invoke("save_app_state", { payload: encryptedPayload });
+  return stateSaveQueue.enqueue(async () => {
+    const encryptedPayload = await transformStateAuth(cleanPayload, "encrypt");
+    return invoke("save_app_state", { payload: encryptedPayload });
+  });
 }
 
 export function getEnvVars(workspaceName, collectionName, workspaceEnvironmentId = null) {
