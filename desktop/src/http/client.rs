@@ -311,7 +311,9 @@ fn build_http_client(
     }
 
     if !validate_certs {
-        builder = builder.danger_accept_invalid_certs(true);
+        return Err(
+            "Disabling TLS certificate validation is not permitted because it exposes credentials to man-in-the-middle attacks. Use a custom CA certificate instead.".to_string(),
+        );
     }
 
     if settings.use_custom_ca_certificate && !settings.custom_ca_certificate_path.trim().is_empty() {
