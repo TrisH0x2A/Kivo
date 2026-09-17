@@ -41,6 +41,7 @@ import { normalizeUrl } from "@/lib/http-ui.js";
 import { normalizeAuthState } from "@/lib/oauth.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
 import { redactHistoryUrl } from "@/lib/history-utils.js";
+import { loadWorkspaceStartup } from "@/lib/workspace-startup.js";
 
 const SIDEBAR_COLLAPSED_WIDTH = 52;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -563,7 +564,9 @@ export function useWorkspaceStore() {
   const [isSending, setIsSending] = useState(false);
   const [sendStartedAt, setSendStartedAt] = useState(0);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [isSetupComplete, setIsSetupComplete] = useState(true);
+  const [isSetupComplete, setIsSetupComplete] = useState(null);
+  const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const saveTimerRef = useRef(null);
   const saveFingerprintRef = useRef("");
   const resizeRef = useRef({ active: false, startX: 0, startWidth: 304 });
@@ -577,18 +580,6 @@ export function useWorkspaceStore() {
   const [streamMessages, setStreamMessages] = useState({});
   const streamKeyByIdRef = useRef(new Map());
   const messageIdCounterRef = useRef(0);
-
-  useEffect(() => {
-    async function checkSetup() {
-      try {
-        const config = await invoke("get_app_config");
-        setIsSetupComplete(!!config.storagePath);
-      } catch (error) {
-        console.error("Failed to check setup status:", error);
-      }
-    }
-    checkSetup();
-  }, []);
 
   const activeWorkspace = useMemo(() => getActiveWorkspace(store), [store]);
   const activeCollection = useMemo(() => getActiveCollection(store), [store]);
@@ -606,13 +597,21 @@ export function useWorkspaceStore() {
   const response = activeRequest?.lastResponse ?? createEmptyResponse();
 
   useEffect(() => {
-    if (!isSetupComplete) return;
     let cancelled = false;
+    setIsHydrated(false);
+    setLoadError("");
 
     async function hydrate() {
       try {
-        const persisted = await loadAppState();
-        let normalized = normalizeStore(persisted);
+        const result = await loadWorkspaceStartup({
+          readConfig: () => invoke("get_app_config"),
+          readState: loadAppState,
+          normalize: normalizeStore,
+        });
+        if (cancelled) return;
+        setIsSetupComplete(!result.needsSetup);
+        if (result.needsSetup) return;
+        let normalized = result.store;
 
         if (normalized?.appSettings?.clearOAuthSessionOnStart) {
           normalized = clearOAuthSessionsInStore(normalized);
@@ -647,14 +646,11 @@ export function useWorkspaceStore() {
 
         if (!cancelled) {
           setStore(normalized);
-        }
-      } catch {
-        if (!cancelled) {
-          setStore(createDefaultStore());
-        }
-      } finally {
-        if (!cancelled) {
           setIsHydrated(true);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(error instanceof Error ? error.message : String(error || "Storage could not be loaded."));
         }
       }
     }
@@ -664,7 +660,7 @@ export function useWorkspaceStore() {
     return () => {
       cancelled = true;
     };
-  }, [isSetupComplete]);
+  }, [loadAttempt]);
 
   useEffect(() => {
     function handleMove(event) {
@@ -2880,6 +2876,8 @@ export function useWorkspaceStore() {
     sendStartedAt,
     isHydrated,
     isSetupComplete,
+    loadError,
+    retryLoad: () => setLoadAttempt((attempt) => attempt + 1),
     saveTimerRef,
     resizeRef,
     activeWorkspace,
@@ -2954,13 +2952,6 @@ export function useWorkspaceStore() {
     streamMessages,
     clearStreamMessagesForKey,
     cancelSend,
-    checkSetup: async () => {
-      try {
-        const config = await invoke("get_app_config");
-        setIsSetupComplete(!!config.storagePath);
-      } catch (error) {
-        console.error("Failed to check setup status:", error);
-      }
-    },
+    checkSetup: () => setLoadAttempt((attempt) => attempt + 1),
   };
 }

@@ -16,6 +16,7 @@ import { doesEventMatchShortcut, isEditableEventTarget, KEYBINDING_ACTIONS, norm
 import { SIDEBAR_COLLAPSED_WIDTH } from "@/lib/workspace-utils.js";
 import { Toaster } from "sonner";
 import {
+  AlertTriangle,
   Beaker,
   Building2,
   Code2,
@@ -26,6 +27,7 @@ import {
   Globe,
   Layers,
   MoonStar,
+  RefreshCw,
   Snowflake,
   SquareKanban,
   Star,
@@ -160,6 +162,9 @@ export default function App() {
     isSending,
     sendStartedAt,
     isSetupComplete,
+    isHydrated,
+    loadError,
+    retryLoad,
     resizeRef,
     activeWorkspace,
     activeCollection,
@@ -346,6 +351,7 @@ export default function App() {
     }
 
     function handleGlobalKeydown(event) {
+      if (!isHydrated) return;
       for (const action of KEYBINDING_ACTIONS) {
         const shortcut = keybindingMap[action.id];
         if (!shortcut) continue;
@@ -375,6 +381,7 @@ export default function App() {
     duplicateRequestRecord,
     handleSend,
     isSending,
+    isHydrated,
     keybindingMap,
     pasteRequestRecord,
     requestTabs,
@@ -417,13 +424,29 @@ export default function App() {
     }
   }
 
-  if (!isSetupComplete) {
+  if (loadError) {
+    return (
+      <main className="h-dvh overflow-auto bg-background p-8 text-foreground">
+        <section className="max-w-xl space-y-4" role="alert">
+          <AlertTriangle className="h-6 w-6 text-destructive" aria-hidden="true" />
+          <h1 className="text-lg font-semibold">Unable to load your workspace</h1>
+          <p className="text-sm text-muted-foreground">Editing and autosave are paused. Check that your storage folder is available, then try again.</p>
+          <pre className="whitespace-pre-wrap break-words border-l-2 border-destructive/50 pl-3 text-xs text-muted-foreground">{loadError}</pre>
+          <Button onClick={retryLoad}><RefreshCw className="mr-2 h-4 w-4" />Retry</Button>
+        </section>
+      </main>
+    );
+  }
+
+  if (isSetupComplete === false) {
     return (
       <Suspense fallback={<WorkspaceFallback />}>
         <SetupWizard onComplete={checkSetup} />
       </Suspense>
     );
   }
+
+  if (!isHydrated) return <WorkspaceFallback />;
 
   const sidebarWidth = store.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : store.sidebarWidth;
 
