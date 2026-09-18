@@ -1,8 +1,10 @@
 use std::fs;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::io::Write;
+use std::path::Path;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
@@ -15,6 +17,7 @@ use uuid::Uuid;
 use super::AppSettings;
 
 const AUTH_ENCRYPTION_PREFIX: &str = "enc:v1:";
+static SEED_LOCK: Mutex<()> = Mutex::new(());
 const AUTH_ENCRYPTION_SALT: &[u8] = b"kivo-auth-encryption-salt-v1";
 const AUTH_ENCRYPTION_ITERATIONS: u32 = 100_000;
 const PROTECTED_SEED_PREFIX: &str = "dpapi:v1:";
@@ -212,8 +215,8 @@ fn unprotect_seed(value: &str) -> Result<String, String> {
 
 fn is_protected_seed(value: &str) -> bool {
     value.starts_with(PROTECTED_SEED_PREFIX)
-        || cfg!(target_os = "macos") && value.starts_with("keychain:v1:")
-        || cfg!(target_os = "linux") && value.starts_with("secret-service:v1:")
+        || value.starts_with("keychain:v1:")
+        || value.starts_with("secret-service:v1:")
 }
 
 #[tauri::command]
@@ -225,51 +228,72 @@ pub fn get_or_create_auth_secret_seed(app: AppHandle) -> Result<String, String> 
     fs::create_dir_all(&app_dir)
         .map_err(|e| format!("Failed to create app data directory: {e}"))?;
 
-    let secret_path = app_dir.join("auth-secret.seed");
+    read_or_create_seed(
+        &app_dir.join("auth-secret.seed"),
+        protect_seed,
+        unprotect_seed,
+    )
+}
+
+fn read_or_create_seed(
+    secret_path: &Path,
+    protect: impl Fn(&str) -> Result<String, String>,
+    unprotect: impl Fn(&str) -> Result<String, String>,
+) -> Result<String, String> {
+    let _guard = SEED_LOCK
+        .lock()
+        .map_err(|_| "Secure storage is unavailable. Restart Kivo to retry.".to_string())?;
     if secret_path.exists() {
-        let seed = fs::read_to_string(&secret_path)
+        let seed = fs::read_to_string(secret_path)
             .map_err(|e| format!("Failed to read auth secret seed: {e}"))?;
         let trimmed = seed.trim();
         if !trimmed.is_empty() {
             if is_protected_seed(trimmed) {
-                return unprotect_seed(trimmed);
+                let seed = unprotect(trimmed)?;
+                if seed.trim().is_empty() {
+                    return Err("Secure storage returned an empty auth seed".to_string());
+                }
+                return Ok(seed);
             }
 
-            let protected = protect_seed(trimmed)?;
+            let protected = protect(trimmed)?;
             if protected != trimmed {
-                fs::write(&secret_path, protected)
-                    .map_err(|e| format!("Failed to migrate auth secret seed: {e}"))?;
+                super::durable::atomic_write(secret_path, protected)?;
             }
             return Ok(trimmed.to_string());
         }
+        return Err(
+            "Auth secret seed is empty. Restore the original vault seed before continuing."
+                .to_string(),
+        );
     }
 
     let seed = format!("{}{}{}", Uuid::new_v4(), Uuid::new_v4(), Uuid::new_v4());
-    fs::write(&secret_path, protect_seed(&seed)?)
-        .map_err(|e| format!("Failed to persist auth secret seed: {e}"))?;
+    super::durable::atomic_write(secret_path, protect(&seed)?)?;
     Ok(seed)
 }
 
-fn decrypt_sensitive_text_with_seed(value: &str, seed: &str) -> String {
-    if !value.starts_with(AUTH_ENCRYPTION_PREFIX) || seed.trim().is_empty() {
-        return value.to_string();
+fn decrypt_sensitive_text_with_seed(value: &str, seed: &str) -> Result<String, String> {
+    if !value.starts_with(AUTH_ENCRYPTION_PREFIX) {
+        return Ok(value.to_string());
+    }
+    let failure = || {
+        "A saved credential could not be decrypted. Restore access to the original keychain before continuing.".to_string()
+    };
+    if seed.trim().is_empty() {
+        return Err(failure());
     }
 
     let payload = &value[AUTH_ENCRYPTION_PREFIX.len()..];
-    let Some((iv_b64, cipher_b64)) = payload.split_once(':') else {
-        return String::new();
-    };
-
-    let iv = match base64::engine::general_purpose::STANDARD.decode(iv_b64) {
-        Ok(bytes) => bytes,
-        Err(_) => return String::new(),
-    };
-    let cipher_text = match base64::engine::general_purpose::STANDARD.decode(cipher_b64) {
-        Ok(bytes) => bytes,
-        Err(_) => return String::new(),
-    };
-    if iv.len() != 12 {
-        return String::new();
+    let (iv_b64, cipher_b64) = payload.split_once(':').ok_or_else(failure)?;
+    let iv = base64::engine::general_purpose::STANDARD
+        .decode(iv_b64)
+        .map_err(|_| failure())?;
+    let cipher_text = base64::engine::general_purpose::STANDARD
+        .decode(cipher_b64)
+        .map_err(|_| failure())?;
+    if iv.len() != 12 || cipher_text.len() < 16 {
+        return Err(failure());
     }
 
     let mut key = [0u8; 32];
@@ -280,24 +304,161 @@ fn decrypt_sensitive_text_with_seed(value: &str, seed: &str) -> String {
         &mut key,
     );
 
-    let Ok(cipher) = Aes256Gcm::new_from_slice(&key) else {
-        return String::new();
-    };
+    let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| failure())?;
     let nonce = Nonce::from_slice(&iv);
-    match cipher.decrypt(nonce, cipher_text.as_ref()) {
-        Ok(plain) => String::from_utf8(plain).unwrap_or_default(),
-        Err(_) => String::new(),
-    }
+    let plain = cipher
+        .decrypt(nonce, cipher_text.as_ref())
+        .map_err(|_| failure())?;
+    String::from_utf8(plain).map_err(|_| failure())
 }
 
-pub fn decrypt_app_settings_for_runtime(app: &AppHandle, settings: &mut AppSettings) {
-    let Ok(seed) = get_or_create_auth_secret_seed(app.clone()) else {
-        return;
-    };
-    settings.proxy_password = decrypt_sensitive_text_with_seed(&settings.proxy_password, &seed);
-    settings.custom_ca_certificate_path =
-        decrypt_sensitive_text_with_seed(&settings.custom_ca_certificate_path, &seed);
-    settings.client_certificate_path =
-        decrypt_sensitive_text_with_seed(&settings.client_certificate_path, &seed);
-    settings.client_key_path = decrypt_sensitive_text_with_seed(&settings.client_key_path, &seed);
+pub fn decrypt_app_settings_for_runtime(
+    app: &AppHandle,
+    settings: &mut AppSettings,
+) -> Result<(), String> {
+    if ![
+        &settings.proxy_password,
+        &settings.custom_ca_certificate_path,
+        &settings.client_certificate_path,
+        &settings.client_key_path,
+    ]
+    .iter()
+    .any(|value| value.starts_with(AUTH_ENCRYPTION_PREFIX))
+    {
+        return Ok(());
+    }
+    let seed = get_or_create_auth_secret_seed(app.clone())?;
+    let proxy = decrypt_sensitive_text_with_seed(&settings.proxy_password, &seed)?;
+    let ca = decrypt_sensitive_text_with_seed(&settings.custom_ca_certificate_path, &seed)?;
+    let certificate = decrypt_sensitive_text_with_seed(&settings.client_certificate_path, &seed)?;
+    let key = decrypt_sensitive_text_with_seed(&settings.client_key_path, &seed)?;
+    settings.proxy_password = proxy;
+    settings.custom_ca_certificate_path = ca;
+    settings.client_certificate_path = certificate;
+    settings.client_key_path = key;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn unavailable_vault_does_not_write_a_plaintext_seed() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("auth-secret.seed");
+        assert!(read_or_create_seed(&path, |_| Err("locked".into()), |_| unreachable!()).is_err());
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn empty_or_locked_vault_is_not_replaced() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("auth-secret.seed");
+        for content in ["", "dpapi:v1:synthetic-protected-value"] {
+            fs::write(&path, content).unwrap();
+            assert!(read_or_create_seed(
+                &path,
+                |_| panic!("must not replace seed"),
+                |_| Err("locked".into())
+            )
+            .is_err());
+            assert_eq!(fs::read_to_string(&path).unwrap(), content);
+        }
+    }
+
+    #[test]
+    fn legacy_seed_is_only_replaced_after_successful_protection() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("auth-secret.seed");
+        fs::write(&path, "synthetic-legacy-seed").unwrap();
+        assert!(read_or_create_seed(&path, |_| Err("locked".into()), |_| unreachable!()).is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), "synthetic-legacy-seed");
+        assert_eq!(
+            read_or_create_seed(
+                &path,
+                |_| Ok("dpapi:v1:synthetic".into()),
+                |_| unreachable!()
+            )
+            .unwrap(),
+            "synthetic-legacy-seed"
+        );
+        assert_eq!(fs::read_to_string(&path).unwrap(), "dpapi:v1:synthetic");
+    }
+
+    #[test]
+    fn malformed_ciphertext_is_an_error_not_an_empty_secret() {
+        for value in [
+            "enc:v1:",
+            "enc:v1:bad:data",
+            "enc:v1:AAAAAAAAAAAAAAAA:bad",
+            "enc:v1:AAAAAAAAAAAAAAAA:AAAAAAAAAAAAAAAAAAAAAA==",
+        ] {
+            assert!(decrypt_sensitive_text_with_seed(value, "synthetic-seed").is_err());
+        }
+        assert_eq!(
+            decrypt_sensitive_text_with_seed("legacy", "").unwrap(),
+            "legacy"
+        );
+    }
+
+    #[test]
+    fn authenticated_ciphertext_roundtrips_and_rejects_wrong_key() {
+        let seed = "synthetic-seed";
+        let mut key = [0u8; 32];
+        pbkdf2_hmac::<Sha256>(
+            seed.as_bytes(),
+            AUTH_ENCRYPTION_SALT,
+            AUTH_ENCRYPTION_ITERATIONS,
+            &mut key,
+        );
+        let cipher = Aes256Gcm::new_from_slice(&key).unwrap();
+        let iv = [7u8; 12];
+        let encrypted = cipher
+            .encrypt(Nonce::from_slice(&iv), b"synthetic-token".as_ref())
+            .unwrap();
+        let value = format!(
+            "enc:v1:{}:{}",
+            base64::engine::general_purpose::STANDARD.encode(iv),
+            base64::engine::general_purpose::STANDARD.encode(encrypted)
+        );
+        assert_eq!(
+            decrypt_sensitive_text_with_seed(&value, seed).unwrap(),
+            "synthetic-token"
+        );
+        assert!(decrypt_sensitive_text_with_seed(&value, "wrong-key").is_err());
+        assert_eq!(
+            value,
+            "enc:v1:BwcHBwcHBwcHBwcH:HwpAEswax305AYS/i8m2T2Dp8W5/YFLwT5OkFj+eoQ=="
+        );
+    }
+
+    #[test]
+    fn concurrent_seed_requests_share_one_persisted_seed() {
+        let root = TempDir::new().unwrap();
+        let path = root.path().join("auth-secret.seed");
+        let handles = (0..8)
+            .map(|_| {
+                let path = path.clone();
+                std::thread::spawn(move || {
+                    read_or_create_seed(
+                        &path,
+                        |seed| Ok(format!("dpapi:v1:{seed}")),
+                        |value| Ok(value.strip_prefix("dpapi:v1:").unwrap().to_string()),
+                    )
+                    .unwrap()
+                })
+            })
+            .collect::<Vec<_>>();
+        let seeds = handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>();
+        assert!(seeds.iter().all(|seed| seed == &seeds[0]));
+        assert_eq!(
+            fs::read_to_string(path).unwrap(),
+            format!("dpapi:v1:{}", seeds[0])
+        );
+    }
 }

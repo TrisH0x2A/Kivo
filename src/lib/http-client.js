@@ -2,10 +2,10 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { redactHistoryUrl } from "@/lib/history-utils.js";
 import { createSaveQueue } from "./save-queue.js";
+import { deriveAuthKey, encryptSensitiveText, decryptSensitiveText } from "./auth-crypto.js";
 
 const stateSaveQueue = createSaveQueue();
 
-const AUTH_ENCRYPTION_PREFIX = "enc:v1:";
 const AUTH_SENSITIVE_KEYS = new Set([
   "token",
   "password",
@@ -23,96 +23,8 @@ const AUTH_SENSITIVE_KEYS = new Set([
   "customCaCertificatePath",
 ]);
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-
-function base64Encode(bytes) {
-  const chunkSize = 0x8000;
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize);
-    binary += String.fromCharCode(...chunk);
-  }
-  return btoa(binary);
-}
-
-function base64Decode(value) {
-  const binary = atob(String(value || ""));
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
 async function getAuthCryptoKey() {
-  try {
-    if (!window?.crypto?.subtle) return null;
-    const seed = await invoke("get_or_create_auth_secret_seed");
-    if (!seed) return null;
-
-    const keyMaterial = await window.crypto.subtle.importKey(
-      "raw",
-      textEncoder.encode(seed),
-      { name: "PBKDF2" },
-      false,
-      ["deriveKey"]
-    );
-
-    return window.crypto.subtle.deriveKey(
-      {
-        name: "PBKDF2",
-        salt: textEncoder.encode("kivo-auth-encryption-salt-v1"),
-        iterations: 100_000,
-        hash: "SHA-256",
-      },
-      keyMaterial,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
-  } catch {
-    return null;
-  }
-}
-
-async function encryptSensitiveText(value, key) {
-  const raw = String(value ?? "");
-  if (!raw || raw.startsWith(AUTH_ENCRYPTION_PREFIX) || !key) return raw;
-
-  try {
-    const iv = new Uint8Array(12);
-    window.crypto.getRandomValues(iv);
-    const encrypted = await window.crypto.subtle.encrypt(
-      { name: "AES-GCM", iv },
-      key,
-      textEncoder.encode(raw)
-    );
-    return `${AUTH_ENCRYPTION_PREFIX}${base64Encode(iv)}:${base64Encode(new Uint8Array(encrypted))}`;
-  } catch {
-    return raw;
-  }
-}
-
-async function decryptSensitiveText(value, key) {
-  const raw = String(value ?? "");
-  if (!raw.startsWith(AUTH_ENCRYPTION_PREFIX) || !key) return raw;
-
-  try {
-    const payload = raw.slice(AUTH_ENCRYPTION_PREFIX.length);
-    const [ivB64, cipherB64] = payload.split(":");
-    if (!ivB64 || !cipherB64) return "";
-    const iv = base64Decode(ivB64);
-    const cipher = base64Decode(cipherB64);
-    const decrypted = await window.crypto.subtle.decrypt(
-      { name: "AES-GCM", iv },
-      key,
-      cipher
-    );
-    return textDecoder.decode(decrypted);
-  } catch {
-    return "";
-  }
+  return deriveAuthKey(() => invoke("get_or_create_auth_secret_seed"));
 }
 
 async function transformAuthNode(value, key, mode) {

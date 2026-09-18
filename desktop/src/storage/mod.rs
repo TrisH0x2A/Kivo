@@ -277,7 +277,7 @@ pub fn get_app_config(app: AppHandle) -> Result<PersistedAppState, String> {
     let contents = fs::read_to_string(&path).map_err(|e| format!("Failed to read state: {e}"))?;
     let mut state: PersistedAppState =
         serde_json::from_str(&contents).map_err(|e| format!("Failed to parse state: {e}"))?;
-    secrets::decrypt_app_settings_for_runtime(&app, &mut state.app_settings);
+    secrets::decrypt_app_settings_for_runtime(&app, &mut state.app_settings)?;
     Ok(state)
 }
 
