@@ -136,7 +136,7 @@ pub(super) fn stage_defaults(path: &Path, plan: &mut SavePlan) -> Result<(), Str
         plan.writes.entry(env).or_default();
     }
     let ignore = path.join(".gitignore");
-    let mut content = match plan.writes.get(&ignore) {
+    let content = match plan.writes.get(&ignore) {
         Some(bytes) => String::from_utf8(bytes.clone()).map_err(|e| e.to_string())?,
         None => match fs::read_to_string(&ignore) {
             Ok(content) => content,
@@ -144,9 +144,33 @@ pub(super) fn stage_defaults(path: &Path, plan: &mut SavePlan) -> Result<(), Str
             Err(e) => return Err(e.to_string()),
         },
     };
-    if !content.lines().any(|line| line.trim() == ".env") {
-        content.push_str("\n.env\n");
-    }
-    plan.writes.insert(ignore, content.into_bytes());
+    plan.writes.insert(
+        ignore,
+        protected_ignore_content(&content, ".env\n.env.*\n").into_bytes(),
+    );
     Ok(())
+}
+
+pub(super) fn protected_ignore_content(content: &str, rules: &str) -> String {
+    if content.ends_with(rules) {
+        return content.to_string();
+    }
+    format!(
+        "{}{}{}",
+        content,
+        if content.is_empty() || content.ends_with('\n') {
+            ""
+        } else {
+            "\n"
+        },
+        rules
+    )
+}
+
+pub(super) fn read_ignore_file(path: &Path) -> Result<String, String> {
+    match fs::read_to_string(path) {
+        Ok(content) => Ok(content),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(error) => Err(format!("Cannot read ignore rules: {error}")),
+    }
 }

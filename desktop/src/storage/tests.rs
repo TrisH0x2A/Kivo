@@ -1000,6 +1000,36 @@ mod fs_env_vars_tests {
     }
 
     #[test]
+    fn ignore_rules_protect_named_environments_and_recovery_without_churn() {
+        let root = TempDir::new().unwrap();
+        let workspaces = vec![ws("ws", vec![col("api", vec![])])];
+        fs_save_workspaces(root.path(), &workspaces).unwrap();
+        let ignore = root.path().join("ws/collections/api/.gitignore");
+        fs::write(&ignore, "# user rules\n*.log\n.env\n!.env.production").unwrap();
+        fs_save_workspaces(root.path(), &workspaces).unwrap();
+        let content = fs::read_to_string(&ignore).unwrap();
+        assert!(content.starts_with("# user rules\n*.log\n"));
+        assert!(content.ends_with(".env\n.env.*\n"));
+        fs_save_workspaces(root.path(), &workspaces).unwrap();
+        assert_eq!(fs::read_to_string(ignore).unwrap(), content);
+        assert!(fs::read_to_string(root.path().join(".gitignore")).unwrap().ends_with(".kivo-recovery/\n"));
+        assert!(fs::read_to_string(root.path().join("ws/.gitignore")).unwrap().ends_with(".env\n.env.*\n"));
+    }
+
+    #[test]
+    fn writing_an_environment_installs_ignore_rules_before_the_secret() {
+        let root = TempDir::new().unwrap();
+        write_env_file(&root.path().join(".env.production"), &[EnvVar {
+            key: "TOKEN".into(), value: "synthetic-secret".into(),
+        }]).unwrap();
+        assert!(fs::read_to_string(root.path().join(".gitignore")).unwrap().ends_with(".env\n.env.*\n"));
+        fs::remove_file(root.path().join(".gitignore")).unwrap();
+        fs::create_dir(root.path().join(".gitignore")).unwrap();
+        assert!(write_env_file(&root.path().join(".env.staging"), &[]).is_err());
+        assert!(!root.path().join(".env.staging").exists());
+    }
+
+    #[test]
     fn workspace_environment_lifecycle_and_active_switching() {
         let dir = TempDir::new().unwrap();
         fs_save_workspaces(dir.path(), &[ws("ws", vec![])]).unwrap();

@@ -286,6 +286,10 @@ pub fn parse_env_file(path: &Path) -> HashMap<String, String> {
 }
 
 pub fn write_env_file(path: &Path, vars: &[EnvVar]) -> Result<(), String> {
+    let directory = path.parent().ok_or("Environment file has no parent directory")?;
+    let ignore = directory.join(".gitignore");
+    let content = read_ignore_file(&ignore)?;
+    durable::atomic_write(&ignore, protected_ignore_content(&content, ".env\n.env.*\n"))?;
     let lines: Vec<String> = vars
         .iter()
         .filter(|v| !v.key.trim().is_empty())
@@ -541,6 +545,9 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
     super::paths::validate_snapshot(root, workspaces)?;
     validate_identities(root, workspaces)?;
     let existing = existing_workspaces(root)?;
+    let ignore = root.join(".gitignore");
+    let content = read_ignore_file(&ignore)?;
+    plan.writes.insert(ignore, protected_ignore_content(&content, ".kivo-recovery/\n").into_bytes());
     if !root.exists() {
         fs::create_dir_all(root).map_err(|e| format!("Failed to create storage root: {e}"))?;
     }
