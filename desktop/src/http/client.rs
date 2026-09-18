@@ -3,7 +3,7 @@ use std::error::Error as StdError;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -1068,22 +1068,47 @@ pub(crate) fn load_cookie_store(app: &AppHandle) -> Result<Vec<CookieJarEntry>, 
         return Ok(vec![]);
     }
 
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read cookie store: {e}"))?;
-    if raw.trim().is_empty() {
-        return Ok(vec![]);
-    }
+    let seed = crate::storage::get_or_create_auth_secret_seed(app.clone())?;
+    read_cookie_file(&path, &seed)
+}
 
-    serde_json::from_str::<Vec<CookieJarEntry>>(&raw)
-        .map_err(|e| format!("Failed to parse cookie store: {e}"))
+#[derive(serde::Serialize, serde::Deserialize)]
+struct ProtectedCookieStore {
+    version: u8,
+    encrypted: String,
+}
+
+fn read_cookie_file(path: &Path, seed: &str) -> Result<Vec<CookieJarEntry>, String> {
+    let raw = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read cookie store: {e}"))?;
+    if raw.trim_start().starts_with('[') {
+        let entries = serde_json::from_str::<Vec<CookieJarEntry>>(&raw)
+            .map_err(|_| "Failed to parse legacy cookie store; the original file was retained".to_string())?;
+        write_cookie_file(path, &entries, seed)?;
+        return Ok(entries);
+    }
+    let envelope: ProtectedCookieStore = serde_json::from_str(&raw)
+        .map_err(|_| "Failed to parse encrypted cookie store; the original file was retained".to_string())?;
+    if envelope.version != 1 || !envelope.encrypted.starts_with("enc:v1:") {
+        return Err("Unsupported encrypted cookie store format".to_string());
+    }
+    let plaintext = crate::storage::secrets::decrypt_sensitive_text_with_seed(&envelope.encrypted, seed)?;
+    serde_json::from_str(&plaintext).map_err(|_| "Failed to parse decrypted cookie store".to_string())
 }
 
 fn save_cookie_store(app: &AppHandle, entries: &[CookieJarEntry]) -> Result<(), String> {
     let path = cookie_store_path(app)?;
+    let seed = crate::storage::get_or_create_auth_secret_seed(app.clone())?;
+    write_cookie_file(&path, entries, &seed)
+}
+
+fn write_cookie_file(path: &Path, entries: &[CookieJarEntry], seed: &str) -> Result<(), String> {
     let serialized = serde_json::to_string_pretty(entries)
         .map_err(|e| format!("Failed to serialize cookie store: {e}"))?;
-    fs::write(&path, serialized)
-        .map_err(|e| format!("Failed to write cookie store: {e}"))
+    let encrypted = crate::storage::secrets::encrypt_sensitive_text_with_seed(&serialized, seed)?;
+    let envelope = serde_json::to_vec(&ProtectedCookieStore { version: 1, encrypted })
+        .map_err(|e| e.to_string())?;
+    crate::storage::durable::atomic_write(path, envelope)
 }
 
 fn parse_cookie_datetime(value: &str) -> Option<DateTime<Utc>> {

@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
 
-use aes_gcm::aead::{Aead, KeyInit};
+use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use pbkdf2::pbkdf2_hmac;
@@ -273,7 +273,31 @@ fn read_or_create_seed(
     Ok(seed)
 }
 
-fn decrypt_sensitive_text_with_seed(value: &str, seed: &str) -> Result<String, String> {
+pub(crate) fn encrypt_sensitive_text_with_seed(value: &str, seed: &str) -> Result<String, String> {
+    if seed.trim().is_empty() {
+        return Err("Secure storage key is unavailable".to_string());
+    }
+    let mut key = [0u8; 32];
+    pbkdf2_hmac::<Sha256>(
+        seed.as_bytes(),
+        AUTH_ENCRYPTION_SALT,
+        AUTH_ENCRYPTION_ITERATIONS,
+        &mut key,
+    );
+    let cipher =
+        Aes256Gcm::new_from_slice(&key).map_err(|_| "Cannot initialize encryption".to_string())?;
+    let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+    let encrypted = cipher
+        .encrypt(&nonce, value.as_bytes())
+        .map_err(|_| "Cannot encrypt private data".to_string())?;
+    Ok(format!(
+        "{AUTH_ENCRYPTION_PREFIX}{}:{}",
+        base64::engine::general_purpose::STANDARD.encode(nonce),
+        base64::engine::general_purpose::STANDARD.encode(encrypted)
+    ))
+}
+
+pub(crate) fn decrypt_sensitive_text_with_seed(value: &str, seed: &str) -> Result<String, String> {
     if !value.starts_with(AUTH_ENCRYPTION_PREFIX) {
         return Ok(value.to_string());
     }

@@ -11,6 +11,61 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
 use super::*;
+
+#[test]
+fn cookie_store_encrypts_values_and_metadata_at_rest() {
+    let root = tempfile::TempDir::new().unwrap();
+    let path = root.path().join("cookies.json");
+    let cookie = parse_set_cookie("session=synthetic-cookie; Secure; HttpOnly", &reqwest::Url::parse("https://example.com/login").unwrap(), "workspace", "collection").unwrap();
+    write_cookie_file(&path, std::slice::from_ref(&cookie), "synthetic-seed").unwrap();
+    let raw = fs::read_to_string(&path).unwrap();
+    assert!(!raw.contains("synthetic-cookie"));
+    assert!(!raw.contains("example.com"));
+    assert!(raw.contains("enc:v1:"));
+    let loaded = read_cookie_file(&path, "synthetic-seed").unwrap();
+    assert_eq!(loaded[0].value, cookie.value);
+    assert!(loaded[0].http_only);
+    assert!(loaded[0].secure);
+}
+
+#[test]
+fn legacy_cookie_store_migrates_only_after_validation() {
+    let root = tempfile::TempDir::new().unwrap();
+    let path = root.path().join("cookies.json");
+    let cookie = parse_set_cookie("session=synthetic-cookie", &reqwest::Url::parse("https://example.com").unwrap(), "workspace", "collection").unwrap();
+    fs::write(&path, serde_json::to_vec(&[cookie]).unwrap()).unwrap();
+    assert_eq!(read_cookie_file(&path, "synthetic-seed").unwrap()[0].value, "synthetic-cookie");
+    assert!(!fs::read_to_string(&path).unwrap().contains("synthetic-cookie"));
+    assert_eq!(read_cookie_file(&path, "synthetic-seed").unwrap().len(), 1);
+    fs::write(&path, "[invalid").unwrap();
+    assert!(read_cookie_file(&path, "synthetic-seed").is_err());
+    assert_eq!(fs::read_to_string(path).unwrap(), "[invalid");
+}
+
+#[test]
+fn locked_or_wrong_cookie_key_never_overwrites_existing_data() {
+    let root = tempfile::TempDir::new().unwrap();
+    let path = root.path().join("cookies.json");
+    fs::write(&path, "[]").unwrap();
+    assert!(read_cookie_file(&path, "").is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), "[]");
+    write_cookie_file(&path, &[], "synthetic-seed").unwrap();
+    let original = fs::read(&path).unwrap();
+    assert!(read_cookie_file(&path, "wrong-key").is_err());
+    assert!(write_cookie_file(&path, &[], "").is_err());
+    assert_eq!(fs::read(&path).unwrap(), original);
+}
+
+#[test]
+fn unsupported_cookie_envelopes_are_not_treated_as_empty_jars() {
+    let root = tempfile::TempDir::new().unwrap();
+    let path = root.path().join("cookies.json");
+    for raw in ["", "{}", "{\"version\":2,\"encrypted\":\"enc:v1:future\"}", "{\"version\":1,\"encrypted\":\"[]\"}"] {
+        fs::write(&path, raw).unwrap();
+        assert!(read_cookie_file(&path, "synthetic-seed").is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), raw);
+    }
+}
 use crate::http::models::CookieJarEntry;
 use crate::storage::models::AppSettings;
 
