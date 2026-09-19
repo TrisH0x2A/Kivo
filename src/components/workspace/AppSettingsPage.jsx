@@ -126,7 +126,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
   const [cookieDraft, setCookieDraft] = useState(EMPTY_COOKIE_DRAFT);
   const [isCookieEditorOpen, setIsCookieEditorOpen] = useState(false);
   const [isSavingCookie, setIsSavingCookie] = useState(false);
-  const [activeSettingsTab, setActiveSettingsTab] = useState("Storage");
+  const [activeSettingsTab, setActiveSettingsTab] = useState(() => SETTINGS_TABS.includes(initialTab) ? initialTab : "Storage");
   const [appSettings, setSettingsState] = useState(DEFAULT_APP_SETTINGS);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [editingShortcutActionId, setEditingShortcutActionId] = useState("");
@@ -624,7 +624,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
   }
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[236px_minmax(0,1fr)] overflow-hidden bg-background">
+    <div className="kivo-settings-layout h-full min-h-0 overflow-hidden bg-background">
       <aside className="kivo-settings-rail kivo-scrollbar-none flex min-h-0 flex-col overflow-y-auto overflow-x-hidden px-3 py-4">
         <div className="mb-4 flex items-center gap-3 px-2">
           <div className="flex h-9 w-9 items-center justify-center border border-primary/20 bg-primary/10 text-primary">

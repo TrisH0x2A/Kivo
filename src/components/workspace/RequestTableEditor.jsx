@@ -103,8 +103,8 @@ export function TableEditor({
     : "grid-cols-[32px_minmax(0,1fr)_minmax(0,1fr)_36px]";
 
   return (
-    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-card/35">
-      <div className="flex items-center justify-between gap-3 border-b border-border/15 bg-card/70 px-3 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
+    <div className="kivo-data-table grid min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border/30 py-2 text-[12px] text-muted-foreground">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate font-medium text-foreground">{title}</span>
           <span className="shrink-0 rounded-sm bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-primary">
@@ -173,9 +173,9 @@ export function TableEditor({
           <div className="thin-scrollbar min-h-0 overflow-auto">
             {rows.length > 0 ? (
               rows.map((row, index) => (
-                <div key={row.id || `row-${index}`} className={cn("grid px-1 transition-colors hover:bg-card/35", gridColumns)}>
+                <div key={row.id || `row-${index}`} className={cn("kivo-data-row grid px-1 transition-colors hover:bg-card/35", gridColumns)}>
                   <label className="flex items-center justify-center">
-                    <input disabled={disabled} type="checkbox" checked={row.enabled ?? true} onChange={(event) => updateRow(index, "enabled", event.target.checked)} />
+                    <input aria-label={`Enable ${row.key || `row ${index + 1}`}`} disabled={disabled} type="checkbox" checked={row.enabled ?? true} onChange={(event) => updateRow(index, "enabled", event.target.checked)} />
                   </label>
                   <Input disabled={disabled} className="h-10 border-0 bg-transparent text-[12px] focus-visible:ring-0 lg:text-[14px]" value={row.key} onChange={(event) => updateRow(index, "key", event.target.value)} placeholder={keyLabel} />
                   {allowFileRows ? (
@@ -209,7 +209,7 @@ export function TableEditor({
                       </Button>
                     ) : null}
                   </div>
-                  <button type="button" disabled={disabled} className="flex items-center justify-center text-muted-foreground transition-colors hover:bg-card/45 hover:text-foreground disabled:opacity-40" onClick={() => removeRow(index)}>
+                  <button type="button" title="Remove row" aria-label={`Remove ${row.key || `row ${index + 1}`}`} disabled={disabled} className="flex h-8 items-center justify-center text-muted-foreground transition-colors hover:bg-card/45 hover:text-foreground disabled:opacity-40" onClick={() => removeRow(index)}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
@@ -220,6 +220,7 @@ export function TableEditor({
                 <button
                   type="button"
                   onClick={addRow}
+                  disabled={disabled}
                   className="mt-3 bg-card/40 px-3 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-card/70"
                 >
                   Add {keyLabel}

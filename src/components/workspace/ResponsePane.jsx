@@ -226,8 +226,8 @@ export function ResponsePane({
   }
 
   return (
-    <Card className="kivo-panel flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
-      <div className="kivo-quiet-divider flex items-center justify-between border-b bg-card/80 px-3 py-2 text-[11px] text-muted-foreground lg:py-2.5 lg:text-[12px]">
+    <Card role="region" aria-label="Response inspector" className="kivo-response-pane flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
+      <div className="kivo-response-metrics flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-[12px] text-muted-foreground">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <Clock3 className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
@@ -248,19 +248,19 @@ export function ResponsePane({
         </div>
       </div>
 
-      <div className="kivo-quiet-divider border-b bg-card/70 px-3 py-2 text-[12px] lg:text-[13px]">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-hidden pr-1">
+      <div className="kivo-editor-tabs border-b px-3 text-[12px]">
+        <div className="flex flex-wrap items-center justify-between gap-x-2">
+          <div className="thin-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pr-1">
             {responseTabs.map((tab) => (
               <button
                 key={tab}
                 type="button"
                 onClick={() => onTabChange(tab)}
-                className={cn("shrink-0 whitespace-nowrap px-1.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground lg:px-2.5 lg:py-1.5 lg:text-[13px]", activeTab === tab && "kivo-tab-active")}
+                aria-pressed={activeTab === tab}
+                className={cn("kivo-editor-tab shrink-0 whitespace-nowrap px-2 text-[12px] text-muted-foreground hover:text-foreground", activeTab === tab && "kivo-tab-active")}
               >
                 {tab}
-                {tab === "Headers" ? ` ${Object.keys(response.headers).length}` : ""}
-                {tab === "Cookies" ? ` ${response.cookies.length}` : ""}
+                {tab === "Headers" || tab === "Cookies" ? <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">{tab === "Headers" ? Object.keys(response.headers).length : response.cookies.length}</span> : null}
               </button>
             ))}
           </div>

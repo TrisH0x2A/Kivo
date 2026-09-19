@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button.jsx";
 import { useTheme } from "@/hooks/use-theme.js";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store.js";
 import { useEnv } from "@/hooks/use-env.js";
+import { useGithubStars } from "@/hooks/use-github-stars.js";
+import { formatStarCount } from "@/lib/github-stars.js";
 import { getResolvedStoragePath } from "@/lib/http-client.js";
 import { doesEventMatchShortcut, isEditableEventTarget, KEYBINDING_ACTIONS, normalizeKeybindingMap } from "@/lib/keybindings.js";
 import { SIDEBAR_COLLAPSED_WIDTH } from "@/lib/workspace-utils.js";
@@ -27,6 +29,7 @@ import {
   Globe,
   Layers,
   MoonStar,
+  PanelLeft,
   RefreshCw,
   Snowflake,
   SquareKanban,
@@ -78,7 +81,7 @@ function EnvChip({ globalCount, collectionCount, onClick }) {
       type="button"
       onClick={onClick}
       title={`Workspace Globals: ${globalCount}\nCollection Variables: ${collectionCount}`}
-      className="group flex items-center gap-2 border border-border/40 bg-accent/30 px-2.5 py-1.5 text-[10px] font-semibold text-muted-foreground shadow-sm transition-all hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
+      className="group flex h-8 items-center gap-2 border border-border/40 bg-transparent px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
     >
       <span className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
         <Globe className="h-3.5 w-3.5 text-primary/80 group-hover:text-primary transition-colors" />
@@ -100,12 +103,7 @@ function ChromeActions({
   onOpenGithub,
   onToggleTheme,
 }) {
-  const formattedStars =
-    githubStars !== null
-      ? githubStars > 999
-        ? `${(githubStars / 1000).toFixed(1)}k`
-        : githubStars
-      : "GitHub";
+  const formattedStars = formatStarCount(githubStars);
 
   return (
     <div className="kivo-chrome-actions" aria-label="App utilities">
@@ -113,11 +111,11 @@ function ChromeActions({
         type="button"
         className="kivo-chrome-action"
         onClick={onOpenGithub}
-        title="Open GitHub"
-        aria-label="Open Kivo on GitHub"
+        title={githubStars === null ? "Kivo on GitHub (star count unavailable)" : `${githubStars.toLocaleString()} stars on GitHub`}
+        aria-label={githubStars === null ? "Open Kivo on GitHub. Star count unavailable" : `Open Kivo on GitHub. ${githubStars} stars`}
       >
         <Github className="h-3.5 w-3.5" />
-        <span>{formattedStars}</span>
+        <span className="min-w-[3ch] font-mono tabular-nums">{formattedStars}</span>
         <Star className="h-3 w-3 fill-current text-yellow-500/90" />
       </button>
       <button
@@ -139,18 +137,8 @@ export default function App() {
   const activeThemeMeta = getThemeMeta(theme);
   const ActiveThemeIcon = THEME_ICON_MAP[activeThemeMeta.icon] ?? SunMedium;
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
-  const [githubStars, setGithubStars] = useState(null);
-
-  useEffect(() => {
-    fetch("https://api.github.com/repos/TrisH0x2A/Kivo")
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.stargazers_count !== undefined) {
-          setGithubStars(data.stargazers_count);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const githubStars = useGithubStars();
 
   const [settingsConfig, setSettingsConfig] = useState({ tab: "Overview", envTab: "workspace" });
   const [appSettingsTab, setAppSettingsTab] = useState("Storage");
@@ -499,13 +487,20 @@ export default function App() {
         </div>
       )}
       <div inert={isRenaming || undefined} aria-busy={isRenaming} className="kivo-app-shell flex h-full min-h-0 flex-col overflow-hidden border border-border/10">
+        <div className="kivo-mobile-navigation">
+          <button type="button" title="Toggle collections" aria-label="Toggle collections" aria-expanded={mobileNavigationOpen} onClick={() => setMobileNavigationOpen((open) => !open)} className="flex h-8 w-8 items-center justify-center text-muted-foreground">
+            <PanelLeft className="h-4 w-4" />
+          </button>
+          <span className="min-w-0 truncate text-[12px] font-medium">{activeWorkspace?.name || "Kivo"}</span>
+        </div>
+        {mobileNavigationOpen && <button type="button" className="kivo-navigation-backdrop" aria-label="Close collections" onClick={() => setMobileNavigationOpen(false)} />}
         <div className="flex min-h-0 flex-1 overflow-hidden">
-          <div style={{ width: `${sidebarWidth}px` }} className="min-h-0 shrink-0 overflow-hidden">
+          <div style={{ width: `${sidebarWidth}px` }} data-mobile-open={mobileNavigationOpen} className="kivo-sidebar-slot min-h-0 shrink-0 overflow-hidden">
             <Suspense fallback={<WorkspaceFallback />}>
               <Sidebar
                 iconSrc="/icon.ico"
                 sidebarTab={store.sidebarTab}
-                collapsed={store.sidebarCollapsed}
+                collapsed={store.sidebarCollapsed && !mobileNavigationOpen}
                 workspaces={store.workspaces}
                 activeWorkspaceName={store.activeWorkspaceName}
                 activeCollectionName={store.activeCollectionName}
@@ -513,13 +508,14 @@ export default function App() {
                 onSidebarTabChange={handleSidebarTabChangeWithView}
                 onSelectWorkspace={selectWorkspace}
                 onSelectCollection={(wName, cName) => {
+                  setMobileNavigationOpen(false);
                   selectCollection(wName, cName);
                   openCollectionSettings("Overview");
                 }}
                 onOpenCollectionSettings={() => openCollectionSettings("Overview")}
-                onOpenAppSettings={openAppSettings}
+                onOpenAppSettings={() => { setMobileNavigationOpen(false); openAppSettings(); }}
                 settingsActive={showAppSettings}
-                onSelectRequest={handleSelectRequest}
+                onSelectRequest={(...args) => { setMobileNavigationOpen(false); handleSelectRequest(...args); }}
                 onCreateWorkspace={createWorkspaceRecord}
                 onRenameWorkspace={renameWorkspaceRecord}
                 onDeleteWorkspace={deleteWorkspaceRecord}
@@ -691,7 +687,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="min-h-0 flex-1 overflow-hidden bg-background p-4">
+              <div className="min-h-0 flex-1 overflow-hidden bg-background">
                 <Suspense fallback={<WorkspaceFallback />}>
                   <WorkspaceView
                     request={activeRequest}

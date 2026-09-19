@@ -142,7 +142,7 @@ export function RequestTabs({
   }
 
   return (
-    <div className="thin-scrollbar flex items-center gap-1 overflow-x-auto overflow-y-hidden px-2 py-1.5 lg:h-[48px]">
+    <div aria-label="Open requests" className="thin-scrollbar flex h-10 min-w-0 items-center overflow-x-auto overflow-y-hidden bg-card/25">
       {requestTabs.map((request) => (
         (() => {
           const isWebSocket = request.requestMode === REQUEST_MODES.WEBSOCKET;
@@ -169,41 +169,37 @@ export function RequestTabs({
               : (isGraphql ? "tone-gql-text tone-gql-bg" : getMethodTone(request.method)))));
 
           return (
-            <button
+            <div
               key={request.name}
-              type="button"
-              onClick={() => selectRequest(activeWorkspaceName, activeCollectionName, request.name)}
-
-              className={cn(
-                "group relative flex h-9 min-w-[132px] items-center gap-2 px-3 text-[12px] transition-colors lg:text-[13px]",
-                request.name === activeRequestName
-                  ? "border border-primary/25 bg-primary/10 text-foreground shadow-[0_8px_22px_hsl(var(--primary)/0.08),inset_0_-2px_0_hsl(var(--primary)/0.68)]"
-                  : "border border-transparent bg-transparent text-muted-foreground hover:border-border/25 hover:bg-accent/20 hover:text-foreground"
-              )}
+              data-active={request.name === activeRequestName}
+              className="kivo-request-tab group"
             >
-              <span className={cn("px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] lg:text-[11px]", methodTone)}>{displayMethod}</span>
-              {request.pinned ? <Pin className="h-3 w-3 shrink-0 text-primary" /> : null}
-              <span className={cn("truncate", request.name === activeRequestName && "font-semibold")}>{request.name}</span>
-              <span
-                className="ml-auto opacity-0 transition-opacity group-hover:opacity-100"
-
-                onClick={(event) => {
-                  event.stopPropagation();
-                  closeRequestTab(request.name);
-                }}
+              <button type="button" aria-pressed={request.name === activeRequestName} onClick={() => selectRequest(activeWorkspaceName, activeCollectionName, request.name)} className="flex h-full min-w-0 flex-1 items-center gap-2 px-3 text-[12px] hover:bg-accent/20" title={request.name}>
+                <span className={cn("shrink-0 px-1 py-0.5 text-[10px] font-mono font-semibold", methodTone)}>{displayMethod}</span>
+                {request.pinned ? <Pin className="h-3 w-3 shrink-0 text-primary" /> : null}
+                <span className={cn("truncate", request.name === activeRequestName && "font-semibold")}>{request.name}</span>
+              </button>
+              <button
+                type="button"
+                title={`Close ${request.name}`}
+                aria-label={`Close ${request.name}`}
+                className="mr-1 flex h-6 w-6 shrink-0 items-center justify-center text-muted-foreground opacity-60 transition-opacity hover:bg-accent/30 hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+                onClick={() => closeRequestTab(request.name)}
               >
                 <X className="h-3.5 w-3.5" />
-              </span>
-            </button>
+              </button>
+            </div>
           );
         })()
       ))}
 
       <button
         type="button"
+        title="New request"
+        aria-label="New request"
         onClick={openCreateRequestMenu}
         className={cn(
-          "flex h-9 w-9 shrink-0 items-center justify-center border border-dashed border-border/30 bg-card/30 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground",
+          "mx-1 flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground",
           !activeWorkspaceName && "opacity-0 pointer-events-none"
         )}
       >

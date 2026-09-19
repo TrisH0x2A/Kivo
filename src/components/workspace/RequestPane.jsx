@@ -1243,12 +1243,12 @@ export function RequestPane({
   }
 
   return (
-    <Card className="kivo-panel flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
+    <section aria-label="Request editor" className="kivo-request-pane flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
       <div className={cn(
-          "kivo-quiet-divider grid gap-px border-b bg-card",
+          "kivo-request-command grid items-center gap-2 border-b p-3",
         isGrpcRequest
-          ? "grid-cols-[88px_minmax(0,1fr)_92px] xl:grid-cols-[100px_minmax(0,1fr)_260px_40px_40px_108px]"
-          : "grid-cols-[108px_minmax(0,1fr)_92px] lg:grid-cols-[124px_minmax(0,1fr)_108px]"
+          ? "grid-cols-[64px_minmax(0,1fr)_80px] xl:grid-cols-[64px_minmax(90px,1fr)_minmax(100px,0.65fr)_32px_32px_80px]"
+          : "grid-cols-[92px_minmax(0,1fr)_88px]"
       )}>
         {isWebSocketRequest ? (
           <div className="flex h-8 items-center px-3 lg:h-10">
@@ -1267,7 +1267,7 @@ export function RequestPane({
         )}
 
         <EnvHighlightInput
-          inputClassName="h-8 rounded-none border-0 bg-transparent text-[12.5px] lg:h-10 lg:text-[14px]"
+          inputClassName="h-10 text-[13px]"
           value={state.url}
           onValueChange={(val) => onChange("url", val)}
           placeholder={isWebSocketRequest ? "wss://example.com/chat" : isSocketIoRequest ? "ws://example.com/socket.io/?EIO=4&transport=websocket" : isGrpcRequest ? "grpcb.in:9000" : isSseRequest ? "https://example.com/events" : "https://api.example.com/v1/users"}
@@ -1646,7 +1646,7 @@ export function RequestPane({
         stackTrace={sendErrorTrace}
         onClose={() => setShowSendErrorModal(false)}
       />
-    </Card>
+    </section>
   );
 }
 

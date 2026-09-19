@@ -20,20 +20,31 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
         setMenuOpen(false);
       }
     };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuRef.current?.querySelector("button")?.focus();
+      }
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", onKeyDown);
+    };
   }, [menuOpen]);
 
   return (
-    <div className="kivo-quiet-divider border-b bg-card/75 px-2 py-2 text-[11px] text-muted-foreground lg:text-[12px]">
+    <div className="kivo-editor-tabs border-b px-3 text-[12px] text-muted-foreground">
       <div className="flex items-center gap-1">
         {mainTabs.map((tab) => (
           <button
             key={tab}
             type="button"
             onClick={() => onTabChange(tab)}
+            aria-pressed={activeTab === tab}
             className={cn(
-              "whitespace-nowrap px-2 py-1 text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground lg:px-3 lg:py-1.5",
+              "kivo-editor-tab whitespace-nowrap px-2.5 text-muted-foreground transition-colors hover:text-foreground",
               activeTab === tab && "kivo-tab-active"
             )}
           >
@@ -46,6 +57,9 @@ export function RequestTabBar({ tabs, activeTab, onTabChange }) {
             <button
               type="button"
               onClick={() => setMenuOpen((v) => !v)}
+              title="More request sections"
+              aria-label="More request sections"
+              aria-expanded={menuOpen}
               className={cn(
                 "flex items-center gap-1 whitespace-nowrap px-2 py-1 text-muted-foreground transition-colors hover:bg-accent/20 hover:text-foreground lg:px-3 lg:py-1.5",
                 isOverflowActive && "kivo-tab-active"

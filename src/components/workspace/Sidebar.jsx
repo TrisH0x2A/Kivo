@@ -1234,7 +1234,7 @@ export function RequestsView({
   const [creatingRequestInFolder, setCreatingRequestInFolder] = useState(null);
   const [expandedFolderKeys, setExpandedFolderKeys] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(true);
   const [isWorkspaceSwitcherOpen, setIsWorkspaceSwitcherOpen] = useState(false);
   const [duplicationTarget, setDuplicationTarget] = useState(null);
   const [clipboard, setClipboard] = useState(null);
@@ -1958,9 +1958,9 @@ export function RequestsView({
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
-                  autoFocus
                   className="h-8 pl-8 text-[12px] bg-background/50 border-border/40 focus:border-border/60"
-                  placeholder="Search collections..."
+                  aria-label="Filter collections and requests"
+                  placeholder="Filter collections and requests..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />

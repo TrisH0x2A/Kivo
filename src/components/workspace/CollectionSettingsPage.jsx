@@ -645,7 +645,7 @@ export function CollectionSettingsPage({
   const activeHeaderCount = (config.defaultHeaders || []).filter((row) => row?.enabled !== false && String(row?.key || "").trim()).length;
 
   return (
-    <div className="grid h-full min-h-0 grid-cols-[236px_minmax(0,1fr)] overflow-hidden bg-background">
+    <div className="kivo-settings-layout h-full min-h-0 overflow-hidden bg-background">
       <aside className="kivo-settings-rail kivo-scrollbar-none flex min-h-0 flex-col overflow-y-auto overflow-x-hidden px-3 py-4">
         <div className="mb-4 flex items-center gap-3 px-2">
           <div className="flex h-9 w-9 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
