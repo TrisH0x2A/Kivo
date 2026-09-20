@@ -1882,13 +1882,13 @@
   .kivo-response-metrics {
     min-height: 65px;
     border-color: hsl(var(--border) / 0.4);
-    background: hsl(var(--card) / 0.35);
+    background: transparent;
   }
 
   .kivo-editor-tabs {
     flex-shrink: 0;
     border-color: hsl(var(--border) / 0.4);
-    background: hsl(var(--card) / 0.2);
+    background: transparent;
   }
 
   .kivo-editor-tab {
@@ -1915,6 +1915,10 @@
     color: hsl(var(--muted-foreground));
   }
 
+  .kivo-request-tabs { scrollbar-width: none; }
+  .kivo-request-tabs::-webkit-scrollbar { display: none; }
+  .kivo-new-request { position: sticky; right: 0; background: hsl(var(--background)); box-shadow: -4px 0 0 hsl(var(--background)); }
+
   .kivo-request-tab[data-active="true"] {
     color: hsl(var(--foreground));
     background: hsl(var(--background));
@@ -1922,7 +1926,7 @@
   }
 
   .kivo-data-table {
-    margin: 12px;
+    margin: 16px;
     background: transparent;
   }
 
@@ -1943,6 +1947,106 @@
   .kivo-settings-layout {
     display: grid;
     grid-template-columns: 216px minmax(0, 1fr);
+  }
+
+  .kivo-global-header {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 10px;
+    height: 56px;
+    padding: 0 16px;
+    border-bottom: 1px solid hsl(var(--border) / 0.5);
+    background: hsl(var(--sidebar));
+  }
+
+  .kivo-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    color: hsl(var(--muted-foreground));
+    border-radius: 3px;
+  }
+  .kivo-icon-button:hover:not(:disabled) { color: hsl(var(--foreground)); background: hsl(var(--accent) / 0.55); }
+  .kivo-icon-button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .kivo-icon-button svg { width: 15px; height: 15px; }
+  .kivo-brand-mark { flex-shrink: 0; object-fit: contain; }
+  .kivo-workspace-picker, .kivo-environment-picker { display: flex; align-items: center; position: relative; min-width: 0; }
+  .kivo-workspace-picker { flex: 0 1 190px; }
+  .kivo-workspace-picker select, .kivo-environment-picker select {
+    appearance: none;
+    min-width: 0;
+    width: 100%;
+    height: 34px;
+    padding: 0 24px 0 4px;
+    background: transparent;
+    color: hsl(var(--foreground));
+    font-size: 12px;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .kivo-workspace-picker select { font-weight: 600; }
+  .kivo-workspace-picker > svg, .kivo-environment-picker > svg { position: absolute; right: 4px; width: 12px; pointer-events: none; color: hsl(var(--muted-foreground)); }
+  .kivo-header-collection { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 190px; font-size: 12px; }
+  .kivo-header-collection span:first-child { color: hsl(var(--muted-foreground)); }
+  .kivo-header-collection span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: hsl(var(--primary)); }
+  .kivo-command-trigger { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 32px; height: 34px; margin: 0 10px; padding: 0 12px; border: 1px solid hsl(var(--border) / 0.5); border-radius: 4px; background: hsl(var(--background)); color: hsl(var(--muted-foreground)); text-align: left; font-size: 12px; }
+  .kivo-command-trigger span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .kivo-command-trigger svg { flex-shrink: 0; width: 14px; height: 14px; }
+  .kivo-command-trigger:hover { border-color: hsl(var(--primary) / 0.6); }
+  .kivo-environment-picker { flex: 0 1 180px; border: 1px solid hsl(var(--border) / 0.5); border-radius: 4px; padding: 0 4px; }
+  .kivo-environment-picker .kivo-icon-button { color: hsl(var(--primary)); }
+  .kivo-statusbar { display: flex; align-items: center; gap: 16px; flex-shrink: 0; height: 30px; padding: 0 12px; border-top: 1px solid hsl(var(--border) / 0.5); background: hsl(var(--sidebar)); color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .kivo-status-primary, .kivo-status-metric { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .kivo-status-primary { color: hsl(var(--foreground)); }
+  .kivo-status-primary > span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .kivo-status-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: hsl(var(--muted-foreground)); }
+  .kivo-status-dot.is-active { background: hsl(var(--primary)); }
+  .kivo-status-protocol, .kivo-status-metric { font-family: Consolas, monospace; border-left: 1px solid hsl(var(--border) / 0.6); padding-left: 14px; }
+  .kivo-status-metric svg { width: 12px; height: 12px; }
+  .kivo-status-actions { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+  .kivo-status-actions button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; min-width: 26px; }
+  .kivo-status-actions button:hover { color: hsl(var(--primary)); }
+  .kivo-status-actions svg { width: 13px; height: 13px; }
+  .kivo-command-dialog { width: min(640px, calc(100vw - 24px)); max-height: min(600px, calc(100dvh - 48px)); margin: 10vh auto auto; padding: 0; border: 1px solid hsl(var(--border)); border-radius: 6px; background: hsl(var(--background)); color: hsl(var(--foreground)); box-shadow: 0 16px 60px #0005; overflow: hidden; }
+  .kivo-command-dialog[open] { display: flex; flex-direction: column; }
+  .kivo-command-dialog::backdrop { background: #0007; }
+  .kivo-command-search { display: flex; flex-shrink: 0; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid hsl(var(--border) / 0.6); }
+  .kivo-command-search > svg { width: 18px; color: hsl(var(--primary)); }
+  .kivo-command-search input { width: 100%; min-width: 0; background: transparent; border: 0; outline: 0; font-size: 13px; }
+  .kivo-command-results { padding: 6px; overflow: auto; min-height: 0; }
+  .kivo-command-result { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 3px; cursor: pointer; }
+  .kivo-command-result:hover, .kivo-command-result[aria-selected="true"] { background: hsl(var(--primary) / 0.1); }
+  .kivo-command-result[aria-selected="true"] { box-shadow: inset 2px 0 hsl(var(--primary)); }
+  .kivo-command-result > svg { width: 16px; flex-shrink: 0; color: hsl(var(--muted-foreground)); }
+  .kivo-command-result > div { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+  .kivo-command-result strong { font-size: 13px; font-weight: 500; }
+  .kivo-command-result strong, .kivo-command-result div span { white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+  .kivo-command-result div span { color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .kivo-command-method { font: 10px Consolas, monospace; text-transform: uppercase; color: hsl(var(--primary)); }
+  .kivo-command-footer { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding: 10px 16px; border-top: 1px solid hsl(var(--border) / 0.4); color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .kivo-command-footer svg { width: 13px; height: 13px; }
+  .kivo-transport-headers { margin: 20px 16px 12px; padding-bottom: 14px; border-bottom: 1px solid hsl(var(--border) / 0.4); }
+  .kivo-transport-headers dl { margin-top: 12px; font: 12px/1.6 Consolas, monospace; }
+  .kivo-transport-headers dl > div { display: grid; grid-template-columns: minmax(100px, 0.7fr) minmax(0, 1fr); gap: 16px; padding: 6px 0; }
+  .kivo-transport-headers dt { color: hsl(var(--muted-foreground)); }
+  .kivo-transport-headers dd { overflow-wrap: anywhere; }
+  .kivo-inline-payload { margin: 24px 16px; }
+  .kivo-response-body { background: transparent; border: 0; }
+  .kivo-grpc-message { margin: 4px 0 16px; padding: 16px; border: 1px solid hsl(var(--border) / 0.4); border-radius: 4px; overflow: auto; }
+  .kivo-append-row { opacity: 0.8; }
+  .kivo-append-row:focus-within { opacity: 1; }
+  .kivo-data-row:focus-within { background: hsl(var(--primary) / 0.04); }
+  .kivo-collection-actions { position: absolute; right: 4px; background: hsl(var(--sidebar)); pointer-events: none; }
+  .group:hover > .kivo-collection-actions, .group:focus-within > .kivo-collection-actions { pointer-events: auto; }
+  .kivo-data-row input:focus-visible { box-shadow: inset 0 -1px hsl(var(--primary)); }
+
+  @media (max-width: 1200px) {
+    .kivo-header-collection { display: none; }
+    .kivo-global-header .kivo-chrome-action:last-child span { display: none; }
   }
 
   .kivo-mobile-navigation,
@@ -1967,11 +2071,22 @@
   }
 
   @media (max-width: 720px) {
+    .kivo-global-header { height: 48px; gap: 6px; padding: 0 8px; }
+    .kivo-brand-mark, .kivo-new-workspace, .kivo-global-header .kivo-chrome-action:first-child { display: none; }
+    .kivo-workspace-picker { flex: 1 1 80px; }
+    .kivo-command-trigger { flex: 0 0 30px; padding: 0 7px; margin: 0; border: 0; background: transparent; }
+    .kivo-command-trigger span { display: none; }
+    .kivo-environment-picker { flex: 0 1 112px; }
+    .kivo-global-header .kivo-chrome-actions { gap: 0; padding: 0; border: 0; }
+    .kivo-global-header .kivo-chrome-action { padding: 0 4px; min-width: 26px; }
+    .kivo-statusbar { gap: 8px; }
+    .kivo-status-metric, .kivo-status-actions span { display: none; }
+    .kivo-status-actions { gap: 4px; }
     .kivo-mobile-navigation { display: flex; flex-shrink: 0; align-items: center; gap: 8px; height: 40px; padding: 0 8px; border-bottom: 1px solid hsl(var(--border) / 0.4); }
     .kivo-sidebar-slot { display: none; }
-    .kivo-sidebar-slot[data-mobile-open="true"] { display: block; position: absolute; z-index: 60; top: 40px; left: 0; bottom: 0; width: min(280px, calc(100% - 48px)) !important; }
+    .kivo-sidebar-slot[data-mobile-open="true"] { display: block; position: absolute; z-index: 60; top: 48px; left: 0; bottom: 30px; width: min(280px, calc(100% - 48px)) !important; }
     .kivo-sidebar-slot + div { display: none; }
-    .kivo-navigation-backdrop { display: block; position: absolute; z-index: 50; inset: 40px 0 0; border: 0; border-radius: 0; background: hsl(0 0% 0% / 0.45); }
+    .kivo-navigation-backdrop { display: block; position: absolute; z-index: 50; inset: 48px 0 30px; border: 0; border-radius: 0; background: hsl(0 0% 0% / 0.45); }
     .kivo-topbar { flex-wrap: wrap; padding: 10px 12px; }
     .kivo-topbar > div:first-child { flex-basis: 100%; }
     .kivo-settings-layout { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }

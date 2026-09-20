@@ -11,6 +11,7 @@ const STREAM_MODE_BY_REQUEST = {
 
 export function WorkspaceView({
   request,
+  requestTabs,
   isSending,
   sendStartedAt,
   onSend,
@@ -35,7 +36,11 @@ export function WorkspaceView({
 
   return (
     <div className="kivo-workbench">
+      <div className="kivo-request-column flex min-h-0 min-w-0 flex-col overflow-hidden">
+      {requestTabs && <div className="kivo-quiet-divider flex shrink-0 overflow-hidden border-b">{requestTabs}</div>}
+      <div className="min-h-0 flex-1 overflow-hidden">
       <RequestPane
+        key={`${workspaceName}:${collectionName}:${request.name}`}
         state={request}
         isSending={isSending}
         onSend={onSend}
@@ -53,6 +58,8 @@ export function WorkspaceView({
         workspaceName={workspaceName}
         collectionName={collectionName}
       />
+      </div>
+      </div>
       {streamMode ? (
         <StreamResponsePanel
           mode={streamMode}

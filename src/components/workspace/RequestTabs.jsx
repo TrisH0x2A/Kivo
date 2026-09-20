@@ -27,6 +27,24 @@ export function RequestTabs({
   });
   const [pendingRenameTarget, setPendingRenameTarget] = useState(null);
   const createMenuRef = useRef(null);
+  const tabsRef = useRef(null);
+
+  useLayoutEffect(() => {
+    const rail = tabsRef.current;
+    if (!rail) return;
+    const revealActiveTab = () => {
+      const active = rail.querySelector('[data-active="true"]');
+      if (!active) return;
+      const outer = rail.getBoundingClientRect();
+      const inner = active.getBoundingClientRect();
+      if (inner.left < outer.left) rail.scrollLeft += inner.left - outer.left;
+      else if (inner.right > outer.right - 36) rail.scrollLeft += inner.right - outer.right + 36;
+    };
+    revealActiveTab();
+    const observer = new ResizeObserver(revealActiveTab);
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [activeRequestName, activeCollectionName, requestTabs.length]);
 
   useEffect(() => {
     if (!createRequestMenu) return;
@@ -142,7 +160,7 @@ export function RequestTabs({
   }
 
   return (
-    <div aria-label="Open requests" className="thin-scrollbar flex h-10 min-w-0 items-center overflow-x-auto overflow-y-hidden bg-card/25">
+    <div ref={tabsRef} aria-label="Open requests" className="kivo-request-tabs flex h-10 min-w-0 flex-1 items-center overflow-x-auto overflow-y-hidden bg-transparent">
       {requestTabs.map((request) => (
         (() => {
           const isWebSocket = request.requestMode === REQUEST_MODES.WEBSOCKET;
@@ -199,7 +217,7 @@ export function RequestTabs({
         aria-label="New request"
         onClick={openCreateRequestMenu}
         className={cn(
-          "mx-1 flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground",
+          "kivo-new-request mx-1 flex h-7 w-7 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground",
           !activeWorkspaceName && "opacity-0 pointer-events-none"
         )}
       >

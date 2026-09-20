@@ -56,6 +56,29 @@ test("disabled empty tables cannot add a row", async () => {
   assert.ok(buttons.every((button) => button.includes('disabled=""')));
 });
 
+test("workbench chrome uses real status and accessible command controls", async () => {
+  const { WorkbenchHeader, WorkbenchStatusBar } = await server.ssrLoadModule("/src/components/workspace/WorkbenchChrome.jsx");
+  const header = render(WorkbenchHeader, { workspaces: [{ name: "Demo" }], workspaceName: "Demo", collectionName: "Gateway" });
+  assert.match(header, /aria-label="Active environment"/);
+  assert.match(header, /aria-label="Search requests and commands"/);
+  assert.match(header, /aria-label="New workspace"/);
+  const footer = render(WorkbenchStatusBar, { request: { requestMode: "grpc" }, isSending: true });
+  assert.match(footer, /Request in progress/);
+  assert.doesNotMatch(footer, /Proxy Connected|TLS v1|Saved/);
+});
+
+test("gRPC message view requires stream metadata and paginates large message lists", async () => {
+  const { ResponsePane } = await server.ssrLoadModule("/src/components/workspace/ResponsePane.jsx");
+  const response = { ...model.createEmptyResponse(), isJson: true, body: JSON.stringify(Array.from({ length: 80 }, (_, id) => ({ id }))), headers: { "x-kivo-grpc-mode": "server_stream" } };
+  const html = render(ResponsePane, { response, activeTab: "Body", bodyView: "Messages" });
+  assert.match(html, /Received gRPC messages/);
+  assert.match(html, /Message #50/);
+  assert.doesNotMatch(html, /Message #51/);
+  assert.match(html, /Show more messages/);
+  const http = render(ResponsePane, { response: { ...response, headers: {} }, activeTab: "Body", bodyView: "Messages" });
+  assert.doesNotMatch(http, /Received gRPC messages/);
+});
+
 test("collection sections retain their content in the flat settings layout", async () => {
   const { CollectionSettingsPage } = await server.ssrLoadModule("/src/components/workspace/CollectionSettingsPage.jsx");
   for (const initialTab of ["Overview", "Headers", "Environments", "Auth", "Docs", "Runner"]) {

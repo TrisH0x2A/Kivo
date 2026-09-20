@@ -3,6 +3,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
+import { WorkbenchHeader, WorkbenchSearch, WorkbenchStatusBar } from "@/components/workspace/WorkbenchChrome.jsx";
 import { RequestTabs } from "@/components/workspace/RequestTabs.jsx";
 import { SidebarResizer } from "@/components/workspace/SidebarResizer.jsx";
 import { Updater } from "@/components/Updater.jsx";
@@ -15,7 +16,6 @@ import { useGithubStars } from "@/hooks/use-github-stars.js";
 import { formatStarCount } from "@/lib/github-stars.js";
 import { getResolvedStoragePath } from "@/lib/http-client.js";
 import { doesEventMatchShortcut, isEditableEventTarget, KEYBINDING_ACTIONS, normalizeKeybindingMap } from "@/lib/keybindings.js";
-import { SIDEBAR_COLLAPSED_WIDTH } from "@/lib/workspace-utils.js";
 import { Toaster } from "sonner";
 import {
   AlertTriangle,
@@ -26,10 +26,8 @@ import {
   FlaskConical,
   GitBranch,
   Github,
-  Globe,
   Layers,
   MoonStar,
-  PanelLeft,
   RefreshCw,
   Snowflake,
   SquareKanban,
@@ -73,29 +71,6 @@ const THEME_ICON_MAP = {
   code2: Code2,
 };
 
-function EnvChip({ globalCount, collectionCount, onClick }) {
-  const total = globalCount + collectionCount;
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={`Workspace Globals: ${globalCount}\nCollection Variables: ${collectionCount}`}
-      className="group flex h-8 items-center gap-2 border border-border/40 bg-transparent px-2.5 text-[11px] font-medium text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/10 hover:text-foreground"
-    >
-      <span className="flex items-center gap-1.5 opacity-80 group-hover:opacity-100">
-        <Globe className="h-3.5 w-3.5 text-primary/80 group-hover:text-primary transition-colors" />
-        <span className="uppercase tracking-[0.1em]">ENV</span>
-      </span>
-      {total > 0 && (
-        <span className="flex h-4 min-w-[16px] items-center justify-center border border-primary/25 bg-primary/20 text-[9px] font-bold text-primary">
-          {total}
-        </span>
-      )}
-    </button>
-  );
-}
-
 function ChromeActions({
   activeThemeMeta,
   ActiveThemeIcon,
@@ -138,7 +113,9 @@ export default function App() {
   const ActiveThemeIcon = THEME_ICON_MAP[activeThemeMeta.icon] ?? SunMedium;
   const [showWorkspaceModal, setShowWorkspaceModal] = useState(false);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [compactLayout, setCompactLayout] = useState(() => window.matchMedia("(max-width: 720px)").matches);
   const githubStars = useGithubStars();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const [settingsConfig, setSettingsConfig] = useState({ tab: "Overview", envTab: "workspace" });
   const [appSettingsTab, setAppSettingsTab] = useState("Storage");
@@ -163,7 +140,6 @@ export default function App() {
     activeWebSocketState,
     activeStreamMessages,
     clearActiveStreamMessages,
-    SIDEBAR_MIN_WIDTH,
     SIDEBAR_REOPEN_WIDTH,
     updateStore,
     handleSidebarTabChange,
@@ -200,6 +176,13 @@ export default function App() {
     importCollectionRecord,
     importRequestRecords,
   } = useWorkspaceStore();
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 720px)");
+    const onChange = () => { setCompactLayout(query.matches); setMobileNavigationOpen(false); };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   const [resolvedPath, setResolvedPath] = useState(null);
   useEffect(() => {
@@ -248,6 +231,9 @@ export default function App() {
 
     function runShortcutAction(actionId) {
       switch (actionId) {
+        case "app.search":
+          setSearchOpen(true);
+          break;
         case "app.openSettings":
           openAppSettings();
           break;
@@ -319,6 +305,10 @@ export default function App() {
           selectTabByOffset(-1);
           break;
         case "sidebar.toggle":
+          if (compactLayout) {
+            setMobileNavigationOpen((open) => !open);
+            break;
+          }
           updateStore((current) => ({
             ...current,
             sidebarCollapsed: !current.sidebarCollapsed,
@@ -340,7 +330,7 @@ export default function App() {
     }
 
     function handleGlobalKeydown(event) {
-      if (!isHydrated || isRenaming) return;
+      if (!isHydrated || isRenaming || event.target.closest?.("dialog[open]")) return;
       for (const action of KEYBINDING_ACTIONS) {
         const shortcut = keybindingMap[action.id];
         if (!shortcut) continue;
@@ -360,6 +350,7 @@ export default function App() {
     activeCollection,
     activeRequest,
     activeWorkspace,
+    compactLayout,
     applyZoom,
     cancelSend,
     closeRequestTab,
@@ -438,7 +429,11 @@ export default function App() {
 
   if (!isHydrated) return <WorkspaceFallback />;
 
-  const sidebarWidth = store.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : store.sidebarWidth;
+  const sidebarWidth = store.sidebarCollapsed ? 0 : store.sidebarWidth;
+  function toggleSidebar() {
+    if (window.matchMedia("(max-width: 720px)").matches) setMobileNavigationOpen((open) => !open);
+    else updateStore((current) => ({ ...current, sidebarCollapsed: !current.sidebarCollapsed, sidebarWidth: Math.max(current.sidebarWidth, SIDEBAR_REOPEN_WIDTH) }));
+  }
 
   const showNoWorkspaceState = !activeWorkspace;
   const showNoCollectionsState = activeWorkspace && activeWorkspace.collections.length === 0;
@@ -454,8 +449,6 @@ export default function App() {
 
   const showWorkspaceView = !showAppSettings && activeRequest && forcedView !== "collectionSettings";
 
-  const globalVarCount = envVars?.workspace?.length ?? 0;
-  const collectionVarCount = envVars?.collection?.length ?? 0;
 
   return (
     <div className="h-full overflow-hidden">
@@ -487,12 +480,29 @@ export default function App() {
         </div>
       )}
       <div inert={isRenaming || undefined} aria-busy={isRenaming} className="kivo-app-shell flex h-full min-h-0 flex-col overflow-hidden border border-border/10">
-        <div className="kivo-mobile-navigation">
-          <button type="button" title="Toggle collections" aria-label="Toggle collections" aria-expanded={mobileNavigationOpen} onClick={() => setMobileNavigationOpen((open) => !open)} className="flex h-8 w-8 items-center justify-center text-muted-foreground">
-            <PanelLeft className="h-4 w-4" />
-          </button>
-          <span className="min-w-0 truncate text-[12px] font-medium">{activeWorkspace?.name || "Kivo"}</span>
-        </div>
+        <WorkbenchHeader
+          key={activeWorkspace?.name}
+          workspaces={store.workspaces}
+          workspaceName={activeWorkspace?.name}
+          collectionName={activeCollection?.name}
+          onWorkspaceChange={(name) => { setForcedView(null); handleSidebarTabChange("requests"); selectWorkspace(name); }}
+          onCreateWorkspace={() => setShowWorkspaceModal(true)}
+          onCollectionSettings={() => openCollectionSettings()}
+          onEnvironments={() => openCollectionSettings("Environments", "workspace")}
+          onEnvironmentChange={refreshEnvVars}
+          onSearch={() => setSearchOpen(true)}
+          onToggleSidebar={toggleSidebar}
+          sidebarOpen={compactLayout ? mobileNavigationOpen : !store.sidebarCollapsed}
+          utilities={<ChromeActions activeThemeMeta={activeThemeMeta} ActiveThemeIcon={ActiveThemeIcon} githubStars={githubStars} onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")} onToggleTheme={toggleTheme} />}
+        />
+        {searchOpen && <WorkbenchSearch
+          workspaces={store.workspaces} onClose={() => setSearchOpen(false)}
+          onSelectRequest={handleSelectRequest}
+          onSelectCollection={(workspace, collection) => { selectCollection(workspace, collection); openCollectionSettings(); }}
+          onSettings={() => openAppSettings()}
+          canCreateRequest={Boolean(activeWorkspace && activeCollection)}
+          onNewRequest={() => { setForcedView(null); handleSidebarTabChange("requests"); createRequestRecord(activeWorkspace.name, activeCollection.name); }}
+        />}
         {mobileNavigationOpen && <button type="button" className="kivo-navigation-backdrop" aria-label="Close collections" onClick={() => setMobileNavigationOpen(false)} />}
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <div style={{ width: `${sidebarWidth}px` }} data-mobile-open={mobileNavigationOpen} className="kivo-sidebar-slot min-h-0 shrink-0 overflow-hidden">
@@ -596,33 +606,6 @@ export default function App() {
 
             <>
               { }
-              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b px-5 py-3 backdrop-blur-md">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="text-[17px] font-semibold tracking-tight text-foreground truncate">
-                    {activeCollection?.name ?? "Collection"}
-                  </div>
-                </div>
-                { }
-                <div className="flex items-center gap-2">
-                  {activeWorkspace && (
-                    <>
-                      <EnvChip
-                        globalCount={globalVarCount}
-                        collectionCount={collectionVarCount}
-                        onClick={() => openCollectionSettings("Environments", "workspace")}
-                      />
-                    </>
-                  )}
-                  <ChromeActions
-                    activeThemeMeta={activeThemeMeta}
-                    ActiveThemeIcon={ActiveThemeIcon}
-                    githubStars={githubStars}
-                    onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
-                    onToggleTheme={toggleTheme}
-                  />
-                </div>
-              </div>
-
               <div className="flex-1 min-h-0 overflow-hidden">
                 <Suspense fallback={<WorkspaceFallback />}>
                   <CollectionSettingsPage
@@ -640,56 +623,10 @@ export default function App() {
           ) : showWorkspaceView ? (
 
             <>
-              <div data-tauri-drag-region className="kivo-topbar flex shrink-0 items-center justify-between border-b px-5 py-3.5 backdrop-blur-md">
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="min-w-0 truncate text-[18px] font-semibold tracking-tight text-foreground">
-                      {activeCollection?.name ?? "No Collection"}
-                    </div>
-                    {activeRequest ? (
-                      <div className="hidden min-w-0 items-center gap-2 text-[12px] text-muted-foreground md:flex">
-                        <span className="h-1 w-1 rounded-full bg-primary/70" aria-hidden="true" />
-                        <span className="truncate">{activeRequest.name}</span>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
-                { }
-                <div className="flex items-center gap-2">
-                  {activeCollection && (
-                    <>
-                      <EnvChip
-                        globalCount={globalVarCount}
-                        collectionCount={collectionVarCount}
-                        onClick={() => openCollectionSettings("Environments", "workspace")}
-                      />
-                    </>
-                  )}
-                  <ChromeActions
-                    activeThemeMeta={activeThemeMeta}
-                    ActiveThemeIcon={ActiveThemeIcon}
-                    githubStars={githubStars}
-                    onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")}
-                    onToggleTheme={toggleTheme}
-                  />
-                </div>
-              </div>
-
-              <div className="kivo-quiet-divider flex min-h-0 shrink-0 border-b bg-background/10">
-                <RequestTabs
-                  activeWorkspaceName={activeWorkspace?.name}
-                  activeCollectionName={activeCollection?.name}
-                  activeRequestName={activeRequest?.name}
-                  requestTabs={requestTabs}
-                  selectRequest={handleSelectRequest}
-                  closeRequestTab={closeRequestTab}
-                  createRequestRecord={createRequestRecord}
-                />
-              </div>
-
               <div className="min-h-0 flex-1 overflow-hidden bg-background">
                 <Suspense fallback={<WorkspaceFallback />}>
                   <WorkspaceView
+                    requestTabs={<RequestTabs activeWorkspaceName={activeWorkspace?.name} activeCollectionName={activeCollection?.name} activeRequestName={activeRequest?.name} requestTabs={requestTabs} selectRequest={handleSelectRequest} closeRequestTab={closeRequestTab} createRequestRecord={createRequestRecord} />}
                     request={activeRequest}
                     isSending={isSending}
                     sendStartedAt={sendStartedAt}
@@ -715,6 +652,7 @@ export default function App() {
           ) : null}
           </main>
         </div>
+        <WorkbenchStatusBar request={activeRequest} response={response} isSending={isSending} connectionState={activeWebSocketState} onHistory={() => openAppSettings("History")} onSettings={() => openAppSettings()} onSearch={() => setSearchOpen(true)} onToggleSidebar={toggleSidebar} />
       </div>
     </div>
   );

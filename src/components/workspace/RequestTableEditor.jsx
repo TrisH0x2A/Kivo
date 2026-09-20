@@ -22,6 +22,15 @@ export function TableEditor({
 }) {
   const [isBulkMode, setIsBulkMode] = useState(false);
   const [bulkText, setBulkText] = useState("");
+  const [draftKey, setDraftKey] = useState("");
+  const [draftValue, setDraftValue] = useState("");
+
+  function appendDraft() {
+    if (disabled || (!draftKey.trim() && !draftValue.trim())) return;
+    onChange([...rows, { ...createRow(), key: draftKey, value: draftValue }]);
+    setDraftKey("");
+    setDraftValue("");
+  }
 
   function updateRow(index, field, value) {
     onChange(rows.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
@@ -215,18 +224,15 @@ export function TableEditor({
                 </div>
               ))
             ) : (
-              <div className="flex h-full min-h-[150px] flex-col items-center justify-center bg-background/10 px-4 py-8 text-center text-muted-foreground/70">
-                <p className="text-[11px] uppercase tracking-[0.14em]">No {title.toLowerCase()} defined</p>
-                <button
-                  type="button"
-                  onClick={addRow}
-                  disabled={disabled}
-                  className="mt-3 bg-card/40 px-3 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-card/70"
-                >
-                  Add {keyLabel}
-                </button>
-              </div>
+              null
             )}
+            <div className={cn("kivo-data-row kivo-append-row grid px-1", gridColumns)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); appendDraft(); } }}>
+              <Plus className="mx-auto h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <Input aria-label={`New ${keyLabel}`} disabled={disabled} value={draftKey} onChange={(event) => setDraftKey(event.target.value)} placeholder={`Add ${keyLabel}`} />
+              {allowFileRows && <span className="px-2 text-[11px] text-muted-foreground">Text</span>}
+              <Input aria-label={`New ${valueLabel}`} disabled={disabled} value={draftValue} onChange={(event) => setDraftValue(event.target.value)} placeholder={`Add ${valueLabel}`} />
+              <button type="button" className="kivo-icon-button" title="Add pair" aria-label="Add pair" disabled={disabled || (!draftKey.trim() && !draftValue.trim())} onClick={appendDraft}><Plus /></button>
+            </div>
           </div>
         </div>
       )}

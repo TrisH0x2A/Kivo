@@ -121,7 +121,7 @@ function buildGrpcErrorTrace(response, fallbackTitle = "gRPC request failed") {
   return lines.join("\n");
 }
 
-function GrpcHeadersPanel({ headers, onHeadersChange }) {
+function GrpcHeadersPanel({ headers, onHeadersChange, body, onBodyChange, bodyNotice }) {
   const systemHeaders = [
     { key: "content-type", value: "application/grpc" },
     { key: "te", value: "trailers" },
@@ -129,28 +129,34 @@ function GrpcHeadersPanel({ headers, onHeadersChange }) {
   ];
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-      <div className="border-b border-border/20 px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
-        gRPC Transport Headers
-      </div>
-      <div className="thin-scrollbar min-h-0 overflow-auto">
-        {systemHeaders.map((row) => (
-          <div key={row.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] border-b border-border/10 px-3 py-2 text-[12px]">
-            <div className="text-foreground">{row.key}</div>
-            <div className="text-muted-foreground">{row.value}</div>
-          </div>
-        ))}
-        <div>
-          <TableEditor
-            rows={headers}
-            onChange={onHeadersChange}
-            keyLabel="header"
-            valueLabel="value"
-            title="Custom Metadata"
-            addLabel="Add"
-          />
+    <div className="kivo-grpc-metadata thin-scrollbar h-full min-h-0 overflow-auto">
+      <section className="kivo-transport-headers" aria-label="gRPC transport headers">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <h3>gRPC transport headers</h3><span className="text-primary">Managed by runtime</span>
         </div>
-      </div>
+        <dl>
+          {systemHeaders.map((row) => (
+            <div key={row.key}>
+              <dt>{row.key}</dt><dd>{row.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+      <TableEditor
+        rows={headers}
+        onChange={onHeadersChange}
+        keyLabel="header"
+        valueLabel="value"
+        title="Custom Metadata"
+        addLabel="Add"
+      />
+      <section className="kivo-inline-payload" aria-label="gRPC message payload">
+        <h3 className="mb-3 text-[11px] font-medium text-muted-foreground">JSON message body</h3>
+        <div className="h-56 min-h-0 overflow-hidden border border-border/40">
+          <CodeEditor value={body} onChange={onBodyChange} language="json" placeholder="{}" />
+        </div>
+        {bodyNotice && <p role="status" className="mt-2 text-[11px] text-amber-500">{bodyNotice}</p>}
+      </section>
     </div>
   );
 }
@@ -1348,7 +1354,7 @@ export function RequestPane({
       </div>
 
       {isGrpcRequest ? (
-        <div className="kivo-quiet-divider grid grid-cols-[minmax(0,1fr)_34px_34px] gap-px border-b bg-card xl:hidden">
+        <div className="kivo-quiet-divider grid grid-cols-[minmax(0,1fr)_34px_34px] gap-px border-b bg-transparent xl:hidden">
           {hasGrpcProtoSelected ? (
             <SelectMenu
               value={state.grpcMethodPath || ""}
@@ -1393,7 +1399,7 @@ export function RequestPane({
       ) : null}
 
       {isGrpcRequest ? (
-        <div className="kivo-quiet-divider flex items-center justify-between border-b bg-card px-3 py-2 text-[11px] text-muted-foreground">
+        <div className="kivo-quiet-divider flex items-center justify-between border-b bg-transparent px-3 py-2 text-[11px] text-muted-foreground">
           <div className="flex min-w-0 items-center gap-2 truncate">
             <FileText className="h-3.5 w-3.5 shrink-0 tone-grpc-text" />
             <span className="truncate">{grpcSelectedProtoFileName || "No .proto file selected"}</span>
@@ -1411,7 +1417,7 @@ export function RequestPane({
       ) : null}
 
       {isGrpcRequest && grpcReflectionStatus ? (
-        <div className="kivo-quiet-divider border-b bg-card px-3 py-1.5 text-[11px] text-muted-foreground">
+        <div className="kivo-quiet-divider border-b bg-transparent px-3 py-1.5 text-[11px] text-muted-foreground">
           {grpcReflectionStatus}
         </div>
       ) : null}
@@ -1431,9 +1437,9 @@ export function RequestPane({
       <div className="min-h-0 flex-1 overflow-hidden bg-transparent">
         {activeTab === "Params" ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] text-[12px]">
-            <div className="kivo-quiet-divider border-b bg-card px-3 py-3">
+            <div className="kivo-quiet-divider border-b bg-transparent px-3 py-3">
               <div className="mb-1 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">URL Preview</div>
-              <div className="kivo-field px-3 py-2 text-foreground">{urlPreview || state.url}</div>
+              <div className="break-all font-mono text-[12px] leading-5 text-foreground">{urlPreview || state.url}</div>
             </div>
             <TableEditor rows={state.queryParams} onChange={onParamsChange} title="Query Parameters" addLabel="Add" />
           </div>
@@ -1447,10 +1453,10 @@ export function RequestPane({
           ) : isSocketIoRequest ? (
             <SocketIoHeadersPanel headers={state.headers} onHeadersChange={onHeadersChange} />
           ) : isGrpcRequest ? (
-            <GrpcHeadersPanel headers={state.headers} onHeadersChange={onHeadersChange} />
+            <GrpcHeadersPanel headers={state.headers} onHeadersChange={onHeadersChange} body={state.body} onBodyChange={handleGrpcBodyChange} bodyNotice={grpcBodyNotice} />
           ) : (
             <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
-              <label className="kivo-quiet-divider flex items-center gap-2 border-b bg-card px-4 py-2.5 text-[11px] text-muted-foreground lg:text-[12px] cursor-pointer">
+              <label className="kivo-quiet-divider flex items-center gap-2 border-b bg-transparent px-4 py-2.5 text-[11px] text-muted-foreground lg:text-[12px] cursor-pointer">
                 <input
                   type="checkbox"
                   className="accent-primary w-3 h-3.5 outline-none"

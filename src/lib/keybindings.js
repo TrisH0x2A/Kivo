@@ -1,6 +1,7 @@
 const IS_MAC = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent || "");
 
 export const KEYBINDING_ACTIONS = [
+  { id: "app.search", label: "Search Requests and Commands", section: "General", defaultShortcut: "Mod+K", allowInInput: true },
   { id: "app.openSettings", label: "Show App Preferences", section: "General", defaultShortcut: "Mod+,", allowInInput: true },
   { id: "app.openKeybindings", label: "Show Keybindings", section: "General", defaultShortcut: "Mod+Shift+K", allowInInput: true },
   { id: "app.openCollectionSettings", label: "Show Collection Settings", section: "General", defaultShortcut: "Mod+Shift+," },

@@ -82,9 +82,18 @@ export function ResponsePane({
   const responseBodyLanguage = detectResponseLanguage(contentType, response.body || response.rawBody, isJson);
   const jsonTreeTooLarge = isJson && String(response.body || "").length > MAX_JSON_TREE_CHARS;
 
+  const parsedJson = useMemo(() => {
+    if (!isJson || jsonTreeTooLarge) return null;
+    try { return JSON.parse(response.body); } catch { return null; }
+  }, [response.body, isJson, jsonTreeTooLarge]);
+  const grpcMessages = getHeaderValue(response.headers, "x-kivo-grpc-mode") === "server_stream" && Array.isArray(parsedJson) ? parsedJson : null;
+  const [messageLimit, setMessageLimit] = useState(50);
+  useEffect(() => { setMessageLimit(50); }, [response.body]);
+
   let bodyViews = ["Raw"];
   if (isJson) {
     bodyViews = ["Tree", "JSON", "Raw"];
+    if (grpcMessages) bodyViews.unshift("Messages");
   } else if (isHtml) {
     bodyViews = ["Preview", "Raw"];
   }
@@ -93,15 +102,6 @@ export function ResponsePane({
   if (!bodyViews.includes(currentView)) {
     currentView = bodyViews[0];
   }
-
-  const parsedJson = useMemo(() => {
-    if (!isJson || jsonTreeTooLarge) return null;
-    try {
-      return JSON.parse(response.body);
-    } catch {
-      return null;
-    }
-  }, [response.body, isJson, jsonTreeTooLarge]);
 
   const [inputValue, setInputValue] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -228,7 +228,7 @@ export function ResponsePane({
   return (
     <Card role="region" aria-label="Response inspector" className="kivo-response-pane flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
       <div className="kivo-response-metrics flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-[12px] text-muted-foreground">
-        <div className="flex items-center gap-3">
+        <div className="order-2 flex items-center gap-3 font-mono">
           <div className="flex items-center gap-1.5">
             <Clock3 className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
             <span>{response.duration}</span>
@@ -296,11 +296,11 @@ export function ResponsePane({
       <div className="relative min-h-0 flex-1 overflow-hidden p-3">
         {activeTab === "Body" ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-            <div className="flex items-center justify-between text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5">
                   <FileJson2 className="h-3 w-3" />
-                  <span>Body</span>
+                  <span>{grpcMessages ? `${grpcMessages.length} messages` : "Body"}</span>
                 </div>
                 {currentView === "Tree" && (
                   <div className="kivo-field ml-2 flex w-48 items-center gap-1.5 py-[3px] pl-2.5 pr-1.5 normal-case tracking-normal transition-colors">
@@ -336,14 +336,25 @@ export function ResponsePane({
                 ))}
               </div>
             </div>
-            {isBinary ? (
+            {currentView === "Messages" && grpcMessages ? (
+              <div className="thin-scrollbar min-h-0 overflow-auto" aria-label="Received gRPC messages">
+                {grpcMessages.slice(0, messageLimit).map((message, index) => (
+                  <article key={index} className="kivo-grpc-message">
+                    <div className="mb-3 flex items-center justify-between gap-2 text-[11px] font-mono text-muted-foreground"><h3 className="text-primary">Message #{index + 1}</h3><span>{new TextEncoder().encode(JSON.stringify(message)).length} B JSON</span></div>
+                    <JsonTree data={message} />
+                  </article>
+                ))}
+                {grpcMessages.length === 0 && <p className="p-4 text-[12px] text-muted-foreground">No messages received</p>}
+                {grpcMessages.length > messageLimit && <Button variant="ghost" onClick={() => setMessageLimit((limit) => limit + 50)}>Show more messages</Button>}
+              </div>
+            ) : isBinary ? (
               <div className="kivo-field flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
                 <Download className="h-8 w-8 text-primary/70" />
                 <div className="text-[13px] font-medium text-foreground">Binary response</div>
                 <div className="max-w-sm text-[12px]">Preview is unavailable for this content type. Save the response to inspect the original bytes.</div>
               </div>
             ) : currentView === "Tree" && parsedJson !== null ? (
-              <div className="kivo-field thin-scrollbar h-full overflow-auto p-4">
+              <div className="kivo-response-body thin-scrollbar h-full overflow-auto p-3">
                 {(Array.isArray(displayJson) ? displayJson.length > 0 : Object.keys(displayJson || {}).length > 0) ? (
                   <div className="flex flex-col gap-0">
                     {searchQuery && (

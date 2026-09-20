@@ -52,6 +52,12 @@ export function useEnv(workspaceName, collectionName, workspaceEnvironmentId = n
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const onEnvironmentChange = (event) => { if (event.detail === workspaceName) refresh(); };
+    window.addEventListener("kivo:workspace-environments-changed", onEnvironmentChange);
+    return () => window.removeEventListener("kivo:workspace-environments-changed", onEnvironmentChange);
+  }, [workspaceName, refresh]);
+
 
   async function saveVars(scope, orderedVars) {
     const colName = scope === "collection" ? (collectionName || null) : null;

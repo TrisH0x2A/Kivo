@@ -1235,7 +1235,6 @@ export function RequestsView({
   const [expandedFolderKeys, setExpandedFolderKeys] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchVisible, setIsSearchVisible] = useState(true);
-  const [isWorkspaceSwitcherOpen, setIsWorkspaceSwitcherOpen] = useState(false);
   const [duplicationTarget, setDuplicationTarget] = useState(null);
   const [clipboard, setClipboard] = useState(null);
   const [collectionContextMenu, setCollectionContextMenu] = useState(null);
@@ -1798,7 +1797,7 @@ export function RequestsView({
 
     return activeWorkspace.collections.map(col => {
       const matchesCol = col.name.toLowerCase().includes(normalizedSearchQuery);
-      const matchedRequests = col.requests.filter(req => req.name.toLowerCase().includes(normalizedSearchQuery));
+      const matchedRequests = col.requests.filter(req => `${req.name} ${req.method} ${req.url} ${req.grpcMethodPath || ""}`.toLowerCase().includes(normalizedSearchQuery));
 
       if (matchesCol) {
         return col;
@@ -1825,51 +1824,6 @@ export function RequestsView({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
 
-      <div className="relative mb-4">
-        <button
-          onClick={() => setIsWorkspaceSwitcherOpen(!isWorkspaceSwitcherOpen)}
-          className="kivo-workspace-switcher flex w-full items-center justify-between gap-2 border border-transparent px-2.5 py-2 text-left transition-colors"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <SquareKanban className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate text-[14px] font-semibold text-foreground">
-              {activeWorkspace?.name ?? "No workspace"}
-            </span>
-          </div>
-          <ChevronDown className={cn("h-4 w-4 shrink-0 text-muted-foreground transition-transform", isWorkspaceSwitcherOpen && "rotate-180")} />
-        </button>
-
-        {isWorkspaceSwitcherOpen && (
-          <div className="kivo-glass absolute left-0 right-0 top-full z-50 mt-1 p-1 shadow-xl">
-            {workspaces.map((w) => (
-              <button
-                key={w.name}
-                onClick={() => {
-                  onSelectWorkspace(w.name);
-                  setIsWorkspaceSwitcherOpen(false);
-                }}
-                className={cn(
-                  "flex w-full items-center border border-transparent px-3 py-2 text-left text-[12px] transition-colors hover:border-border/35 hover:bg-accent/45",
-                  w.name === activeWorkspaceName ? "border-border/35 bg-accent text-foreground" : "text-foreground/80"
-                )}
-              >
-                {w.name}
-              </button>
-            ))}
-            <div className="my-1 border-t border-border/40" />
-            <button
-              onClick={() => {
-                setEditingWorkspaceName(null);
-                setShowWorkspaceForm(true);
-                setIsWorkspaceSwitcherOpen(false);
-              }}
-              className="flex w-full items-center gap-2 border border-transparent px-3 py-2 text-left text-[12px] text-muted-foreground transition-colors hover:border-border/35 hover:bg-accent/45"
-            >
-              <Plus className="h-3.5 w-3.5" /> Create Workspace
-            </button>
-          </div>
-        )}
-      </div>
 
       {showWorkspaceForm && (
         <WorkspaceModal
@@ -1948,6 +1902,9 @@ export function RequestsView({
                   >
                     <Plus className="h-3.5 w-3.5" /> Import Collection
                   </button>
+                  <div className="my-1 border-t border-border/40" />
+                  <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-accent/45" onClick={() => { setSidebarOptionsOpen(false); setEditingWorkspaceName(null); setShowWorkspaceForm(true); }}><Plus className="h-3.5 w-3.5" />New Workspace</button>
+                  <button type="button" className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] hover:bg-accent/45" onClick={() => { setSidebarOptionsOpen(false); setEditingWorkspaceName(effectiveWorkspaceName); setShowWorkspaceForm(true); }}><Pencil className="h-3.5 w-3.5" />Rename Workspace</button>
                 </div>
               )}
             </div>
@@ -2033,7 +1990,7 @@ export function RequestsView({
                       onContextMenu={(e) => openCollectionContextMenu(e, effectiveWorkspaceName, col.name)}
                       data-active={isActive}
                       className={cn(
-                        "kivo-nav-item group flex min-h-[32px] items-center gap-1 px-1.5 py-1 transition-colors cursor-pointer select-none",
+                        "kivo-nav-item relative group flex min-h-[32px] items-center gap-1.5 px-1.5 py-1 transition-colors cursor-pointer select-none",
                         isActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.16)]" : "text-foreground/80 hover:bg-accent/20"
                       )}
                     >
@@ -2049,10 +2006,12 @@ export function RequestsView({
                       >
                         {isColExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                       </button>
+                      <Folder className="h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden="true" />
                       <div className="truncate text-[12.5px] font-medium flex-1 text-left">
                         {col.name}
                       </div>
-                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                      <span className="kivo-collection-count text-[10px] font-mono text-muted-foreground">{col.requests.length}</span>
+                      <div className="kivo-collection-actions flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={(event) => openCreateRequestMenu(event, effectiveWorkspaceName, col.name, "")}
