@@ -251,7 +251,6 @@ self.onmessage = async (event) => {
       "Worker",
       "SharedWorker",
       "importScripts",
-      "eval",
       "Function",
     ].join(", ");
     const moduleSource = \`export default async function(kivo, \${shadowedGlobals}) {\\n"use strict";\\n\${source}\\n}\`;
@@ -274,17 +273,18 @@ function runScriptInWorker({ source, phase, requestDraft, responseApi, vars }) {
   return new Promise((resolve) => {
     const blob = new Blob([buildWorkerSource()], { type: "text/javascript" });
     const workerUrl = URL.createObjectURL(blob);
-    const worker = new Worker(workerUrl, { type: "module" });
+    let worker;
+    let timeoutId;
     let finished = false;
     const finish = (result) => {
       if (finished) return;
       finished = true;
       clearTimeout(timeoutId);
-      worker.terminate();
+      worker?.terminate();
       URL.revokeObjectURL(workerUrl);
       resolve(result);
     };
-    const timeoutId = setTimeout(() => {
+    timeoutId = setTimeout(() => {
       finish({
         ok: false,
         request: requestDraft,
@@ -294,16 +294,23 @@ function runScriptInWorker({ source, phase, requestDraft, responseApi, vars }) {
         error: `Script timed out after ${SCRIPT_TIMEOUT_MS} ms.`,
       });
     }, SCRIPT_TIMEOUT_MS);
-    worker.onmessage = (event) => finish(event.data);
-    worker.onerror = (event) => finish({
+    const fail = (error) => finish({
       ok: false,
       request: requestDraft,
       logs: [],
       tests: [],
       vars,
-      error: event?.message || "Script worker failed.",
+      error: error?.message || "Script worker failed.",
     });
-    worker.postMessage({ source, phase, requestDraft, response: responseApi, vars });
+    try {
+      worker = new Worker(workerUrl, { type: "module" });
+      worker.onmessage = (event) => finish(event.data);
+      worker.onerror = fail;
+      worker.onmessageerror = () => fail(new Error("Script result could not be transferred."));
+      worker.postMessage({ source, phase, requestDraft, response: responseApi, vars });
+    } catch (error) {
+      fail(error);
+    }
   });
 }
 
@@ -352,11 +359,6 @@ export async function runRequestScript({
     statusText: String(response?.statusText ?? ""),
     headers: response?.headers && typeof response.headers === "object" ? response.headers : {},
     body: String(response?.rawBody ?? response?.body ?? ""),
-    json() {
-      const text = String(response?.rawBody ?? response?.body ?? "").trim();
-      if (!text) return null;
-      return JSON.parse(text);
-    },
   };
 
   try {
