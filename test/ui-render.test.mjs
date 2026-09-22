@@ -109,6 +109,24 @@ test("gRPC message view requires stream metadata and paginates large message lis
   assert.doesNotMatch(http, /Received gRPC messages/);
 });
 
+test("stream inspectors expose accessible resizing and payload controls for every streaming protocol", async () => {
+  const { StreamResponsePanel } = await server.ssrLoadModule("/src/components/workspace/StreamResponsePanel.jsx");
+  for (const mode of ["sse", "websocket", "socketio"]) {
+    const html = render(StreamResponsePanel, {
+      mode,
+      messages: [{ id: "event-1", direction: "in", event: "message", text: '{"ok":true}', size: 11, at: "2026-09-23T10:00:00Z" }],
+    });
+    assert.match(html, /role="separator"[^>]*aria-label="Resize payload inspector"/, mode);
+    assert.match(html, /aria-valuemin="15" aria-valuemax="85" aria-valuenow="60"/, mode);
+    assert.match(html, /aria-label="Collapse payload inspector"/, mode);
+    assert.match(html, /aria-label="Word wrap" aria-pressed="true"/, mode);
+    assert.match(html, /aria-label="Payload format"/, mode);
+    assert.match(html, /aria-label="Copy payload"/, mode);
+    assert.match(html, /&quot;ok&quot;/, mode);
+    assert.doesNotMatch(html, /flex-basis:/, mode);
+  }
+});
+
 test("collection sections retain their content in the flat settings layout", async () => {
   const { CollectionSettingsPage } = await server.ssrLoadModule("/src/components/workspace/CollectionSettingsPage.jsx");
   for (const initialTab of ["Overview", "Headers", "Environments", "Auth", "Docs", "Runner"]) {

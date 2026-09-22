@@ -2034,6 +2034,12 @@
   .kivo-transport-headers dd { overflow-wrap: anywhere; }
   .kivo-inline-payload { margin: 24px 16px; }
   .kivo-response-body { background: transparent; border: 0; }
+  .kivo-stream-divider { display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; background: hsl(var(--sidebar)); border-block: 1px solid hsl(var(--border) / 0.4); color: hsl(var(--muted-foreground) / 0.65); transition: background-color 120ms ease, color 120ms ease; }
+  .kivo-stream-divider svg { width: 24px; height: 12px; pointer-events: none; }
+  .kivo-stream-divider:hover, .kivo-stream-divider:focus-visible, .kivo-stream-divider[data-resizing="true"] { background: hsl(var(--primary) / 0.1); color: hsl(var(--primary)); }
+  .kivo-stream-divider:focus-visible { outline: 1px solid hsl(var(--primary)); outline-offset: -1px; }
+  .kivo-payload-toolbar { display: flex; flex-shrink: 0; align-items: center; gap: 8px; min-height: 40px; padding: 5px 10px; border-bottom: 1px solid hsl(var(--border) / 0.4); background: hsl(var(--background)); color: hsl(var(--muted-foreground)); font-size: 11px; }
+  .kivo-payload-formats { display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid hsl(var(--border) / 0.5); border-radius: 3px; }
   .kivo-grpc-message { margin: 4px 0 16px; padding: 16px; border: 1px solid hsl(var(--border) / 0.4); border-radius: 4px; overflow: auto; }
   .kivo-append-row { opacity: 0.8; }
   .kivo-append-row:focus-within { opacity: 1; }

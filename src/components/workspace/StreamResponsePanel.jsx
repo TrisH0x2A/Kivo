@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Ban,
   Braces,
   Check,
+  ChevronDown,
+  ChevronUp,
   Cookie,
   Copy,
   CornerDownLeft,
   Eraser,
   FileText,
   Filter,
+  GripHorizontal,
   Info,
   Loader2,
   Pause,
@@ -147,7 +150,10 @@ export function StreamResponsePanel({
   const listRef = useRef(null);
   const splitRef = useRef(null);
   const [timelinePct, setTimelinePct] = useState(60);
-  const draggingRef = useRef(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const inspectorId = useId();
+  const draggingRef = useRef(null);
   const [isCookiesOpen, setIsCookiesOpen] = useState(false);
 
   useEffect(() => {
@@ -155,26 +161,35 @@ export function StreamResponsePanel({
       if (!draggingRef.current || !splitRef.current) return;
       const rect = splitRef.current.getBoundingClientRect();
       if (rect.height <= 0) return;
-      const pct = ((event.clientY - rect.top) / rect.height) * 100;
+      const pct = ((event.clientY - rect.top - 6) / Math.max(1, rect.height - 12)) * 100;
       setTimelinePct(Math.min(85, Math.max(15, pct)));
     }
     function handleUp() {
       if (!draggingRef.current) return;
-      draggingRef.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
+      document.body.style.cursor = draggingRef.current.cursor;
+      document.body.style.userSelect = draggingRef.current.userSelect;
+      draggingRef.current = null;
+      setIsResizing(false);
     }
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", handleUp);
+    window.addEventListener("pointercancel", handleUp);
+    window.addEventListener("blur", handleUp);
     return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", handleUp);
+      window.removeEventListener("pointercancel", handleUp);
+      window.removeEventListener("blur", handleUp);
+      handleUp();
     };
   }, []);
 
   function startDrag(event) {
+    if (event.button !== 0 || draggingRef.current) return;
     event.preventDefault();
-    draggingRef.current = true;
+    event.currentTarget.focus();
+    draggingRef.current = { cursor: document.body.style.cursor, userSelect: document.body.style.userSelect };
+    setIsResizing(true);
     document.body.style.cursor = "row-resize";
     document.body.style.userSelect = "none";
   }
@@ -336,11 +351,11 @@ export function StreamResponsePanel({
         ) : null}
       </header>
 
-      <div ref={splitRef} className="relative flex min-h-0 min-w-0 flex-col overflow-hidden">
+      <div ref={splitRef} className="kivo-stream-split relative grid min-h-0 min-w-0 overflow-hidden"
+        style={{ gridTemplateRows: inspectorCollapsed ? "minmax(0, 1fr) auto" : `minmax(0, ${timelinePct}fr) 12px minmax(44px, ${100 - timelinePct}fr)` }}>
         <div
           ref={listRef}
           className="thin-scrollbar min-h-0 w-full overflow-y-auto overflow-x-hidden"
-          style={{ flexBasis: `${timelinePct}%`, flexGrow: 0, flexShrink: 0 }}
         >
           {filtered.length === 0 ? (
             <EmptyState
@@ -363,20 +378,35 @@ export function StreamResponsePanel({
           )}
         </div>
 
-        <div
+        {!inspectorCollapsed && <div
           role="separator"
           aria-orientation="horizontal"
-          onMouseDown={startDrag}
+          aria-label="Resize payload inspector"
+          aria-controls={inspectorId}
+          aria-valuemin={15}
+          aria-valuemax={85}
+          aria-valuenow={Math.round(timelinePct)}
+          aria-valuetext={`${Math.round(timelinePct)}% timeline`}
+          tabIndex={0}
+          onPointerDown={startDrag}
+          onKeyDown={(event) => {
+            if (!["ArrowUp", "ArrowDown", "Home", "End", "Enter"].includes(event.key)) return;
+            event.preventDefault();
+            if (event.key === "Home") setTimelinePct(15);
+            else if (event.key === "End") setTimelinePct(85);
+            else if (event.key === "Enter") setTimelinePct(60);
+            else setTimelinePct((current) => Math.min(85, Math.max(15, current + (event.key === "ArrowUp" ? -5 : 5))));
+          }}
           onDoubleClick={() => setTimelinePct(60)}
-          className="group relative h-1.5 shrink-0 cursor-row-resize border-y border-border/40 bg-border/20 transition-colors hover:bg-primary/30"
-          title="Drag to resize — double click to reset"
+          className="kivo-stream-divider"
+          data-resizing={isResizing}
+          title="Resize payload inspector. Double-click to reset."
         >
-          <span className="pointer-events-none absolute left-1/2 top-1/2 h-0.5 w-10 -translate-x-1/2 -translate-y-1/2 rounded-none bg-muted-foreground/40 group-hover:bg-primary/60" />
-        </div>
+          <GripHorizontal aria-hidden="true" />
+        </div>}
 
         <div
-          className="flex min-h-0 flex-col"
-          style={{ flexBasis: `${100 - timelinePct}%`, flexGrow: 0, flexShrink: 0 }}
+          className="flex min-h-0 min-w-0 flex-col overflow-hidden"
         >
           <InspectorBar
             message={selected}
@@ -386,8 +416,13 @@ export function StreamResponsePanel({
             onWrapChange={setWrap}
             followLatest={followLatest}
             onFollowLatest={handleFollowLatest}
+            collapsed={inspectorCollapsed}
+            onToggleCollapsed={() => setInspectorCollapsed((current) => !current)}
+            inspectorId={inspectorId}
           />
-          <MessageInspector message={selected} view={view} wrap={wrap} />
+          <div id={inspectorId} hidden={inspectorCollapsed} className="min-h-0 flex-1 overflow-hidden">
+            <MessageInspector message={selected} view={view} wrap={wrap} />
+          </div>
         </div>
       </div>
 
@@ -448,7 +483,7 @@ function MessageRow({ message, active, onSelect }) {
   );
 }
 
-function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followLatest, onFollowLatest }) {
+function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followLatest, onFollowLatest, collapsed, onToggleCollapsed, inspectorId }) {
   const [copied, setCopied] = useState(false);
 
   function copyPayload() {
@@ -464,59 +499,49 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-y border-border/40 bg-card/60 px-3 py-1.5 text-[11px] text-muted-foreground">
-      {message ? (
-        <>
-          <span className={cn("font-semibold", directionTone(message.direction, message.kind, message.event))}>
-            {message.direction === "out"
-              ? "→ Sent"
-              : message.direction === "system"
-                ? "● System"
-                : "← Received"}
-          </span>
-          <span className="text-border">·</span>
-          <span className="truncate">{message.event || "message"}</span>
-          <span className="text-border">·</span>
-          <span>{formatTime(message.at)}</span>
-          <span className="text-border">·</span>
-          <span>{formatBytes(message.size)}</span>
-        </>
-      ) : (
-        <span>Select a message to inspect its payload.</span>
-      )}
+    <div className="kivo-payload-toolbar">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="shrink-0 font-medium text-foreground">Payload</span>
+        {message && <span className="truncate" title={`${message.direction === "out" ? "Sent" : message.direction === "system" ? "System" : "Received"} / ${message.event || "message"} / ${formatTime(message.at)} / ${formatBytes(message.size)}`}>
+          {message.event || "message"} · {formatTime(message.at)} · {formatBytes(message.size)}
+        </span>}
+      </div>
 
-      <div className="ml-auto flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
+        {!collapsed && <>
         {!followLatest ? (
           <Button
             type="button"
             size="sm"
             variant="ghost"
-            className="h-6 gap-1 px-2 text-[10px]"
+            className="kivo-icon-button h-7 w-7 p-0"
             onClick={onFollowLatest}
             title="Jump to latest message"
+            aria-label="Jump to latest message"
           >
             <CornerDownLeft className="h-3 w-3" />
-            Latest
           </Button>
         ) : null}
         <button
           type="button"
           onClick={() => onWrapChange(!wrap)}
+          aria-label="Word wrap"
+          aria-pressed={wrap}
           className={cn(
-            "flex h-6 items-center gap-1 rounded-none px-1.5 text-[10px] transition-colors",
+            "kivo-icon-button h-7 w-7 transition-colors",
             wrap ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground",
           )}
           title={wrap ? "Disable word wrap" : "Enable word wrap"}
         >
           <WrapText className="h-3 w-3" />
-          Wrap
         </button>
-        <div className="ml-1 flex items-center gap-0.5 rounded-none border border-border/40 p-0.5">
+        <div role="group" aria-label="Payload format" className="kivo-payload-formats">
           <button
             type="button"
             onClick={() => onViewChange("json")}
+            aria-pressed={view === "json"}
             className={cn(
-              "flex h-5 items-center gap-1 rounded-none px-1.5 text-[10px] font-medium transition-colors",
+              "flex h-6 items-center gap-1 px-2 text-[11px] font-medium transition-colors",
               view === "json"
                 ? "bg-primary/15 text-primary"
                 : "text-muted-foreground hover:text-foreground",
@@ -528,8 +553,9 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
           <button
             type="button"
             onClick={() => onViewChange("raw")}
+            aria-pressed={view === "raw"}
             className={cn(
-              "flex h-5 items-center gap-1 rounded-none px-1.5 text-[10px] font-medium transition-colors",
+              "flex h-6 items-center gap-1 px-2 text-[11px] font-medium transition-colors",
               view === "raw"
                 ? "bg-primary/15 text-primary"
                 : "text-muted-foreground hover:text-foreground",
@@ -543,15 +569,21 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
           type="button"
           onClick={copyPayload}
           disabled={!message}
-          className="flex h-6 items-center gap-1 rounded-none px-1.5 text-[10px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
-          title="Copy payload"
+          className="kivo-icon-button h-7 w-7"
+          aria-label={copied ? "Payload copied" : "Copy payload"}
+          title={copied ? "Payload copied" : "Copy payload"}
         >
           {copied ? (
             <Check className="h-3 w-3" style={{ color: "hsl(var(--success))" }} />
           ) : (
             <Copy className="h-3 w-3" />
           )}
-          {copied ? "Copied" : "Copy"}
+        </button>
+        </>}
+        <button type="button" className="kivo-icon-button h-7 w-7" aria-expanded={!collapsed} aria-controls={inspectorId}
+          aria-label={collapsed ? "Expand payload inspector" : "Collapse payload inspector"}
+          title={collapsed ? "Expand payload inspector" : "Collapse payload inspector"} onClick={onToggleCollapsed}>
+          {collapsed ? <ChevronUp /> : <ChevronDown />}
         </button>
       </div>
     </div>
@@ -561,7 +593,7 @@ function InspectorBar({ message, view, onViewChange, wrap, onWrapChange, followL
 function MessageInspector({ message, view, wrap }) {
   if (!message) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1 px-6 py-6 text-center text-muted-foreground">
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-1 px-6 py-3 text-center text-muted-foreground">
         <Info className="h-4 w-4 opacity-60" />
         <p className="text-[11px]">No payload selected.</p>
       </div>
@@ -577,7 +609,7 @@ function MessageInspector({ message, view, wrap }) {
   const showJson = view === "json" && parsed.ok;
 
   return (
-    <div className="thin-scrollbar min-h-0 flex-1 overflow-auto bg-background/15 p-3 font-mono text-[12px] leading-relaxed">
+    <div className="thin-scrollbar h-full min-h-0 overflow-auto p-3 font-mono text-[12px] leading-relaxed">
       {showJson ? (
         <JsonTree data={parsed.value} />
       ) : (
