@@ -648,16 +648,16 @@ export function CollectionSettingsPage({
     <div className="kivo-settings-layout h-full min-h-0 overflow-hidden bg-background">
       <aside className="kivo-settings-rail kivo-scrollbar-none flex min-h-0 flex-col overflow-y-auto overflow-x-hidden px-3 py-4">
         <div className="mb-4 flex items-center gap-3 px-2">
-          <div className="flex h-9 w-9 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-primary/20 bg-primary/10 text-primary">
             <FileJson className="h-4 w-4" />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-[15px] font-semibold tracking-tight text-foreground">{collection?.name ?? "Collection"}</div>
-            <p className="mt-0.5 truncate text-[11px] text-muted-foreground/75">Collection settings</p>
+            <div className="[overflow-wrap:anywhere] text-[15px] font-semibold leading-snug text-foreground">{collection?.name ?? "Collection"}</div>
+            <p className="mt-0.5 text-[11px] text-muted-foreground/75">Collection settings</p>
           </div>
         </div>
 
-        <div className="grid gap-1">
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-1">
           {TABS.map((tab) => {
             const TabIcon = tab.icon;
             const selected = activeTab === tab.id;
@@ -667,14 +667,14 @@ export function CollectionSettingsPage({
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 data-active={selected}
-                className="kivo-settings-nav-item group flex w-full items-center gap-3 px-2.5 py-2.5 text-left"
+                className="kivo-settings-nav-item group flex min-w-0 w-full items-start gap-3 px-2.5 py-2.5 text-left"
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center border border-border/15 bg-background/25 text-muted-foreground transition-colors group-hover:text-foreground group-data-[active=true]:border-primary/25 group-data-[active=true]:bg-primary/10 group-data-[active=true]:text-primary">
                   <TabIcon className="h-3.5 w-3.5" />
                 </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-[12px] font-medium text-foreground">{tab.label}</span>
-                  <span className="mt-0.5 block truncate text-[10.5px] text-muted-foreground">{tab.description}</span>
+                <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+                  <span className="block text-[12px] font-medium leading-4 text-foreground">{tab.label}</span>
+                  <span className="mt-1 block text-[10.5px] leading-4 text-muted-foreground">{tab.description}</span>
                 </span>
               </button>
             );
