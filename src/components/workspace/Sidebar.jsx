@@ -1990,7 +1990,7 @@ export function RequestsView({
                       onContextMenu={(e) => openCollectionContextMenu(e, effectiveWorkspaceName, col.name)}
                       data-active={isActive}
                       className={cn(
-                        "kivo-nav-item relative group flex min-h-[32px] items-center gap-1.5 px-1.5 py-1 transition-colors cursor-pointer select-none",
+                        "kivo-nav-item relative group flex min-h-[32px] items-center gap-1.5 px-1.5 py-1 pr-[84px] transition-colors cursor-pointer select-none",
                         isActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.16)]" : "text-foreground/80 hover:bg-accent/20"
                       )}
                     >
@@ -2011,11 +2011,12 @@ export function RequestsView({
                         {col.name}
                       </div>
                       <span className="kivo-collection-count text-[10px] font-mono text-muted-foreground">{col.requests.length}</span>
-                      <div className="kivo-collection-actions flex items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" onClick={(e) => e.stopPropagation()}>
+                      <div className="kivo-sidebar-actions kivo-collection-actions" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"
                           onClick={(event) => openCreateRequestMenu(event, effectiveWorkspaceName, col.name, "")}
-                          className="p-1 text-muted-foreground hover:text-foreground"
+                          className="kivo-sidebar-action-button text-muted-foreground hover:text-foreground"
+                          aria-label={`Add request to ${col.name}`}
                         >
                           <Plus className="h-3.5 w-3.5" />
                         </button>
@@ -2023,8 +2024,8 @@ export function RequestsView({
                           e.stopPropagation();
                           setEditingWorkspaceName(null);
                           setEditingItemId(`col:${col.name}`);
-                        }} className="p-1 text-muted-foreground hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></button>
-                        <button type="button" onClick={() => onDeleteCollection(effectiveWorkspaceName, col.name)} className="p-1 text-muted-foreground hover:text-red-500"><Trash2 className="h-3.5 w-3.5" /></button>
+                        }} className="kivo-sidebar-action-button text-muted-foreground hover:text-foreground" aria-label={`Rename ${col.name}`}><Pencil className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => onDeleteCollection(effectiveWorkspaceName, col.name)} className="kivo-sidebar-action-button text-muted-foreground hover:text-red-500" aria-label={`Delete ${col.name}`}><Trash2 className="h-3.5 w-3.5" /></button>
                       </div>
                     </div>
                   )}
@@ -2099,8 +2100,8 @@ export function RequestsView({
                                     {req.pinned && <Pin className="h-3 w-3 text-primary shrink-0" />}
                                     <span className="truncate">{req.name}</span>
                                   </div>
-                                  <div className="flex items-center opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                                    <button type="button" className="p-1 text-muted-foreground hover:text-red-500" onClick={() => onDeleteRequest(effectiveWorkspaceName, col.name, req.name)}><Trash2 className="h-3.5 w-3.5" /></button>
+                                  <div className="kivo-sidebar-actions" onClick={(e) => e.stopPropagation()}>
+                                    <button type="button" className="kivo-sidebar-action-button text-muted-foreground hover:text-red-500" aria-label={`Delete ${req.name}`} onClick={() => onDeleteRequest(effectiveWorkspaceName, col.name, req.name)}><Trash2 className="h-3.5 w-3.5" /></button>
                                   </div>
                                 </div>
                               )}
@@ -2153,11 +2154,11 @@ export function RequestsView({
                                         </button>
                                         <Folder className="h-3.5 w-3.5 shrink-0" />
                                         <span className="truncate flex-1">{getFolderLabel(folderPath)}</span>
-                                        <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100" onClick={(event) => event.stopPropagation()}>
+                                        <div className="kivo-sidebar-actions" onClick={(event) => event.stopPropagation()}>
                                           <button
                                             type="button"
                                             onClick={() => handleStartCreateFolderRequest(effectiveWorkspaceName, col.name, folderPath)}
-                                            className="p-0.5 text-muted-foreground hover:text-foreground"
+                                            className="kivo-sidebar-action-button text-muted-foreground hover:text-foreground"
                                             title="New request"
                                           >
                                             <Plus className="h-3.5 w-3.5" />
@@ -2165,7 +2166,7 @@ export function RequestsView({
                                           <button
                                             type="button"
                                             onClick={() => startRenameFolder(col.name, folderPath)}
-                                            className="p-0.5 text-muted-foreground hover:text-foreground"
+                                            className="kivo-sidebar-action-button text-muted-foreground hover:text-foreground"
                                             title="Rename"
                                           >
                                             <Pencil className="h-3.5 w-3.5" />
@@ -2173,7 +2174,7 @@ export function RequestsView({
                                           <button
                                             type="button"
                                             onClick={() => onDeleteFolder(effectiveWorkspaceName, col.name, folderPath)}
-                                            className="p-0.5 text-muted-foreground hover:text-red-500"
+                                            className="kivo-sidebar-action-button text-muted-foreground hover:text-red-500"
                                             title="Delete"
                                           >
                                             <Trash2 className="h-3.5 w-3.5" />

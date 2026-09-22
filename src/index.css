@@ -2044,8 +2044,44 @@
   .kivo-append-row { opacity: 0.8; }
   .kivo-append-row:focus-within { opacity: 1; }
   .kivo-data-row:focus-within { background: hsl(var(--primary) / 0.04); }
-  .kivo-collection-actions { position: absolute; right: 4px; background: hsl(var(--sidebar)); pointer-events: none; }
-  .group:hover > .kivo-collection-actions, .group:focus-within > .kivo-collection-actions { pointer-events: auto; }
+  .kivo-sidebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 2px;
+    border: 1px solid hsl(var(--border) / 0.45);
+    border-radius: 4px;
+    background: hsl(var(--popover) / 0.96);
+    box-shadow: 0 4px 14px hsl(0 0% 0% / 0.12);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(4px);
+    transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease;
+  }
+  .kivo-collection-actions { position: absolute; right: 4px; }
+  .group:hover > .kivo-sidebar-actions,
+  .group:focus-within > .kivo-sidebar-actions,
+  .kivo-sidebar-actions:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+  }
+  .kivo-sidebar-action-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 23px;
+    height: 23px;
+    border-radius: 2px;
+    transition: background-color 120ms ease, color 120ms ease;
+  }
+  .kivo-sidebar-action-button:hover,
+  .kivo-sidebar-action-button:focus-visible {
+    background: hsl(var(--accent) / 0.7);
+  }
+  .kivo-sidebar-action-button:focus-visible { outline-offset: -2px; }
   .kivo-data-row input:focus-visible { box-shadow: inset 0 -1px hsl(var(--primary)); }
 
   @media (max-width: 1200px) {
