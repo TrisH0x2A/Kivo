@@ -4,8 +4,9 @@ import { toast } from "sonner";
 import { useWorkspaceEnvironments } from "@/hooks/use-workspace-environments.js";
 import { searchWorkbench } from "@/lib/workbench-search.js";
 import { cn } from "@/lib/utils.js";
+import { SelectMenu } from "@/components/workspace/SelectMenu.jsx";
 
-export function WorkbenchHeader({ workspaces, workspaceName, collectionName, onWorkspaceChange, onCreateWorkspace, onCollectionSettings, onEnvironments, onEnvironmentChange, onSearch, onToggleSidebar, sidebarOpen, utilities }) {
+export function WorkbenchHeader({ workspaces, workspaceName, collectionName, onWorkspaceChange, onCreateWorkspace, onCollectionSettings, onEnvironments, onEnvironmentChange, onSearch, onToggleSidebar, sidebarOpen, sidebarWidth = 260, utilities }) {
   const { workspaceEnvironments, workspaceEnvironmentsError, isWorkspaceEnvironmentsLoading, refreshWorkspaceEnvironments, setActiveEnvironment } = useWorkspaceEnvironments(workspaceName);
   const [switching, setSwitching] = useState(false);
   async function changeEnvironment(id) {
@@ -16,16 +17,15 @@ export function WorkbenchHeader({ workspaces, workspaceName, collectionName, onW
   }
   return (
     <header className="kivo-global-header">
-      <button className="kivo-icon-button" type="button" aria-label="Toggle collections" title="Toggle collections" aria-expanded={sidebarOpen} onClick={onToggleSidebar}><PanelLeft /></button>
-      <img src="/icon.ico" width="24" height="24" alt="Kivo" className="kivo-brand-mark" />
-      <div className="kivo-workspace-picker">
-        <select aria-label="Workspace" value={workspaceName || ""} onChange={(event) => onWorkspaceChange(event.target.value)}>
-          {!workspaceName && <option value="">No workspace</option>}
-          {workspaces.map((workspace) => <option key={workspace.name} value={workspace.name}>{workspace.name}</option>)}
-        </select>
-        <ChevronDown aria-hidden="true" />
+      <div className="kivo-workspace-region" style={{ "--workspace-region-width": `${sidebarWidth || 260}px` }}>
+        <button className="kivo-icon-button" type="button" aria-label="Toggle collections" title="Toggle collections" aria-expanded={sidebarOpen} onClick={onToggleSidebar}><PanelLeft /></button>
+        <img src="/icon.ico" width="24" height="24" alt="Kivo" className="kivo-brand-mark" />
+        <SelectMenu ariaLabel="Workspace" className="kivo-workspace-picker" constrainWidth
+          value={workspaceName || ""} disabled={!workspaces.length}
+          options={workspaces.length ? workspaces.map((workspace) => ({ value: workspace.name, label: workspace.name })) : [{ value: "", label: "No workspace" }]}
+          onChange={onWorkspaceChange} />
+        <button type="button" className="kivo-icon-button kivo-new-workspace" title="New workspace" aria-label="New workspace" onClick={onCreateWorkspace}><Plus /></button>
       </div>
-      <button type="button" className="kivo-icon-button kivo-new-workspace" title="New workspace" aria-label="New workspace" onClick={onCreateWorkspace}><Plus /></button>
       {collectionName && <button type="button" className="kivo-header-collection" title="Collection settings" onClick={onCollectionSettings}><span aria-hidden="true">/</span><span>{collectionName}</span></button>}
       <button type="button" className="kivo-command-trigger" onClick={onSearch} title="Search requests and commands" aria-label="Search requests and commands"><Search /><span>Search requests, collections, commands...</span></button>
       <div className="kivo-environment-picker">
@@ -76,7 +76,7 @@ export function WorkbenchSearch({ workspaces, onClose, onSelectRequest, onSelect
     dialogRef.current.showModal();
     return () => { if (previous?.isConnected) previous.focus(); };
   }, []);
-  useEffect(() => { dialogRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" }); }, [activeIndex, query]);
+  useEffect(() => { dialogRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", behavior: "instant" }); }, [activeIndex, query]);
   function choose(item) {
     if (!item) return;
     onClose();
@@ -94,7 +94,7 @@ export function WorkbenchSearch({ workspaces, onClose, onSelectRequest, onSelect
         }} />
         <button type="button" className="kivo-icon-button" aria-label="Close search" title="Close search" onClick={onClose}><X /></button>
       </div>
-      <div role="listbox" id="workbench-search-results" aria-label="Search results" className="kivo-command-results">
+      <div role="listbox" id="workbench-search-results" aria-label="Search results" className="kivo-command-results thin-scrollbar">
         {items.map((item, index) => {
           const Icon = item.Icon || (item.kind === "collection" ? Folder : Activity);
           return <div role="option" id={`workbench-result-${index}`} aria-selected={activeIndex === index} key={`${item.kind}:${item.workspaceName}:${item.collectionName}:${item.label}`} className="kivo-command-result" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(item)}>

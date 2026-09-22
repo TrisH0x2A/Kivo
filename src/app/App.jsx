@@ -493,6 +493,7 @@ export default function App() {
           onSearch={() => setSearchOpen(true)}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={compactLayout ? mobileNavigationOpen : !store.sidebarCollapsed}
+          sidebarWidth={sidebarWidth}
           utilities={<ChromeActions activeThemeMeta={activeThemeMeta} ActiveThemeIcon={ActiveThemeIcon} githubStars={githubStars} onOpenGithub={() => openUrl("https://github.com/TrisH0x2A/Kivo")} onToggleTheme={toggleTheme} />}
         />
         {searchOpen && <WorkbenchSearch

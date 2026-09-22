@@ -67,6 +67,36 @@ test("workbench chrome uses real status and accessible command controls", async 
   assert.doesNotMatch(footer, /Proxy Connected|TLS v1|Saved/);
 });
 
+test("workspace picker follows sidebar width and exposes a themed listbox trigger", async () => {
+  const { WorkbenchHeader } = await server.ssrLoadModule("/src/components/workspace/WorkbenchChrome.jsx");
+  const name = "Production workspace with a deliberately long name";
+  const header = render(WorkbenchHeader, { workspaces: [{ name }], workspaceName: name, sidebarWidth: 220 });
+  assert.match(header, /--workspace-region-width:220px/);
+  assert.match(header, /<button[^>]*aria-label="Workspace"[^>]*aria-haspopup="listbox"/);
+  assert.doesNotMatch(header, /<select[^>]*aria-label="Workspace"/);
+  assert.ok(header.includes(`title="${name}"`));
+  const collapsed = render(WorkbenchHeader, { workspaces: [], sidebarWidth: 0 });
+  assert.match(collapsed, /--workspace-region-width:260px/);
+  assert.match(collapsed, /No workspace/);
+});
+
+test("select menus handle empty options without losing their accessible label", async () => {
+  const { SelectMenu } = await server.ssrLoadModule("/src/components/workspace/SelectMenu.jsx");
+  const html = render(SelectMenu, { value: "", options: [], ariaLabel: "Workspace", constrainWidth: true });
+  assert.match(html, /aria-label="Workspace"/);
+  assert.match(html, /aria-expanded="false"/);
+  assert.match(html, /disabled=""/);
+  assert.match(html, /No options/);
+});
+
+test("command search retains keyboard semantics and scoped scrolling", async () => {
+  const { WorkbenchSearch } = await server.ssrLoadModule("/src/components/workspace/WorkbenchChrome.jsx");
+  const html = render(WorkbenchSearch, { workspaces: [], canCreateRequest: false });
+  assert.match(html, /role="combobox" aria-label="Search workspace"/);
+  assert.match(html, /aria-controls="workbench-search-results"/);
+  assert.match(html, /kivo-command-results thin-scrollbar/);
+});
+
 test("gRPC message view requires stream metadata and paginates large message lists", async () => {
   const { ResponsePane } = await server.ssrLoadModule("/src/components/workspace/ResponsePane.jsx");
   const response = { ...model.createEmptyResponse(), isJson: true, body: JSON.stringify(Array.from({ length: 80 }, (_, id) => ({ id }))), headers: { "x-kivo-grpc-mode": "server_stream" } };
