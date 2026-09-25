@@ -1,10 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus, RefreshCw, SendHorizontal, Trash2, TriangleAlert, Wand2, X } from "lucide-react";
+import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus, GitCompareArrows, RefreshCw, SendHorizontal, Trash2, TriangleAlert, Wand2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { CodeEditor } from "@/components/workspace/CodeEditor.jsx";
 import { RequestExplainModal } from "@/components/workspace/RequestExplainModal.jsx";
+import { CompareEnvironmentsModal } from "@/components/workspace/CompareEnvironmentsModal.jsx";
 import { GrpcSchemaTools } from "@/components/workspace/GrpcSchemaTools.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -12,8 +13,10 @@ import { Input } from "@/components/ui/input.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { formatJsonText } from "@/lib/formatters.js";
 import { buildUrlWithParams, getMethodTone, requestBodyModes } from "@/lib/http-ui.js";
-import { getCollectionConfig, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer } from "@/lib/http-client.js";
+import { getCollectionConfig, getEnvVars, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
 import { buildRequestExplanation } from "@/lib/request-explanation.js";
+import { buildComparisonRequestPayload } from "@/lib/request-compare.js";
+import { compareResponses } from "@/lib/response-diff.js";
 import { isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
@@ -660,6 +663,12 @@ export function RequestPane({
   const [requestExplanation, setRequestExplanation] = useState(null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [explainError, setExplainError] = useState("");
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [compareEnvironments, setCompareEnvironments] = useState([]);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [compareRunning, setCompareRunning] = useState(false);
+  const [compareResult, setCompareResult] = useState(null);
+  const [compareError, setCompareError] = useState("");
   const [sendErrorTitle, setSendErrorTitle] = useState("");
   const [sendErrorTrace, setSendErrorTrace] = useState("");
   const seenErrorKeyRef = useRef("");
@@ -1027,6 +1036,45 @@ export function RequestPane({
     }
   }
 
+  async function handleOpenCompare() {
+    setCompareOpen(true);
+    setCompareLoading(true);
+    setCompareRunning(false);
+    setCompareResult(null);
+    setCompareError("");
+    try {
+      const result = await getWorkspaceEnvironments(workspaceName);
+      setCompareEnvironments(Array.isArray(result?.environments) ? result.environments : []);
+    } catch (error) {
+      setCompareEnvironments([]);
+      setCompareError(error instanceof Error ? error.message : "Unable to load workspace environments.");
+    } finally {
+      setCompareLoading(false);
+    }
+  }
+
+  async function handleRunCompare(leftId, rightId) {
+    setCompareRunning(true);
+    setCompareError("");
+    try {
+      const [leftVars, rightVars, collectionConfig] = await Promise.all([
+        getEnvVars(workspaceName, collectionName, leftId),
+        getEnvVars(workspaceName, collectionName, rightId),
+        getCollectionConfig(workspaceName, collectionName),
+      ]);
+      const stamp = Date.now();
+      const [left, right] = await Promise.all([
+        sendHttpRequest(buildComparisonRequestPayload(state, leftVars, collectionConfig, collection, workspaceName, collectionName, `compare-left-${stamp}`)),
+        sendHttpRequest(buildComparisonRequestPayload(state, rightVars, collectionConfig, collection, workspaceName, collectionName, `compare-right-${stamp}`)),
+      ]);
+      setCompareResult({ leftId, rightId, left, right, diff: compareResponses(left, right) });
+    } catch (error) {
+      setCompareError(error instanceof Error ? error.message : "Environment comparison failed.");
+    } finally {
+      setCompareRunning(false);
+    }
+  }
+
   function handleFormatBody() {
     if (!isJsonBody) return;
     onChange("body", formatJsonText(state.body));
@@ -1274,8 +1322,8 @@ export function RequestPane({
       <div className={cn(
           "kivo-request-command grid items-center gap-2 border-b p-3",
         isGrpcRequest
-          ? "grid-cols-[64px_minmax(0,1fr)_80px] xl:grid-cols-[64px_minmax(90px,1fr)_minmax(100px,0.65fr)_32px_32px_32px_80px]"
-          : "grid-cols-[92px_minmax(0,1fr)_36px_88px]"
+          ? "grid-cols-[64px_minmax(0,1fr)_80px] xl:grid-cols-[64px_minmax(90px,1fr)_minmax(100px,0.65fr)_32px_32px_80px]"
+          : "grid-cols-[92px_minmax(0,1fr)_36px_36px_88px]"
       )}>
         {isWebSocketRequest ? (
           <div className="flex h-8 items-center px-3 lg:h-10">
@@ -1359,6 +1407,19 @@ export function RequestPane({
             <FileCode2 className="h-4 w-4" />
           </Button>
         ) : null}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn("h-8 w-8 text-muted-foreground lg:h-10 lg:w-10", (isRealtimeRequest || isGrpcRequest) && "hidden")}
+          onClick={handleOpenCompare}
+          aria-label="Compare environments"
+          title="Compare environments"
+          disabled={isSending}
+        >
+          <GitCompareArrows className="h-4 w-4" />
+        </Button>
 
         <Button
           type="button"
@@ -1706,6 +1767,22 @@ export function RequestPane({
         onClose={() => {
           setRequestExplanation(null);
           setExplainError("");
+        }}
+      />
+
+      <CompareEnvironmentsModal
+        open={compareOpen}
+        request={state}
+        environments={compareEnvironments}
+        loading={compareLoading}
+        running={compareRunning}
+        result={compareResult}
+        error={compareError}
+        onRun={handleRunCompare}
+        onClose={() => {
+          setCompareOpen(false);
+          setCompareResult(null);
+          setCompareError("");
         }}
       />
     </section>

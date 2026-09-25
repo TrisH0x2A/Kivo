@@ -138,6 +138,27 @@ test("request explanation resolves provenance while masking authorization", asyn
   assert.deepEqual(explanation.variables, [{ key: "base_url", source: "Environment", value: "https://api.example.com" }]);
 });
 
+test("environment compare payload keeps inherited folder headers", async () => {
+  const { buildComparisonRequestPayload } = await server.ssrLoadModule("/src/lib/request-compare.js");
+  const payload = buildComparisonRequestPayload({
+    name: "Health",
+    method: "GET",
+    url: "{{base_url}}/health",
+    queryParams: [],
+    headers: [],
+    auth: { type: "inherit" },
+    bodyType: "none",
+    body: "",
+    folderPath: "platform",
+  }, { merged: { base_url: "https://api.example.com" } }, { defaultAuth: { type: "none" }, defaultHeaders: [] }, {
+    folderSettings: [{ path: "platform", defaultHeaders: [{ key: "X-Region", value: "us-east", enabled: true }] }],
+  }, "Demo", "Gateway", "compare-test");
+
+  assert.equal(payload.url, "https://api.example.com/health");
+  assert.equal(payload.headers["X-Region"], "us-east");
+  assert.equal(payload.requestId, "compare-test");
+});
+
 test("gRPC message view requires stream metadata and paginates large message lists", async () => {
   const { ResponsePane } = await server.ssrLoadModule("/src/components/workspace/ResponsePane.jsx");
   const response = { ...model.createEmptyResponse(), isJson: true, body: JSON.stringify(Array.from({ length: 80 }, (_, id) => ({ id }))), headers: { "x-kivo-grpc-mode": "server_stream" } };
