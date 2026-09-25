@@ -644,6 +644,7 @@ export default function App() {
                     onClearResponse={() => updateActiveRequest({ lastResponse: null })}
                     response={response}
                     envVars={envVars}
+                    collection={activeCollection}
                     workspaceName={activeWorkspace?.name}
                     collectionName={activeCollection?.name}
                   />

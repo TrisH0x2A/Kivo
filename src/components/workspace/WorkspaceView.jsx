@@ -25,6 +25,7 @@ export function WorkspaceView({
   onClearResponse,
   response,
   envVars,
+  collection,
   workspaceName,
   collectionName,
   streamMessages = [],
@@ -57,6 +58,7 @@ export function WorkspaceView({
         response={response}
         workspaceName={workspaceName}
         collectionName={collectionName}
+        collection={collection}
       />
       </div>
       </div>

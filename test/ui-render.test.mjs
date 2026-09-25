@@ -112,6 +112,32 @@ test("collection config merges independent edits and reports conflicts", async (
   assert.deepEqual(conflict.conflicts, ["scripts.preRequest"]);
 });
 
+test("request explanation resolves provenance while masking authorization", async () => {
+  const { buildRequestExplanation } = await server.ssrLoadModule("/src/lib/request-explanation.js");
+  const explanation = buildRequestExplanation({
+    name: "Create payment",
+    method: "POST",
+    url: "{{base_url}}/payments",
+    queryParams: [],
+    headers: [{ key: "Accept", value: "application/json", enabled: true }],
+    auth: { type: "bearer", token: "secret-token" },
+    bodyType: "json",
+    body: "{\"amount\": 10}",
+    folderPath: "billing",
+    inheritHeaders: false,
+    timeoutMs: 5000,
+  }, {
+    envVars: { merged: { base_url: "https://api.example.com" } },
+    collectionConfig: { defaultAuth: { type: "none" }, defaultHeaders: [] },
+    collection: { folderSettings: [{ path: "billing", defaultHeaders: [{ key: "X-Team", value: "payments", enabled: true }] }] },
+  });
+
+  assert.equal(explanation.url, "https://api.example.com/payments");
+  assert.equal(explanation.headers.find((header) => header.key === "Authorization").value, "[hidden]");
+  assert.equal(explanation.headers.find((header) => header.key === "X-Team").source, "Inherited");
+  assert.deepEqual(explanation.variables, [{ key: "base_url", source: "Environment", value: "https://api.example.com" }]);
+});
+
 test("gRPC message view requires stream metadata and paginates large message lists", async () => {
   const { ResponsePane } = await server.ssrLoadModule("/src/components/workspace/ResponsePane.jsx");
   const response = { ...model.createEmptyResponse(), isJson: true, body: JSON.stringify(Array.from({ length: 80 }, (_, id) => ({ id }))), headers: { "x-kivo-grpc-mode": "server_stream" } };

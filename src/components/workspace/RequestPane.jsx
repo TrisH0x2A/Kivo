@@ -4,6 +4,7 @@ import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { CodeEditor } from "@/components/workspace/CodeEditor.jsx";
+import { RequestExplainModal } from "@/components/workspace/RequestExplainModal.jsx";
 import { GrpcSchemaTools } from "@/components/workspace/GrpcSchemaTools.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -11,7 +12,8 @@ import { Input } from "@/components/ui/input.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { formatJsonText } from "@/lib/formatters.js";
 import { buildUrlWithParams, getMethodTone, requestBodyModes } from "@/lib/http-ui.js";
-import { listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer } from "@/lib/http-client.js";
+import { getCollectionConfig, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer } from "@/lib/http-client.js";
+import { buildRequestExplanation } from "@/lib/request-explanation.js";
 import { isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
@@ -637,6 +639,7 @@ export function RequestPane({
   onAuthChange,
   envVars,
   response,
+  collection,
   workspaceName,
   collectionName,
 }) {
@@ -654,6 +657,9 @@ export function RequestPane({
   const [grpcBodyNotice, setGrpcBodyNotice] = useState("");
   const [grpcReflectionStatus, setGrpcReflectionStatus] = useState("");
   const [showSendErrorModal, setShowSendErrorModal] = useState(false);
+  const [requestExplanation, setRequestExplanation] = useState(null);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [explainError, setExplainError] = useState("");
   const [sendErrorTitle, setSendErrorTitle] = useState("");
   const [sendErrorTrace, setSendErrorTrace] = useState("");
   const seenErrorKeyRef = useRef("");
@@ -1007,6 +1013,20 @@ export function RequestPane({
     });
   }, [debouncedState, envVars]);
 
+  async function handleExplainRequest() {
+    setIsExplaining(true);
+    setExplainError("");
+    try {
+      const collectionConfig = await getCollectionConfig(workspaceName, collectionName);
+      setRequestExplanation(buildRequestExplanation(state, { envVars, collectionConfig, collection }));
+    } catch (error) {
+      setRequestExplanation(null);
+      setExplainError(error instanceof Error ? error.message : "Unable to resolve this request.");
+    } finally {
+      setIsExplaining(false);
+    }
+  }
+
   function handleFormatBody() {
     if (!isJsonBody) return;
     onChange("body", formatJsonText(state.body));
@@ -1254,8 +1274,8 @@ export function RequestPane({
       <div className={cn(
           "kivo-request-command grid items-center gap-2 border-b p-3",
         isGrpcRequest
-          ? "grid-cols-[64px_minmax(0,1fr)_80px] xl:grid-cols-[64px_minmax(90px,1fr)_minmax(100px,0.65fr)_32px_32px_80px]"
-          : "grid-cols-[92px_minmax(0,1fr)_88px]"
+          ? "grid-cols-[64px_minmax(0,1fr)_80px] xl:grid-cols-[64px_minmax(90px,1fr)_minmax(100px,0.65fr)_32px_32px_32px_80px]"
+          : "grid-cols-[92px_minmax(0,1fr)_36px_88px]"
       )}>
         {isWebSocketRequest ? (
           <div className="flex h-8 items-center px-3 lg:h-10">
@@ -1339,6 +1359,19 @@ export function RequestPane({
             <FileCode2 className="h-4 w-4" />
           </Button>
         ) : null}
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn("h-8 w-8 text-muted-foreground lg:h-10 lg:w-10", isGrpcRequest && "hidden xl:inline-flex")}
+          onClick={handleExplainRequest}
+          aria-label="Explain this request"
+          title="Explain this request"
+          disabled={isExplaining}
+        >
+          <Eye className="h-4 w-4" />
+        </Button>
 
         <Button
           className={cn(
@@ -1664,6 +1697,16 @@ export function RequestPane({
         title={sendErrorTitle}
         stackTrace={sendErrorTrace}
         onClose={() => setShowSendErrorModal(false)}
+      />
+
+      <RequestExplainModal
+        explanation={requestExplanation}
+        loading={isExplaining}
+        error={explainError}
+        onClose={() => {
+          setRequestExplanation(null);
+          setExplainError("");
+        }}
       />
     </section>
   );
