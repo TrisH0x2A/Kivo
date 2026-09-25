@@ -501,6 +501,18 @@ export async function saveCollectionConfig(workspaceName, collectionName, config
   return invoke("save_collection_config", { workspaceName, collectionName, config: encryptedConfig });
 }
 
+export function startMockServer(config) {
+  return invoke("start_mock_server", { config });
+}
+
+export function stopMockServer() {
+  return invoke("stop_mock_server");
+}
+
+export function mockServerStatus() {
+  return invoke("mock_server_status");
+}
+
 export function getResolvedStoragePath() {
   return invoke("get_resolved_storage_path");
 }

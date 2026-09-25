@@ -7,6 +7,7 @@ const DEFAULT_CONFIG = {
   defaultHeaders: [],
   defaultAuth: createDefaultAuthState(),
   scripts: { preRequest: "", postResponse: "" },
+  mockServer: { port: 0, routes: [] },
 };
 
 export function useCollectionConfig(workspaceName, collectionName) {
@@ -29,6 +30,7 @@ export function useCollectionConfig(workspaceName, collectionName) {
         defaultHeaders: result.defaultHeaders ?? [],
         defaultAuth: normalizeAuthState(result.defaultAuth),
         scripts: result.scripts ?? { preRequest: "", postResponse: "" },
+        mockServer: result.mockServer ?? { port: 0, routes: [] },
       };
       setConfig(normalized);
       setSavedConfig(normalized);

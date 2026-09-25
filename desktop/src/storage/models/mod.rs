@@ -62,6 +62,46 @@ pub struct CollectionScripts {
     pub post_response: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MockRouteRecord {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default = "default_mock_method")]
+    pub method: String,
+    #[serde(default = "default_mock_path")]
+    pub path: String,
+    #[serde(default)]
+    pub scenario: String,
+    #[serde(default = "default_mock_status")]
+    pub status: u16,
+    #[serde(default)]
+    pub headers: Vec<KeyValueRow>,
+    #[serde(default)]
+    pub body: String,
+    #[serde(default)]
+    pub delay_ms: u64,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MockServerConfig {
+    #[serde(default)]
+    pub port: u16,
+    #[serde(default)]
+    pub routes: Vec<MockRouteRecord>,
+}
+
+impl Default for MockServerConfig {
+    fn default() -> Self { Self { port: 0, routes: Vec::new() } }
+}
+
+fn default_mock_method() -> String { "GET".to_string() }
+fn default_mock_path() -> String { "/".to_string() }
+fn default_mock_status() -> u16 { 200 }
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CollectionConfig {
@@ -71,6 +111,8 @@ pub struct CollectionConfig {
     pub default_auth: AuthRecord,
     #[serde(default)]
     pub scripts: CollectionScripts,
+    #[serde(default)]
+    pub mock_server: MockServerConfig,
 }
 
 impl Default for CollectionConfig {
@@ -79,6 +121,7 @@ impl Default for CollectionConfig {
             default_headers: vec![],
             default_auth: default_auth_record(),
             scripts: CollectionScripts::default(),
+            mock_server: MockServerConfig::default(),
         }
     }
 }
@@ -432,7 +475,7 @@ pub struct RequestRecord {
     pub last_response: Option<SavedResponse>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyValueRow {
     #[serde(default)]

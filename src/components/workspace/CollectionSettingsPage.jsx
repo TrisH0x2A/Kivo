@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import {
-  BookOpen, Code2, Copy, Download, FileJson, FlaskConical, FolderOpen, Globe, Layers,
+  BookOpen, Code2, Copy, Download, FileJson, FlaskConical, FolderOpen, Globe, Layers, Server,
   Save, Share2, Trash2, Eye, EyeOff
 } from "lucide-react";
 
@@ -18,6 +18,7 @@ import { useCollectionConfig } from "@/hooks/use-collection-config.js";
 import { useEnv } from "@/hooks/use-env.js";
 import { useWorkspaceEnvironments } from "@/hooks/use-workspace-environments.js";
 import { cn } from "@/lib/utils.js";
+import { MockServerTab } from "@/components/workspace/MockServerTab.jsx";
 
 const TABS = [
   { id: "Overview", label: "Overview", description: "Path, requests, and collection health", icon: Layers },
@@ -26,6 +27,7 @@ const TABS = [
   { id: "Auth", label: "Auth", description: "Inherited authentication", icon: Share2 },
   { id: "Docs", label: "Docs", description: "Generated Markdown docs", icon: BookOpen },
   { id: "Runner", label: "Runner", description: "Run the full collection", icon: FlaskConical },
+  { id: "Mock Server", label: "Mock Server", description: "Local scenarios and fixtures", icon: Server },
 ];
 
 function createHeaderRow() {
@@ -782,6 +784,10 @@ export function CollectionSettingsPage({
 
         {activeTab === "Runner" && (
           <CollectionRunner workspace={workspace} collection={collection} />
+        )}
+
+        {activeTab === "Mock Server" && (
+          <MockServerTab config={config} updateConfig={updateConfig} isDirty={isDirty} onSave={handleSave} />
         )}
           </div>
         </div>

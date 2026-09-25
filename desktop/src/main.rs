@@ -12,6 +12,7 @@ use http::client::{
     wait_for_oauth_callback,
 };
 use http::load_test::{run_load_test, cancel_load_test};
+use http::mock_server::{mock_server_status, start_mock_server, stop_mock_server};
 use http::realtime::{
     realtime_connect_websocket, realtime_send, realtime_disconnect, realtime_connect_sse,
     realtime_connect_socketio, realtime_emit_socketio,
@@ -81,6 +82,9 @@ fn main() {
             export_response_file,
             run_load_test,
             cancel_load_test,
+            start_mock_server,
+            stop_mock_server,
+            mock_server_status,
             realtime_connect_websocket,
             realtime_send,
             realtime_disconnect,

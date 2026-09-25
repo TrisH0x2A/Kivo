@@ -31,7 +31,7 @@ pub use models::{
 #[cfg(test)]
 pub use models::{
     AuthRecord, CollectionScripts, KeyValueRow, OAuthConfig, RequestTextOrJson, ResponseMeta,
-    SavedResponse, WorkspaceRecord,
+    SavedResponse, WorkspaceRecord, MockServerConfig,
 };
 
 

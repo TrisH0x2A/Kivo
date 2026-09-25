@@ -11,7 +11,7 @@ use super::{
     sanitize_name, serialize_export_value,
     set_active_workspace_environment, write_env_file, AuthRecord, CollectionConfig, CollectionRecord, CollectionScripts, EnvVar,
     ExportEnvOptions, KeyValueRow, OAuthConfig, RequestRecord, RequestTextOrJson, ResponseMeta,
-    SavedResponse, WorkspaceRecord,
+    SavedResponse, WorkspaceRecord, MockServerConfig,
 };
 
 fn make_request(name: &str) -> RequestRecord {
@@ -1204,6 +1204,7 @@ mod collection_config_tests {
                 pre_request: "console.log('pre')".to_string(),
                 post_response: "console.log('post')".to_string(),
             },
+            mock_server: MockServerConfig::default(),
         };
         fs_save_collection_config(dir.path(), "ws", "api", &config).unwrap();
         let col_path = dir.path().join("ws").join("collections").join("api");
@@ -1247,6 +1248,7 @@ mod collection_config_tests {
             },
             default_headers: vec![],
             scripts: CollectionScripts::default(),
+            mock_server: MockServerConfig::default(),
         };
         fs_save_collection_config(dir.path(), "ws", "api", &config).unwrap();
         fs_save_workspaces(dir.path(), &workspaces).unwrap();
@@ -1279,6 +1281,7 @@ mod collection_config_tests {
             },
             default_headers: vec![],
             scripts: CollectionScripts::default(),
+            mock_server: MockServerConfig::default(),
         };
         fs_save_collection_config(dir.path(), "ws", "auth/user", &config).unwrap();
         let col_path = dir.path().join("ws").join("collections").join("auth_user");
