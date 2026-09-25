@@ -6,7 +6,8 @@ import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { buildRequestPayload } from "@/lib/http-ui.js";
 import { formatSavedAt } from "@/lib/workspace-store.js";
-import { cancelHttpRequest, sendHttpRequest } from "@/lib/http-client.js";
+import { cancelHttpRequest, sendHttpRequest, getCollectionConfig, exchangeOAuthToken } from "@/lib/http-client.js";
+import { executeWorkflowStep, inheritRunRequest, interruptibleDelay } from "@/lib/workflow-runner.js";
 import { formatResponseBody, isJsonText } from "@/lib/formatters.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
 import { applyRunnerDataRow, buildRunReport, getRunnableRequests, normalizeRunnerDelayMs, normalizeRunnerFolderPath, parseRunnerDataRows } from "@/lib/collection-runner.js";
@@ -64,6 +65,10 @@ function getDataSourceMeta(source, rows) {
 export function CollectionRunner({ workspace, collection }) {
   const [folderFilter, setFolderFilter] = useState("");
   const [retryCount, setRetryCount] = useState(0);
+  const [allowUnsafeRetries, setAllowUnsafeRetries] = useState(false);
+  const [extractionRules, setExtractionRules] = useState([]);
+  const [variableNames, setVariableNames] = useState([]);
+  const [runError, setRunError] = useState("");
   const [delayMs, setDelayMs] = useState(0);
   const [stopOnFailure, setStopOnFailure] = useState(false);
   const [dataSource, setDataSource] = useState("");
@@ -72,6 +77,10 @@ export function CollectionRunner({ workspace, collection }) {
   const [runHistory, setRunHistory] = useState([]);
   const stopRequestedRef = useRef(false);
   const currentRequestIdRef = useRef("");
+  useEffect(() => () => {
+    stopRequestedRef.current = true;
+    if (currentRequestIdRef.current) cancelHttpRequest(currentRequestIdRef.current).catch(() => {});
+  }, []);
   const runHistoryKey = useMemo(() => `kivo.runnerHistory.${workspace?.name || "workspace"}.${collection?.name || "collection"}`, [workspace?.name, collection?.name]);
 
   const folders = useMemo(() => {
@@ -116,6 +125,7 @@ export function CollectionRunner({ workspace, collection }) {
       index,
       id: `${row.id}-${index}-${request.name}`,
       dataRowName: dataRows.length ? `Row ${rowIndex + 1}` : "",
+      contextKey: row.id,
       dataValues: row.values,
     })));
   }, [dataRows, runnable]);
@@ -147,96 +157,39 @@ export function CollectionRunner({ workspace, collection }) {
     setResults((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
   }
 
-  async function runOne({ request, index, id, dataRowName, dataValues }) {
+  async function runOne({ request, id, dataValues, dataRowName }, context, config) {
     patchResult(id, { status: "running", error: "", attempts: 0 });
-    let attempts = 0;
-    let lastError = "";
-
-    while (attempts <= retryCount) {
-      attempts += 1;
-      try {
-        let requestForSend = request;
-        let scriptContext = { vars: {} };
-        const preSource = String(request.scriptPreRequest || "").trim();
-        if (preSource) {
-          const preRun = await runRequestScript({
-            phase: "pre-request",
-            script: preSource,
-            request,
-            response: null,
-            context: scriptContext,
-          });
-          scriptContext = preRun.context || scriptContext;
-          if (!preRun.ok) {
-            throw new Error(preRun.error || "Pre-request script failed.");
-          }
-          requestForSend = preRun.request || request;
+    const outcome = await executeWorkflowStep({
+      request: inheritRunRequest(request, collection, config), context, data: dataValues || {},
+      rules: extractionRules.filter((rule) => rule.request === request.name && rule.variable.trim()),
+      retries: retryCount, allowUnsafeRetries, stopped: () => stopRequestedRef.current,
+      script: runRequestScript,
+      prepare: async (draft) => {
+        const oauth = draft.auth?.type === "oauth2" && draft.auth.oauth2;
+        if (oauth?.refreshToken && oauth.expiresAt && Date.parse(oauth.expiresAt) <= Date.now() + 30000) {
+          const refreshed = await exchangeOAuthToken({ workspaceName: workspace?.name || "", collectionName: collection?.name || "", oauth: { ...oauth, grantType: "refresh_token" } });
+          return { ...draft, auth: { ...draft.auth, oauth2: { ...oauth, ...refreshed } } };
         }
-
-        const requestId = `runner-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        return draft;
+      },
+      send: async (draft) => {
+        const requestId = `runner-${crypto.randomUUID()}`;
         currentRequestIdRef.current = requestId;
-        const result = await sendHttpRequest({
-          ...buildRequestPayload(requestForSend, workspace?.name || "", collection?.name || ""),
-          requestId,
-        });
-        if (currentRequestIdRef.current === requestId) {
-          currentRequestIdRef.current = "";
-        }
-        const response = buildRunnerResponse(result, requestForSend);
-        const afterSource = String(request.scriptAfterResponse || "").trim();
-        let tests = [];
-        if (afterSource) {
-          const postRun = await runRequestScript({
-            phase: "after-response",
-            script: afterSource,
-            request: requestForSend,
-            response,
-            context: scriptContext,
-          });
-          tests = Array.isArray(postRun.tests) ? postRun.tests : [];
-          if (!postRun.ok) {
-            throw new Error(postRun.error || "After-response script failed.");
-          }
-        }
-
-        const failedTests = tests.filter((test) => !test.ok);
-        const passed = response.status >= 200 && response.status < 400 && failedTests.length === 0;
-        patchResult(id, {
-          status: passed ? "passed" : "failed",
-          statusCode: response.status,
-          duration: response.duration,
-          attempts,
-          tests,
-          dataRowName,
-          dataValues,
-          error: failedTests.map((test) => `${test.name}: ${test.error || "failed"}`).join("\n"),
-        });
-        return passed;
-      } catch (error) {
-        lastError = error?.message || String(error);
-      } finally {
-        if (currentRequestIdRef.current.startsWith("runner-")) {
-          currentRequestIdRef.current = "";
-        }
-      }
-    }
-
-    patchResult(id, {
-      status: "failed",
-      statusCode: 0,
-      duration: "-",
-      attempts,
-      tests: [],
-      dataRowName,
-      dataValues,
-      error: lastError,
+        try {
+          return buildRunnerResponse(await sendHttpRequest({ ...buildRequestPayload(draft, workspace?.name || "", collection?.name || ""), requestId }), draft);
+        } finally { if (currentRequestIdRef.current === requestId) currentRequestIdRef.current = ""; }
+      },
     });
-    return false;
+    patchResult(id, { ...outcome, dataRowName, dataValues });
+    setVariableNames(Object.keys(context.vars).sort());
+    return outcome.status === "passed";
   }
 
   async function runCollection() {
     if (isRunning || runItems.length === 0) return;
     stopRequestedRef.current = false;
+    setVariableNames([]);
+    setRunError("");
     setIsRunning(true);
     const queued = runItems.map(({ request, index, id, dataRowName, dataValues }) => ({
       id,
@@ -256,21 +209,27 @@ export function CollectionRunner({ workspace, collection }) {
     setResults(queued);
 
     try {
+      const config = await getCollectionConfig(workspace?.name || "", collection?.name || "");
+      const contexts = new Map();
       for (let itemIndex = 0; itemIndex < runItems.length; itemIndex += 1) {
         const item = runItems[itemIndex];
         if (stopRequestedRef.current) {
           setResults((current) => current.map((result) => result.status === "queued" ? { ...result, status: "skipped" } : result));
           break;
         }
-        const passed = await runOne(item);
+        if (!contexts.has(item.contextKey)) contexts.set(item.contextKey, { vars: {} });
+        const passed = await runOne(item, contexts.get(item.contextKey), config || {});
         if (!passed && stopOnFailure) {
           setResults((current) => current.map((result) => result.status === "queued" ? { ...result, status: "skipped" } : result));
           break;
         }
         if (delayMs > 0 && itemIndex < runItems.length - 1 && !stopRequestedRef.current) {
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
+          await interruptibleDelay(delayMs, () => stopRequestedRef.current);
         }
       }
+    } catch (error) {
+      setRunError(String(error));
+      setResults((current) => current.map((result) => result.status === "queued" ? { ...result, status: "skipped" } : result));
     } finally {
       setIsRunning(false);
       setRunHistory((current) => [{
@@ -344,7 +303,9 @@ export function CollectionRunner({ workspace, collection }) {
               type="text"
               inputMode="numeric"
               value={String(retryCount)}
-              onChange={(event) => setRetryCount(Math.max(0, Number.parseInt(event.target.value.replace(/\D/g, ""), 10) || 0))}
+              aria-label="Retries"
+              disabled={isRunning}
+              onChange={(event) => setRetryCount(Math.min(10, Math.max(0, Number.parseInt(event.target.value.replace(/\D/g, ""), 10) || 0)))}
               className="kivo-field h-9 w-24 text-[12px]"
               placeholder="Retries"
             />
@@ -378,6 +339,25 @@ export function CollectionRunner({ workspace, collection }) {
             </Button>
           </div>
         </div>
+        </div>
+        <div className="space-y-3 border-b border-border/30 px-4 py-3">
+          <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={allowUnsafeRetries} disabled={isRunning} onChange={(event) => setAllowUnsafeRetries(event.target.checked)} className="accent-primary" />Retry non-idempotent requests (may repeat side effects)</label>
+          <details>
+            <summary className="cursor-pointer text-xs font-medium">Response extraction ({extractionRules.length})</summary>
+            <div className="mt-3 space-y-2">
+              {extractionRules.map((rule, index) => <div key={rule.id} className="flex flex-wrap gap-2">
+                <select aria-label="Extraction request" disabled={isRunning} value={rule.request} className="kivo-field h-8 min-w-0 flex-1 text-xs" onChange={(event) => setExtractionRules((rules) => rules.map((entry, i) => i === index ? { ...entry, request: event.target.value } : entry))}>
+                  {runnable.map(({ request }) => <option key={request.name} value={request.name}>{request.name}</option>)}
+                </select>
+                <Input aria-label="Variable name" placeholder="Variable name" disabled={isRunning} value={rule.variable} onChange={(event) => setExtractionRules((rules) => rules.map((entry, i) => i === index ? { ...entry, variable: event.target.value } : entry))} className="h-8 min-w-0 flex-1 text-xs" />
+                <Input aria-label="Response JSON pointer" placeholder="/data/id" disabled={isRunning} value={rule.pointer} onChange={(event) => setExtractionRules((rules) => rules.map((entry, i) => i === index ? { ...entry, pointer: event.target.value } : entry))} className="h-8 min-w-0 flex-1 text-xs" />
+                <Button variant="ghost" size="icon" title="Remove extraction" disabled={isRunning} onClick={() => setExtractionRules((rules) => rules.filter((entry) => entry.id !== rule.id))}><Trash2 className="h-3 w-3" /></Button>
+              </div>)}
+              <Button variant="ghost" size="sm" disabled={isRunning || !runnable.length} onClick={() => setExtractionRules((rules) => [...rules, { id: crypto.randomUUID(), request: runnable[0].request.name, variable: "", pointer: "" }])}>Add extraction</Button>
+            </div>
+          </details>
+          {variableNames.length > 0 && <p className="break-all text-xs text-muted-foreground">Run variables: {variableNames.join(", ")}</p>}
+          {runError && <p role="alert" className="text-xs text-destructive">{runError}</p>}
         </div>
         <div className="kivo-quiet-divider grid grid-cols-2 border-b bg-background/8 text-[11px] sm:grid-cols-5">
           <div className="kivo-quiet-divider border-r px-4 py-2.5 text-muted-foreground">Total <span className="ml-1 font-semibold text-foreground">{summary.total}</span></div>
