@@ -496,9 +496,14 @@ export function getCollectionConfig(workspaceName, collectionName) {
     .then((config) => transformCollectionConfigAuth(config, "decrypt"));
 }
 
-export async function saveCollectionConfig(workspaceName, collectionName, config) {
+export function getCollectionConfigSnapshot(workspaceName, collectionName) {
+  return invoke("get_collection_config_snapshot", { workspaceName, collectionName })
+    .then(async (snapshot) => ({ ...snapshot, config: await transformCollectionConfigAuth(snapshot.config, "decrypt") }));
+}
+
+export async function saveCollectionConfig(workspaceName, collectionName, config, expectedRevision = null) {
   const encryptedConfig = await transformCollectionConfigAuth(config, "encrypt");
-  return invoke("save_collection_config", { workspaceName, collectionName, config: encryptedConfig });
+  return invoke("save_collection_config", { workspaceName, collectionName, config: encryptedConfig, expectedRevision });
 }
 
 export function startMockServer(config) {

@@ -23,6 +23,7 @@ pub mod secrets;
 pub use models::{
     default_state, AppSettings, CollectionConfig, CollectionRecord, EnvVar, EnvVarsResult,
     ImportedCollectionResult, ImportedRequestsResult, PersistedAppState, RequestRecord,
+    CollectionConfigSnapshot,
     RequestRuntimeState,
     StoragePathValidationResult, StorageSwitchPayload, WorkspaceEnvironmentsResult,
     WorkspaceFile,
@@ -705,6 +706,20 @@ pub fn get_collection_config(
 }
 
 #[tauri::command]
+pub fn get_collection_config_snapshot(
+    app: AppHandle,
+    workspace_name: String,
+    collection_name: String,
+) -> Result<CollectionConfigSnapshot, String> {
+    let root = get_storage_root(&app)?;
+    let col_path = paths::collection_dir(&root, &workspace_name, &collection_name)?;
+    Ok(CollectionConfigSnapshot {
+        config: load_collection_config_from_path(&col_path),
+        revision: io::collection_config_revision(&col_path),
+    })
+}
+
+#[tauri::command]
 pub fn import_collection_file(file_path: String) -> Result<ImportedCollectionResult, String> {
     let content =
         fs::read_to_string(&file_path).map_err(|e| format!("Failed to read import file: {e}"))?;
@@ -826,9 +841,18 @@ pub fn save_collection_config(
     workspace_name: String,
     collection_name: String,
     config: CollectionConfig,
-) -> Result<(), String> {
+    expected_revision: Option<String>,
+) -> Result<String, String> {
     let root = get_storage_root(&app)?;
-    fs_save_collection_config(&root, &workspace_name, &collection_name, &config)
+    let col_path = paths::collection_dir(&root, &workspace_name, &collection_name)?;
+    let current_revision = io::collection_config_revision(&col_path);
+    if let Some(expected) = expected_revision.filter(|value| !value.is_empty()) {
+        if expected != current_revision {
+            return Err(format!("KIVO_EXTERNAL_CHANGE:{current_revision}"));
+        }
+    }
+    fs_save_collection_config(&root, &workspace_name, &collection_name, &config)?;
+    Ok(io::collection_config_revision(&col_path))
 }
 
 #[tauri::command]

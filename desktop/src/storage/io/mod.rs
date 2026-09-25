@@ -6,6 +6,7 @@ use crate::storage::models::{
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use sha2::{Digest, Sha256};
 use super::durable::{self, SavePlan};
 mod identity;
 use identity::*;
@@ -676,6 +677,13 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
         }
     }
     Ok(())
+}
+
+pub fn collection_config_revision(collection_path: &Path) -> String {
+    let bytes = fs::read(collection_path.join(COLLECTION_CONFIG_FILE_NAME)).unwrap_or_else(|_| b"<missing>".to_vec());
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
 }
 
 pub fn fs_get_env_vars(

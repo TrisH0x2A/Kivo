@@ -97,6 +97,21 @@ test("command search retains keyboard semantics and scoped scrolling", async () 
   assert.match(html, /kivo-command-results thin-scrollbar/);
 });
 
+test("collection config merges independent edits and reports conflicts", async () => {
+  const { mergeConfig } = await server.ssrLoadModule("/src/hooks/use-collection-config.js");
+  const base = { scripts: { preRequest: "", postResponse: "" }, mockServer: { port: 0 } };
+  const local = { scripts: { preRequest: "local", postResponse: "" }, mockServer: { port: 0 } };
+  const remote = { scripts: { preRequest: "", postResponse: "remote" }, mockServer: { port: 0 } };
+  const merged = mergeConfig(base, local, remote);
+  assert.equal(merged.value.scripts.preRequest, "local");
+  assert.equal(merged.value.scripts.postResponse, "remote");
+  assert.deepEqual(merged.conflicts, []);
+
+  const conflict = mergeConfig(base, local, { ...remote, scripts: { preRequest: "remote", postResponse: "" } });
+  assert.equal(conflict.value.scripts.preRequest, "local");
+  assert.deepEqual(conflict.conflicts, ["scripts.preRequest"]);
+});
+
 test("gRPC message view requires stream metadata and paginates large message lists", async () => {
   const { ResponsePane } = await server.ssrLoadModule("/src/components/workspace/ResponsePane.jsx");
   const response = { ...model.createEmptyResponse(), isJson: true, body: JSON.stringify(Array.from({ length: 80 }, (_, id) => ({ id }))), headers: { "x-kivo-grpc-mode": "server_stream" } };

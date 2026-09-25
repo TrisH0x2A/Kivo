@@ -1224,6 +1224,17 @@ mod collection_config_tests {
     }
 
     #[test]
+    fn collection_config_revision_changes_after_external_edit() {
+        let dir = TempDir::new().unwrap();
+        fs_save_workspaces(dir.path(), &[ws("ws", vec![col("api", vec![])])]).unwrap();
+        let col_path = dir.path().join("ws").join("collections").join("api");
+        let before = crate::storage::io::collection_config_revision(&col_path);
+        fs::write(col_path.join("collection.json"), "{\"externallyChanged\":true}").unwrap();
+        let after = crate::storage::io::collection_config_revision(&col_path);
+        assert_ne!(before, after);
+    }
+
+    #[test]
     fn collection_json_preserved_across_request_saves() {
         let dir = TempDir::new().unwrap();
         let workspaces = vec![ws("ws", vec![col("api", vec![make_request("r")])])];

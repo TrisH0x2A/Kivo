@@ -128,6 +128,13 @@ impl Default for CollectionConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CollectionConfigSnapshot {
+    pub config: CollectionConfig,
+    pub revision: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppSettings {
     #[serde(default)]
     pub clear_oauth_session_on_start: bool,

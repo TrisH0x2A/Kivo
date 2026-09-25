@@ -1,7 +1,7 @@
 ﻿import { useEffect, useState } from "react";
 import {
   BookOpen, Code2, Copy, Download, FileJson, FlaskConical, FolderOpen, Globe, Layers, Server,
-  Save, Share2, Trash2, Eye, EyeOff
+  Save, Share2, Trash2, Eye, EyeOff, AlertTriangle
 } from "lucide-react";
 
 import { invoke } from "@tauri-apps/api/core";
@@ -614,7 +614,7 @@ export function CollectionSettingsPage({
   const activeWorkspaceEnvironmentId = workspaceEnvironments?.activeEnvironmentId || "default";
 
   const { vars: envVars } = useEnv(workspace?.name, collection?.name, activeWorkspaceEnvironmentId);
-  const { config, isDirty, updateConfig, save, reset } = useCollectionConfig(
+  const { config, isDirty, conflict, updateConfig, save, reset, resolveConflict } = useCollectionConfig(
     workspace?.name,
     collection?.name
   );
@@ -711,6 +711,10 @@ export function CollectionSettingsPage({
             {isSaving ? "Saving..." : isDirty ? "Unsaved" : "Saved"}
           </div>
         </div>
+
+        {conflict && <div role="alert" className="mx-6 mt-4 border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-xs text-amber-100">
+          <div className="flex flex-wrap items-start gap-3"><AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" /><div className="min-w-0 flex-1"><p className="font-medium">This collection changed on disk.</p><p className="mt-1 text-amber-100/70">Kivo kept your edits and loaded the newer file. Changed fields: {conflict.conflicts.slice(0, 6).join(", ") || "non-overlapping values"}{conflict.conflicts.length > 6 ? "…" : ""}.</p></div><div className="flex flex-wrap gap-2"><Button type="button" size="sm" variant="ghost" onClick={() => resolveConflict("remote")}>Use remote</Button><Button type="button" size="sm" variant="outline" onClick={() => resolveConflict("merge")}>Merge changes</Button><Button type="button" size="sm" onClick={() => resolveConflict("local")}>Keep local</Button></div></div>
+        </div>}
 
         <div className="thin-scrollbar min-h-0 flex-1 overflow-auto bg-background px-6 py-5">
           <div className="flex h-full min-h-0 w-full max-w-6xl flex-col">
