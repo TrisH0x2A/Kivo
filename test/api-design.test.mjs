@@ -44,8 +44,9 @@ test("buildOpenApiOperation includes params headers and request body", () => {
   assert.equal(operation.requestBody.content["application/json"].schema.properties.name.type, "string");
 });
 
-test("validateResponseBodyAgainstRequest passes matching JSON contracts", () => {
-  const result = validateResponseBodyAgainstRequest({
+test("validateResponseBodyAgainstRequest passes explicit response contracts", async () => {
+  const result = await validateResponseBodyAgainstRequest({
+    contract: { responses: { default: { type: "object", required: ["id"], properties: { id: { type: "integer" } } } } },
     bodyType: "json",
     body: "{\"id\":42,\"profile\":{\"name\":\"Ada\"}}"
   }, "{\"id\":7,\"profile\":{\"name\":\"Grace\"}}");
@@ -54,15 +55,14 @@ test("validateResponseBodyAgainstRequest passes matching JSON contracts", () => 
   assert.deepEqual(result.errors, []);
 });
 
-test("validateResponseBodyAgainstRequest reports contract mismatches", () => {
-  const result = validateResponseBodyAgainstRequest({
+test("validateResponseBodyAgainstRequest reports contract mismatches", async () => {
+  const result = await validateResponseBodyAgainstRequest({
+    contract: { responses: { default: { type: "object", required: ["active"], properties: { id: { type: "integer" } } } } },
     bodyType: "json",
     body: "{\"id\":42,\"active\":true}"
   }, "{\"id\":\"42\"}");
 
   assert.equal(result.ok, false);
-  assert.deepEqual(result.errors, [
-    "$.active is required",
-    "$.id expected integer, got string"
-  ]);
+  assert.ok(result.errors.some((error) => error.includes("required")));
+  assert.ok(result.errors.some((error) => error.includes("type")));
 });

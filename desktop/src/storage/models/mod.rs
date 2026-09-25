@@ -374,6 +374,8 @@ pub struct RequestRecord {
     pub grpc_proto_directories: Vec<GrpcProtoDirectoryRecord>,
     #[serde(default)]
     pub docs: String,
+    #[serde(default, skip_serializing_if = "serde_json::Value::is_null")]
+    pub contract: serde_json::Value,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default = "default_true")]

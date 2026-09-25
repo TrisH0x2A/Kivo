@@ -56,47 +56,6 @@ function mockFromSchema(schema) {
   return "string";
 }
 
-function typeName(value) {
-  if (Array.isArray(value)) return "array";
-  if (value === null) return "null";
-  if (typeof value === "number" && Number.isInteger(value)) return "integer";
-  return typeof value;
-}
-
-function matchesType(value, expectedType) {
-  if (!expectedType) return true;
-  const types = Array.isArray(expectedType) ? expectedType : [expectedType];
-  return types.some((type) => {
-    if (type === "array") return Array.isArray(value);
-    if (type === "object") return value && typeof value === "object" && !Array.isArray(value);
-    if (type === "integer") return typeof value === "number" && Number.isInteger(value);
-    if (type === "number") return typeof value === "number";
-    if (type === "null") return value === null;
-    return typeof value === type;
-  });
-}
-
-function validateValue(value, schema, path, errors) {
-  if (!schema || typeof schema !== "object") return;
-
-  if (!matchesType(value, schema.type)) {
-    errors.push(`${path} expected ${Array.isArray(schema.type) ? schema.type.join(" or ") : schema.type}, got ${typeName(value)}`);
-    return;
-  }
-
-  if ((schema.type === "object" || schema.properties) && value && typeof value === "object" && !Array.isArray(value)) {
-    (schema.required || []).forEach((key) => {
-      if (value[key] === undefined) errors.push(`${path}.${key} is required`);
-    });
-    Object.entries(schema.properties || {}).forEach(([key, child]) => {
-      if (value[key] !== undefined) validateValue(value[key], child, `${path}.${key}`, errors);
-    });
-  }
-
-  if (schema.type === "array" && Array.isArray(value) && schema.items) {
-    value.forEach((item, index) => validateValue(item, schema.items, `${path}[${index}]`, errors));
-  }
-}
 
 function getContentType(request) {
   const explicit = (request?.headers || [])
@@ -126,16 +85,20 @@ export function buildMockFromRequest(request) {
   return schema ? mockFromSchema(schema) : null;
 }
 
-export function validateJsonAgainstSchema(value, schema) {
-  const errors = [];
-  validateValue(value, schema, "$", errors);
-  return { ok: errors.length === 0, errors };
+export async function validateJsonAgainstSchema(value, schema) {
+  const validator = await import("./contract-validation.js");
+  return validator.validateJsonAgainstSchema(value, schema);
 }
 
-export function validateResponseBodyAgainstRequest(request, responseBody) {
-  const schema = buildRequestJsonSchema(request);
-  if (!schema) {
-    return { ok: false, errors: ["No JSON request schema is available."], schema: null };
+export function buildResponseJsonSchema(body) {
+  return inferSchema(typeof body === "string" ? JSON.parse(body) : body);
+}
+
+export async function validateResponseBodyAgainstRequest(request, responseBody) {
+  const { selectResponseSchema } = await import("./contract-validation.js");
+  const schema = selectResponseSchema(request?.contract, request?.lastResponse?.status);
+  if (schema === undefined) {
+    return { ok: false, errors: ["No response contract is configured for this status."], schema: null };
   }
 
   const parsed = typeof responseBody === "string" ? parseJson(responseBody) : { ok: true, value: responseBody };
@@ -143,7 +106,7 @@ export function validateResponseBodyAgainstRequest(request, responseBody) {
     return { ok: false, errors: ["Response body is not valid JSON."], schema };
   }
 
-  return { ...validateJsonAgainstSchema(parsed.value, schema), schema };
+  return { ...await validateJsonAgainstSchema(parsed.value, schema), schema };
 }
 
 export function buildOpenApiOperation(request) {

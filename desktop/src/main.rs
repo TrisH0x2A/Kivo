@@ -3,7 +3,7 @@
 mod http;
 mod storage;
 
-use http::client::grpc::{grpc_send_message, grpc_finish_input};
+use http::client::grpc::{grpc_send_message, grpc_finish_input, inspect_grpc_method};
 
 use http::client::{
     cancel_http_request, cancel_oauth_exchange, clear_cookie_jar, delete_cookie_jar_entry,
@@ -41,6 +41,7 @@ fn main() {
             send_grpc_request,
             grpc_send_message,
             grpc_finish_input,
+            inspect_grpc_method,
             reflect_grpc_server,
             cancel_http_request,
             get_cookie_jar,

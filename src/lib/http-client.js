@@ -124,6 +124,10 @@ export function finishGrpcInput(requestId) {
   return invoke("grpc_finish_input", { requestId });
 }
 
+export function inspectGrpcMethod(protoFilePath, methodPath, body = null) {
+  return invoke("inspect_grpc_method", { protoFilePath, methodPath, body });
+}
+
 export function reflectGrpcServer(payload) {
   return invoke("reflect_grpc_server", { payload });
 }
@@ -183,6 +187,7 @@ function sanitizeRequestForSave(request, options = {}) {
     auth: sanitizeAuthForSave(request?.auth),
     bodyType,
     docs: String(request?.docs ?? ""),
+    contract: request?.contract ?? null,
     activeEditorTab: String(request?.activeEditorTab ?? "Params"),
     activeResponseTab: String(request?.activeResponseTab ?? "Body"),
     responseBodyView: String(request?.responseBodyView ?? "JSON"),

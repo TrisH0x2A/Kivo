@@ -1,4 +1,19 @@
 use super::*;
+
+#[test]
+fn descriptor_tools_report_fields_and_validate_without_transport() {
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../mock-servers/protos/book_service.proto");
+    let pool = compile_descriptor_pool(path).unwrap();
+    let service = pool.services().next().unwrap();
+    let method = service.methods().next().unwrap();
+    let key = format!("{}/{}", service.full_name(), method.name());
+    let result = inspect_method(path, &key, Some(r#"{"definitelyUnknownField":1}"#)).unwrap();
+    assert_eq!(result["inputType"], method.input().full_name());
+    assert!(result["fields"].is_array());
+    assert!(result["validationError"].is_string());
+    let example = result["example"].to_string();
+    assert!(inspect_method(path, &key, Some(&example)).unwrap()["validationError"].is_null());
+}
 use tonic::codegen::{http, Body, BoxFuture, Service, StdError};
 use std::task::{Context, Poll};
 

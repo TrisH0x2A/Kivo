@@ -486,7 +486,8 @@ export function CodeEditor({
   wrapLines = false,
   className,
   lineNumbers = false,
-  autocompleteItems = []
+  autocompleteItems = [],
+  getAutocompleteItems
 }) {
   const highlightRef = useRef(null);
   const lineNumbersRef = useRef(null);
@@ -505,7 +506,7 @@ export function CodeEditor({
   const useOverlay = !readOnly && (language === "json" || language === "graphql" || isJavascript || isYaml || isXml);
   const displayValue = useMemo(() => value || "", [value]);
   const totalLines = useMemo(() => getLineCount(displayValue), [displayValue]);
-  const suggestionEnabled = !readOnly && !disabled && isJavascript && Array.isArray(autocompleteItems) && autocompleteItems.length > 0;
+  const suggestionEnabled = !readOnly && !disabled && (typeof getAutocompleteItems === "function" || Array.isArray(autocompleteItems) && autocompleteItems.length > 0);
 
   useEffect(() => {
     if (!textareaRef.current || pendingCursorRef.current == null) {
@@ -536,7 +537,7 @@ export function CodeEditor({
     }
   }
 
-  function updateSuggestionsByCursor(cursorPosition, sourceText = displayValue) {
+  function updateSuggestionsByCursor(cursorPosition, sourceText = displayValue, force = false) {
     if (!suggestionEnabled) {
       setSuggestions([]);
       setSelectedSuggestionIndex(0);
@@ -544,14 +545,15 @@ export function CodeEditor({
     }
 
     const prefix = getTokenPrefix(sourceText, cursorPosition);
-    if (!prefix) {
+    if (!prefix && !force) {
       setSuggestions([]);
       setSelectedSuggestionIndex(0);
       return;
     }
 
     const prefixLower = prefix.toLowerCase();
-    const next = autocompleteItems
+    const candidates = getAutocompleteItems ? getAutocompleteItems(sourceText, cursorPosition) : autocompleteItems;
+    const next = candidates
       .filter((item) => String(item?.label || "").toLowerCase().startsWith(prefixLower))
       .sort((left, right) => {
         const leftLabel = String(left?.label || "");
@@ -788,8 +790,8 @@ export function CodeEditor({
 
           if (suggestionEnabled && event.ctrlKey && event.key === " ") {
             event.preventDefault();
-            setSuggestions(autocompleteItems.slice(0, SUGGESTION_LIMIT));
-            setSelectedSuggestionIndex(0);
+            suppressKeyUpRef.current = true;
+            updateSuggestionsByCursor(event.currentTarget.selectionStart, event.currentTarget.value, true);
           }
         }}
         onClick={(event) => updateSuggestionsByCursor(event.currentTarget.selectionStart)}

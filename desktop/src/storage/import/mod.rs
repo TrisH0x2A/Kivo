@@ -25,6 +25,7 @@ fn empty_request(name: String, method: String, url: String) -> RequestRecord {
         grpc_direct_proto_files: vec![],
         grpc_proto_directories: vec![],
         docs: String::new(),
+        contract: serde_json::Value::Null,
         tags: vec![],
         url_encoding: true,
         follow_redirects: true,

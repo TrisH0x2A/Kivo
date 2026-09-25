@@ -7,6 +7,39 @@ use tonic::metadata::{KeyAndValueRef, MetadataMap};
 const MAX_MESSAGES: usize = 500;
 const MAX_BYTES: usize = 4 * 1024 * 1024;
 
+fn inspect_method(proto: &str, method_path: &str, body: Option<&str>) -> Result<Value, String> {
+    let pool = compile_descriptor_pool(proto)?;
+    let path = method_path.trim_start_matches('/');
+    let (service, name) = path.rsplit_once('/').ok_or("Select a gRPC method")?;
+    let method = find_grpc_method_descriptor(&pool, service, name).ok_or("Method not found in descriptors")?;
+    let input = method.input();
+    let fields: Vec<Value> = input.fields().map(|field| serde_json::json!({
+        "name": field.json_name(), "type": match field.kind() {
+            prost_reflect::Kind::Message(message) => message.full_name().to_string(),
+            prost_reflect::Kind::Enum(enumeration) => enumeration.full_name().to_string(),
+            kind => format!("{kind:?}"),
+        },
+        "repeated": field.is_list(), "map": field.is_map(),
+        "oneof": field.containing_oneof().map(|group| group.name().to_string())
+    })).collect();
+    let mut buffer = Vec::new();
+    DynamicMessage::new(input.clone()).serialize_with_options(
+        &mut serde_json::Serializer::new(&mut buffer),
+        &prost_reflect::SerializeOptions::new().skip_default_fields(false),
+    ).map_err(|error| error.to_string())?;
+    let example: Value = serde_json::from_slice(&buffer).map_err(|error| error.to_string())?;
+    let validation_error = body.and_then(|text| initial_messages(input.clone(), text, method.is_client_streaming()).err());
+    Ok(serde_json::json!({ "inputType": input.full_name(), "outputType": method.output().full_name(),
+        "fields": fields, "example": example, "validationError": validation_error,
+        "validated": body.is_some(), "clientStreaming": method.is_client_streaming() }))
+}
+
+#[tauri::command]
+pub async fn inspect_grpc_method(proto_file_path: String, method_path: String, body: Option<String>) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || inspect_method(&proto_file_path, &method_path, body.as_deref()))
+        .await.map_err(|error| error.to_string())?
+}
+
 #[cfg(test)]
 #[path = "grpc_tests.rs"]
 mod transport_tests;

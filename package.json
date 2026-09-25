@@ -27,6 +27,7 @@
     "vite": "^7.3.1"
   },
   "dependencies": {
+    "@hyperjump/json-schema": "1.17.6",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.5.3",
@@ -34,12 +35,15 @@
     "@tauri-apps/plugin-updater": "^2.5.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "graphql": "16",
+    "graphql-language-service": "5",
     "lucide-react": "^0.542.0",
     "prismjs": "^1.30.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "sonner": "^1.7.4",
-    "tailwind-merge": "^3.3.1"
+    "tailwind-merge": "^3.3.1",
+    "yaml": "2"
   },
   "packageManager": "pnpm@10.8.1"
 }

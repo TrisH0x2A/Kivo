@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus, RefreshCw, SendHorizontal, Trash2, TriangleAlert, Wand2, X } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 import { CodeEditor } from "@/components/workspace/CodeEditor.jsx";
-import { GraphQLEditor } from "@/components/workspace/GraphQLEditor.jsx";
+import { GrpcSchemaTools } from "@/components/workspace/GrpcSchemaTools.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
@@ -17,7 +17,6 @@ import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
 import { EnvHighlightInput } from "@/components/ui/EnvHighlightInput.jsx";
 import { LoadTestPane } from "@/components/workspace/LoadTestPane.jsx";
-import { RequestDocsPanel } from "@/components/workspace/RequestDocsPanel.jsx";
 import {
   WebSocketSettingsPanel,
   SseHeadersPanel,
@@ -37,6 +36,8 @@ import { SelectMenu } from "@/components/workspace/SelectMenu.jsx";
 import { TableEditor } from "@/components/workspace/RequestTableEditor.jsx";
 
 const tabs = ["Params", "Body", "Auth", "Headers", "Scripts", "Docs", "Settings", "Load Test"];
+const GraphQLEditor = lazy(() => import("./GraphQLEditor.jsx").then((module) => ({ default: module.GraphQLEditor })));
+const RequestDocsPanel = lazy(() => import("./RequestDocsPanel.jsx").then((module) => ({ default: module.RequestDocsPanel })));
 const requestMethods = ["GET", "QUERY", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const DEFAULT_USER_AGENT_VALUE = "kivo/0.4.1";
 
@@ -1472,11 +1473,13 @@ export function RequestPane({
 
         {activeTab === "Body" ? (
           isGrpcRequest && hasGrpcMethodSelected ? (
-            <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+            <div className="flex h-full min-h-0 flex-col">
               <div className="flex items-center justify-between gap-3 border-b border-border/20 px-3 py-2 text-[11px] text-muted-foreground">
                 <div className="text-[12px] font-semibold uppercase tracking-[0.14em] tone-grpc-text">{grpcBodyHeading}</div>
                 <div className="text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Body</div>
               </div>
+              <GrpcSchemaTools key={`${workspaceName}/${collectionName}/${state.name}/${state.grpcProtoFilePath}/${state.grpcMethodPath}`} request={state} onChange={onChange} />
+              <div className="min-h-0 flex-1">
               <CodeEditor
                 value={state.body}
                 onChange={handleGrpcBodyChange}
@@ -1484,6 +1487,7 @@ export function RequestPane({
                 language="json"
                 disabled={false}
               />
+              </div>
               {grpcBodyNotice ? (
                 <div className="border-t border-amber-500/20 bg-amber-500/[0.08] px-3 py-1.5 text-[11px] text-amber-500 dark:text-amber-400">
                   {grpcBodyNotice}
@@ -1534,13 +1538,20 @@ export function RequestPane({
             ) : null}
 
             {isGraphqlBody ? (
+              <Suspense fallback={<div role="status" className="p-3 text-xs text-muted-foreground">Loading editor...</div>}>
               <GraphQLEditor
+                key={`${workspaceName}/${collectionName}/${state.name}`}
+                request={state}
+                onChange={onChange}
+                workspaceName={workspaceName}
+                collectionName={collectionName}
                 query={state.body}
                 variables={state.graphqlVariables}
                 onQueryChange={(value) => onChange("body", value)}
                 onVariablesChange={(value) => onChange("graphqlVariables", value)}
                 disabled={bodyDisabled}
               />
+              </Suspense>
             ) : null}
 
             {isFileBody ? (
@@ -1606,7 +1617,9 @@ export function RequestPane({
         ) : null}
 
         {activeTab === "Docs" ? (
-          <RequestDocsPanel request={state} onChange={onChange} />
+          <Suspense fallback={<div role="status" className="p-3 text-xs text-muted-foreground">Loading contracts...</div>}>
+          <RequestDocsPanel key={`${workspaceName}/${collectionName}/${state.name}`} request={state} onChange={onChange} response={response} />
+          </Suspense>
         ) : null}
 
         {activeTab === "Settings" ? (

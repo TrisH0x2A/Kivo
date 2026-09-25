@@ -50,6 +50,7 @@ fn make_request(name: &str) -> RequestRecord {
         grpc_direct_proto_files: vec![],
         grpc_proto_directories: vec![],
         docs: String::new(),
+        contract: serde_json::Value::Null,
         tags: vec![],
         url_encoding: true,
         follow_redirects: true,
@@ -1289,6 +1290,20 @@ mod collection_config_tests {
 #[cfg(test)]
 mod save_load_tests {
     use super::*;
+
+    #[test]
+    fn response_contract_and_graphql_schema_survive_disk_roundtrip() {
+        let dir = TempDir::new().unwrap();
+        let mut request = make_request("Contract");
+        request.contract = serde_json::json!({
+            "responses": {"200": {"type": "object"}, "404": false},
+            "graphqlSchema": "type Query { health: Boolean }",
+            "source": {"operation": "get /health"}
+        });
+        fs_save_workspaces(dir.path(), &[ws("ws", vec![col("api", vec![request.clone()])])]).unwrap();
+        let loaded = fs_load_workspaces(dir.path()).unwrap();
+        assert_eq!(loaded[0].collections[0].requests[0].contract, request.contract);
+    }
 
     #[test]
     fn save_and_load_single_workspace_no_collections() {

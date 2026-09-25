@@ -1,12 +1,13 @@
 import { Braces, FileJson2, ShieldCheck, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { RequestContractPanel } from "./RequestContractPanel.jsx";
 
 import { Button } from "@/components/ui/button.jsx";
 import {
   buildMockFromRequest,
   buildOpenApiOperation,
   buildRequestJsonSchema,
-  formatDesignBlock,
-  validateResponseBodyAgainstRequest
+  formatDesignBlock
 } from "@/lib/api-design.js";
 
 function appendBlock(current, block) {
@@ -14,26 +15,20 @@ function appendBlock(current, block) {
   return prefix ? `${prefix}\n\n${block}` : block;
 }
 
-export function RequestDocsPanel({ request, onChange }) {
+export function RequestDocsPanel({ request, onChange, response }) {
+  const [view, setView] = useState("notes");
   const schema = buildRequestJsonSchema(request);
   const mock = buildMockFromRequest(request);
   const operation = buildOpenApiOperation(request);
-  const responseBody = request?.lastResponse?.rawBody || request?.lastResponse?.body || "";
-  const canCheckContract = Boolean(schema && responseBody && !request?.lastResponse?.isBinary);
-  const appendContractCheck = () => {
-    const result = validateResponseBodyAgainstRequest(request, responseBody);
-    onChange("docs", appendBlock(request.docs, formatDesignBlock("Contract Check", {
-      ok: result.ok,
-      errors: result.errors,
-      schema: result.schema
-    })));
-  };
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] px-3 py-3">
       <div className="flex min-h-0 flex-wrap items-center justify-between gap-2 border-b border-border/20 pb-2">
-        <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Notes</div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1" role="tablist" aria-label="Documentation views">
+          <Button size="sm" variant="ghost" className={view === "notes" ? "border-b-2 border-primary" : "text-muted-foreground"} role="tab" aria-selected={view === "notes"} onClick={() => setView("notes")}>Notes</Button>
+          <Button size="sm" variant="ghost" className={`gap-2 ${view === "contract" ? "border-b-2 border-primary" : "text-muted-foreground"}`} role="tab" aria-selected={view === "contract"} onClick={() => setView("contract")}><ShieldCheck className="h-3.5 w-3.5" />Contract</Button>
+        </div>
+        {view === "notes" && <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
@@ -66,25 +61,14 @@ export function RequestDocsPanel({ request, onChange }) {
             <Sparkles className="h-3 w-3" />
             Mock
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-8 px-2.5 text-[11px]"
-            onClick={appendContractCheck}
-            disabled={!canCheckContract}
-          >
-            <ShieldCheck className="h-3 w-3" />
-            Contract
-          </Button>
-        </div>
+        </div>}
       </div>
-      <textarea
+      {view === "contract" ? <RequestContractPanel request={request} onChange={onChange} response={response} /> : <textarea
         className="thin-scrollbar min-h-0 flex-1 resize-none border-0 bg-transparent p-3 text-[12px] leading-5 text-foreground outline-none"
         value={request.docs}
         onChange={(event) => onChange("docs", event.target.value)}
         placeholder="Request notes, examples, reminders..."
-      />
+      />}
     </div>
   );
 }

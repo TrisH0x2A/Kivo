@@ -125,6 +125,7 @@ pub fn sanitize_request_for_export(
     sanitize_key_value_rows(&mut sanitized.body_rows, options);
     sanitized.body_file_path = sanitize_export_text(&sanitized.body_file_path, options);
     sanitized.docs = sanitize_export_text(&sanitized.docs, options);
+    sanitize_json_value(&mut sanitized.contract, options);
     sanitized.tags = sanitized
         .tags
         .iter()
