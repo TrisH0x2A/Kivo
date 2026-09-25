@@ -695,7 +695,7 @@ export function RequestPane({
       : isSocketIoRequest
         ? ["Params", "Body", "Events", "Auth", "Headers", "Docs"]
     : isGrpcRequest
-      ? [...(hasGrpcMethodSelected ? ["Body"] : []), "Headers", "Docs"]
+      ? [...(hasGrpcMethodSelected ? ["Body"] : []), "Headers", "Docs", "Settings"]
       : tabs;
   const activeTab = state.activeEditorTab ?? "Params";
   const bodyDisabled = !isWebSocketRequest && !isSocketIoRequest && !isGrpcRequest && (state.method === "GET" || state.method === "DELETE" || state.bodyType === "none");
@@ -1610,7 +1610,7 @@ export function RequestPane({
         ) : null}
 
         {activeTab === "Settings" ? (
-          isWebSocketRequest
+          isGrpcRequest ? <div className="p-4"><label className="grid max-w-xs gap-2 text-xs">Deadline (ms)<Input type="number" min="100" max="3600000" value={state.timeoutMs || 60000} onChange={(event) => onChange("timeoutMs", Math.min(3600000, Math.max(100, Number(event.target.value) || 60000)))} /></label></div> : isWebSocketRequest
             ? <WebSocketSettingsPanel state={state} onChange={onChange} />
             : isSseRequest
               ? <SseOptionsPanel state={state} onChange={onChange} />

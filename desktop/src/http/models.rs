@@ -168,11 +168,13 @@ pub struct FormBodyRowPayload {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GrpcRequestPayload {
+    #[serde(default)]
+    pub request_id: String,
+    #[serde(default)]
+    pub timeout_ms: Option<u64>,
     pub url: String,
     pub grpc_proto_file_path: String,
     pub grpc_method_path: String,
-    #[serde(default)]
-    pub grpc_streaming_mode: String,
     #[serde(default)]
     pub headers: HashMap<String, String>,
     #[serde(default)]

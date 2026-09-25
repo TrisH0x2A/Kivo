@@ -112,6 +112,18 @@ export function sendGrpcRequest(payload) {
   return invoke("send_grpc_request", { payload });
 }
 
+export function subscribeGrpc(handler) {
+  return listen("kivo:grpc", (event) => handler(event.payload));
+}
+
+export function sendGrpcMessage(requestId, body) {
+  return invoke("grpc_send_message", { requestId, body });
+}
+
+export function finishGrpcInput(requestId) {
+  return invoke("grpc_finish_input", { requestId });
+}
+
 export function reflectGrpcServer(payload) {
   return invoke("reflect_grpc_server", { payload });
 }

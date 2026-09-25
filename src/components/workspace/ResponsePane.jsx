@@ -12,6 +12,7 @@ import { getHeaderValue, getResponseDownloadName } from "@/lib/response-utils.js
 import { CookieManagerModal, parseSetCookieString } from "@/components/workspace/CookieManagerModal.jsx";
 
 import { JsonTree } from "@/components/ui/JsonTree.jsx";
+import { GrpcSessionControls } from "@/components/workspace/GrpcSessionControls.jsx";
 
 const responseTabs = ["Body", "Headers", "Cookies", "Meta"];
 const MAX_EDITOR_PREVIEW_CHARS = 1_000_000;
@@ -86,7 +87,15 @@ export function ResponsePane({
     if (!isJson || jsonTreeTooLarge) return null;
     try { return JSON.parse(response.body); } catch { return null; }
   }, [response.body, isJson, jsonTreeTooLarge]);
-  const grpcMessages = getHeaderValue(response.headers, "x-kivo-grpc-mode") === "server_stream" && Array.isArray(parsedJson) ? parsedJson : null;
+  const grpcMode = getHeaderValue(response.headers, "x-kivo-grpc-mode");
+  const grpcMessages = ["server_stream", "bidi"].includes(grpcMode) && Array.isArray(parsedJson) ? parsedJson : null;
+  const isGrpc = Boolean(grpcMode);
+  const tabs = isGrpc ? ["Body", "Headers", "Trailers", "Meta"] : responseTabs;
+  const liveGrpc = isSending && Boolean(response.meta?.requestId);
+  function metadataRows(kind) {
+    try { return JSON.parse(getHeaderValue(response.headers, `x-kivo-grpc-${kind}`) || "[]"); }
+    catch { return []; }
+  }
   const [messageLimit, setMessageLimit] = useState(50);
   useEffect(() => { setMessageLimit(50); }, [response.body]);
 
@@ -251,7 +260,7 @@ export function ResponsePane({
       <div className="kivo-editor-tabs border-b px-3 text-[12px]">
         <div className="flex flex-wrap items-center justify-between gap-x-2">
           <div className="thin-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto pr-1">
-            {responseTabs.map((tab) => (
+            {tabs.map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -293,6 +302,8 @@ export function ResponsePane({
         </div>
       </div>
 
+      {liveGrpc && <GrpcSessionControls requestId={response.meta.requestId} inputOpen={response.meta.inputOpen} onCancel={onCancelSend} />}
+      {Number(response.headers?.["x-kivo-grpc-dropped"]) > 0 && <p className="px-3 py-2 text-xs text-muted-foreground" role="status">Older messages omitted from the bounded preview: {response.headers["x-kivo-grpc-dropped"]}</p>}
       <div className="relative min-h-0 flex-1 overflow-hidden p-3">
         {activeTab === "Body" ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
@@ -400,7 +411,13 @@ export function ResponsePane({
           </div>
         ) : null}
 
-        {activeTab === "Headers" ? (
+        {isGrpc && ["Headers", "Trailers"].includes(activeTab) ? (
+          <div className="thin-scrollbar h-full overflow-auto text-xs" aria-label={`gRPC ${activeTab.toLowerCase()}`}>
+            {metadataRows(activeTab.toLowerCase()).map((row, index) => <div key={index} className="grid grid-cols-[minmax(100px,1fr)_minmax(0,2fr)] gap-4 border-b border-border/30 px-2 py-3"><span className="break-all text-muted-foreground">{row.key}</span><span className="break-all font-mono">{row.value}</span></div>)}
+            {metadataRows(activeTab.toLowerCase()).length === 0 && <p className="p-3 text-muted-foreground">No {activeTab.toLowerCase()} received</p>}
+          </div>
+        ) : null}
+        {activeTab === "Headers" && !isGrpc ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
             <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Headers</div>
             <div className="thin-scrollbar min-h-0 overflow-auto bg-transparent">
@@ -473,7 +490,7 @@ export function ResponsePane({
           </div>
         ) : null}
 
-        {isSending ? (
+        {isSending && !liveGrpc ? (
           <div className="absolute inset-0 z-30 flex items-center justify-center backdrop-blur-md">
             <div className="flex flex-col items-center gap-3 text-center">
               <LoaderCircle className="h-7 w-7 animate-spin text-primary" />

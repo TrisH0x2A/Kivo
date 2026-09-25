@@ -17,6 +17,7 @@ import {
   saveAppState,
   saveCollectionConfig,
   sendGrpcRequest,
+  subscribeGrpc,
   sendHttpRequest,
   subscribeRealtime,
 } from "@/lib/http-client.js";
@@ -43,6 +44,7 @@ import { normalizeAuthState } from "@/lib/oauth.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
 import { redactHistoryUrl } from "@/lib/history-utils.js";
 import { loadWorkspaceStartup } from "@/lib/workspace-startup.js";
+import { applyGrpcEvent, createGrpcCapture, grpcCaptureBody } from "@/lib/grpc-session.js";
 
 const SIDEBAR_COLLAPSED_WIDTH = 52;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -2407,9 +2409,33 @@ export function useWorkspaceStore() {
       setIsSending(true);
       setSendStartedAt(Date.now());
 
+      const origin = [activeWorkspace?.name ?? "", activeCollection?.name ?? "", activeRequest.name];
+      const capture = createGrpcCapture();
+      let unlisten;
+      let publishTimer;
+      const publish = () => {
+        publishTimer = null;
+        if (activeHttpRequestIdRef.current !== requestId) return;
+        const body = grpcCaptureBody(capture);
+        updateStore((current) => updateRequestWithLocalResponseByIdentity(current, ...origin, {
+          status: 0, badge: "Streaming", statusText: "Streaming", duration: "Live", size: `${capture.chars} B JSON`,
+          headers: { ...capture.headers, "x-kivo-grpc-dropped": String(capture.dropped) }, cookies: [],
+          body, rawBody: body, isJson: true,
+          meta: { url: resolvedUrl, method: activeRequest.grpcMethodPath, requestId, inputOpen: capture.inputOpen },
+          savedAt: formatSavedAt(),
+        }, ["server_stream", "bidi"].includes(capture.mode) ? "Messages" : "JSON"));
+      };
+
       try {
+        unlisten = await subscribeGrpc((event) => {
+          if (event.requestId !== requestId || activeHttpRequestIdRef.current !== requestId) return;
+          applyGrpcEvent(capture, event);
+          if (!publishTimer) publishTimer = setTimeout(publish, 80);
+        });
+        if (activeHttpRequestIdRef.current !== requestId) return;
         const result = await sendGrpcRequest({
           requestId,
+          timeoutMs: activeRequest.timeoutMs || 60000,
           url: resolvedUrl,
           grpcProtoFilePath: activeRequest.grpcProtoFilePath,
           grpcMethodPath: activeRequest.grpcMethodPath,
@@ -2433,8 +2459,8 @@ export function useWorkspaceStore() {
         const statusText = String(result?.statusText || "OK");
         const savedResponse = {
           status: statusCode,
-          badge: `${statusCode} ${statusText}`,
-          statusText: `${statusCode} ${statusText}`,
+          badge: statusText,
+          statusText,
           duration: `${Number(result?.durationMs || 0)} ms`,
           size: `${bodySize} B`,
           headers: result?.headers || {},
@@ -2449,30 +2475,9 @@ export function useWorkspaceStore() {
           savedAt
         };
 
-        updateStore((current) => ({
-          ...current,
-          workspaces: current.workspaces.map((workspace) => {
-            if (workspace.name !== current.activeWorkspaceName) return workspace;
-            return {
-              ...workspace,
-              collections: workspace.collections.map((collection) => {
-                if (collection.name !== current.activeCollectionName) return collection;
-                return {
-                  ...collection,
-                  requests: collection.requests.map((request) =>
-                    request.name === activeRequest.name
-                      ? {
-                        ...request,
-                        responseBodyView: responseIsJson ? "JSON" : "Raw",
-                        lastResponse: savedResponse
-                      }
-                      : request
-                  )
-                };
-              })
-            };
-          })
-        }));
+        clearTimeout(publishTimer);
+        updateStore((current) => updateRequestWithLocalResponseByIdentity(current, ...origin, savedResponse,
+          ["server_stream", "bidi"].includes(result.headers?.["x-kivo-grpc-mode"]) ? "Messages" : "JSON"));
         recordRequestHistory({
           request: activeRequest,
           workspaceName: activeWorkspace?.name ?? "",
@@ -2487,7 +2492,7 @@ export function useWorkspaceStore() {
 
         const message = buildFriendlyRequestErrorMessage(error, "gRPC request failed");
         const savedAt = formatSavedAt();
-        updateStore((current) => updateRequestWithLocalResponse(current, activeRequest.name, {
+        updateStore((current) => updateRequestWithLocalResponseByIdentity(current, ...origin, {
           status: 500,
           badge: "Failed",
           statusText: "Request failed",
@@ -2518,6 +2523,8 @@ export function useWorkspaceStore() {
           error: message,
         });
       } finally {
+        clearTimeout(publishTimer);
+        unlisten?.();
         if (activeHttpRequestIdRef.current === requestId) {
           activeHttpRequestIdRef.current = "";
           setIsSending(false);

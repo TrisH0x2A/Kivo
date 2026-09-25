@@ -45,6 +45,9 @@ const DIGEST_NONCE_COUNT: &str = "00000001";
 #[path = "client_tests.rs"]
 mod tests;
 
+#[path = "grpc.rs"]
+pub mod grpc;
+
 #[derive(Clone)]
 struct DynamicCodec {
     input: prost_reflect::MessageDescriptor,
@@ -1666,163 +1669,7 @@ pub async fn send_grpc_request(
     app: AppHandle,
     payload: GrpcRequestPayload,
 ) -> Result<ResponsePayload, String> {
-    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name)?;
-
-    let target = normalize_grpc_target(&resolve_payload_value(&payload.url, &env_vars))?;
-    let proto_path = resolve_payload_value(&payload.grpc_proto_file_path, &env_vars);
-    let (requested_service, requested_method) = parse_grpc_method_parts(&payload.grpc_method_path)?;
-    let streaming_mode = payload.grpc_streaming_mode.trim().to_string();
-
-    if streaming_mode == "client_stream" || streaming_mode == "bidi" {
-        return Err("Client streaming and bidirectional streaming are not supported yet.".to_string());
-    }
-
-    let descriptor_pool = compile_descriptor_pool(&proto_path)?;
-    let method_descriptor = find_grpc_method_descriptor(&descriptor_pool, &requested_service, &requested_method)
-        .ok_or_else(|| {
-            format!(
-                "Method {}/{} was not found in selected proto descriptors.",
-                requested_service, requested_method
-            )
-        })?;
-
-    let path = format!(
-        "/{}/{}",
-        method_descriptor.parent_service().full_name(),
-        method_descriptor.name()
-    );
-    let path_and_query = tonic::codegen::http::uri::PathAndQuery::from_str(&path)
-        .map_err(|err| format!("Invalid gRPC method path: {err}"))?;
-
-    let mut endpoint = Endpoint::from_shared(target.clone())
-        .map_err(|err| format!("Invalid gRPC endpoint: {err}"))?;
-    endpoint = endpoint
-        .user_agent(DEFAULT_USER_AGENT)
-        .map_err(|err| format!("Failed to set gRPC user-agent: {err}"))?;
-    endpoint = endpoint.connect_timeout(Duration::from_secs(10));
-    endpoint = endpoint.timeout(Duration::from_secs(45));
-
-    let channel = endpoint
-        .connect()
-        .await
-        .map_err(|err| format!("Failed to connect to gRPC server: {err}"))?;
-
-    let request_body = payload
-        .body
-        .as_ref()
-        .map(|body| resolve_payload_value(body, &env_vars));
-    let request_message = build_dynamic_request_message(method_descriptor.input(), request_body.as_deref())?;
-
-    let mut request = Request::new(request_message);
-    for (key, value) in &payload.headers {
-        let normalized_key = resolve_payload_value(key, &env_vars);
-        let normalized_value = resolve_payload_value(value, &env_vars);
-        if normalized_key.trim().is_empty() {
-            continue;
-        }
-        let lower = normalized_key.to_ascii_lowercase();
-        if lower == "content-type" || lower == "te" || lower == "host" {
-            continue;
-        }
-
-        if let Ok(metadata_key) = tonic::metadata::MetadataKey::from_bytes(lower.as_bytes()) {
-            if let Ok(metadata_value) = tonic::metadata::MetadataValue::try_from(normalized_value.as_str()) {
-                request.metadata_mut().insert(metadata_key, metadata_value);
-            }
-        }
-    }
-
-    let started_at = Instant::now();
-    let mut grpc = tonic::client::Grpc::new(channel);
-    let codec = DynamicCodec::new(method_descriptor.input(), method_descriptor.output());
-
-    timeout(Duration::from_secs(10), grpc.ready())
-        .await
-        .map_err(|_| "gRPC client timed out while waiting to become ready.".to_string())?
-        .map_err(|err| format!("gRPC client not ready: {err}"))?;
-
-    let (body, headers, status_code, status_text) = if method_descriptor.is_server_streaming() {
-        let response = timeout(
-            Duration::from_secs(20),
-            grpc.server_streaming(request, path_and_query, codec),
-        )
-        .await
-        .map_err(|_| "gRPC request timed out while starting server stream.".to_string())?
-        .map_err(|status| {
-            format!(
-                "gRPC request failed ({}): {}",
-                status.code(),
-                status.message()
-            )
-        })?;
-
-        let mut stream = response.into_inner();
-        let mut values = Vec::new();
-        loop {
-            let next_item = timeout(Duration::from_secs(20), stream.message())
-                .await
-                .map_err(|_| "Timed out while waiting for gRPC stream message.".to_string())?
-                .map_err(|status| {
-                    format!(
-                        "Failed while reading gRPC stream ({}): {}",
-                        status.code(),
-                        status.message()
-                    )
-                })?;
-
-            let Some(message) = next_item else {
-                break;
-            };
-
-            values.push(
-                serde_json::to_value(&message)
-                    .map_err(|err| format!("Failed to encode stream message as JSON: {err}"))?,
-            );
-        }
-
-        let stream_body = serde_json::to_string_pretty(&values)
-            .map_err(|err| format!("Failed to serialize gRPC stream response: {err}"))?;
-        let mut response_headers = HashMap::new();
-        response_headers.insert("content-type".to_string(), "application/json".to_string());
-        response_headers.insert("x-kivo-grpc-mode".to_string(), "server_stream".to_string());
-
-        (stream_body, response_headers, 200, "OK".to_string())
-    } else {
-        let response = timeout(Duration::from_secs(20), grpc.unary(request, path_and_query, codec))
-            .await
-            .map_err(|_| "gRPC unary request timed out.".to_string())?
-            .map_err(|status| {
-                format!(
-                    "gRPC request failed ({}): {}",
-                    status.code(),
-                    status.message()
-                )
-            })?;
-
-        let message = response.into_inner();
-        let value = serde_json::to_value(&message)
-            .map_err(|err| format!("Failed to encode gRPC response as JSON: {err}"))?;
-        let unary_body = serde_json::to_string_pretty(&value)
-            .map_err(|err| format!("Failed to serialize gRPC response: {err}"))?;
-
-        let mut response_headers = HashMap::new();
-        response_headers.insert("content-type".to_string(), "application/json".to_string());
-        response_headers.insert("x-kivo-grpc-mode".to_string(), "unary".to_string());
-
-        (unary_body, response_headers, 200, "OK".to_string())
-    };
-
-    Ok(ResponsePayload {
-        status: status_code,
-        status_text,
-        headers,
-        cookies: vec![],
-        body,
-        body_base64: String::new(),
-        is_binary: false,
-        content_type: "application/json".to_string(),
-        duration_ms: started_at.elapsed().as_millis(),
-    })
+    grpc::run(app, payload).await
 }
 
 fn get_expiry_iso(expires_in: Option<u64>) -> String {
