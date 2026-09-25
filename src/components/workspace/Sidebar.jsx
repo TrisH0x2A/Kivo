@@ -1,6 +1,6 @@
 import { useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, ChevronRight, Code2, Copy, Folder, FolderKanban, FolderPlus, Layers, MoreVertical, Pencil, Pin, Plus, Search, Settings, SquareKanban, Trash2, X } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, ChevronDown, ChevronRight, Code2, Copy, Folder, FolderKanban, FolderPlus, Layers, MoreVertical, Pencil, Pin, Plus, Search, Settings, SquareKanban, Trash2, X } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save } from "@tauri-apps/plugin-dialog";
 
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input.jsx";
 import { EnvHighlightInput } from "@/components/ui/EnvHighlightInput.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { exportCollectionFile, exportRequestFile, getCollectionConfig, getEnvVars, importCollectionFile, importRequestFile } from "@/lib/http-client.js";
+import { getImportPreview } from "@/lib/import-preview.js";
 import { buildCurlCommand, codegenLanguageOptions, generateCodeSnippet, getMethodTone, parseCurlCommand } from "@/lib/http-ui.js";
 import { createDefaultAuthState, normalizeAuthState } from "@/lib/oauth.js";
 import { cn } from "@/lib/utils.js";
@@ -135,10 +136,13 @@ function buildCollectionExportExclusionNotice(collection) {
   return `This collection contains unsupported request types: ${modeParts.join(", ")}. ${totalExcluded} ${requestWord} will be excluded from export.`;
 }
 
-function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileName, collectionExportNotice, onClose, onConfirm }) {
+function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileName, collectionExportNotice, onPreview, onClose, onConfirm }) {
   const [filePath, setFilePath] = useState("");
   const [format, setFormat] = useState("postman");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [importPreview, setImportPreview] = useState(null);
+  const [previewError, setPreviewError] = useState("");
   const [isFormatMenuOpen, setIsFormatMenuOpen] = useState(false);
   const [exportEnvMode, setExportEnvMode] = useState("exclude");
   const formatMenuRef = useRef(null);
@@ -148,6 +152,9 @@ function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileN
     setFilePath("");
     setFormat("postman");
     setIsSubmitting(false);
+    setIsPreviewing(false);
+    setImportPreview(null);
+    setPreviewError("");
     setIsFormatMenuOpen(false);
     setExportEnvMode("exclude");
   }, [isOpen]);
@@ -193,6 +200,8 @@ function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileN
       });
       if (typeof selected === "string") {
         setFilePath(selected);
+        setImportPreview(null);
+        setPreviewError("");
       }
       return;
     }
@@ -207,6 +216,21 @@ function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileN
     }
   }
 
+  async function handlePreview() {
+    if (!filePath.trim() || !onPreview) return;
+    setIsPreviewing(true);
+    setPreviewError("");
+    try {
+      const imported = await onPreview({ filePath: filePath.trim(), scope });
+      setImportPreview(imported);
+    } catch (error) {
+      setImportPreview(null);
+      setPreviewError(error instanceof Error ? error.message : "Unable to analyze this file.");
+    } finally {
+      setIsPreviewing(false);
+    }
+  }
+
   async function handleSubmit() {
     if (!filePath.trim()) return;
     setIsSubmitting(true);
@@ -214,6 +238,7 @@ function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileN
       await onConfirm({
         filePath,
         format,
+        imported: importPreview,
         excludeEnvContainedFields: exportEnvMode === "exclude",
         replaceEnvVarsWithValues: exportEnvMode === "replace",
       });
@@ -323,7 +348,11 @@ function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileN
           <div className="flex gap-2">
             <Input
               value={filePath}
-              onChange={(event) => setFilePath(event.target.value)}
+              onChange={(event) => {
+                setFilePath(event.target.value);
+                setImportPreview(null);
+                setPreviewError("");
+              }}
               placeholder={mode === "import" ? "Choose a JSON/YAML file" : "Choose output file path"}
               className="h-10"
             />
@@ -345,11 +374,30 @@ function ImportExportModal({ open: isOpen, mode, scope, targetName, defaultFileN
           </div>
         ) : null}
 
+        {mode === "import" && importPreview ? (() => {
+          const summary = getImportPreview(importPreview, scope);
+          return <div className="mb-4 border border-border/50 bg-background/35 p-3">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-foreground">
+                  <span>{summary.name}</span>
+                  <span className="border border-border/50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{summary.format}</span>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground">{summary.requestCount} request{summary.requestCount === 1 ? "" : "s"}{scope === "collection" ? ` · ${summary.folderCount} folder${summary.folderCount === 1 ? "" : "s"}` : " will be added"}.</p>
+              </div>
+            </div>
+            {summary.warnings.length > 0 ? <div className="mt-3 grid gap-1.5 border-t border-border/35 pt-3 text-[11px] text-amber-200/80">
+              {summary.warnings.map((warning) => <div key={warning} className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-300" /><span>{warning}</span></div>)}
+            </div> : <p className="mt-3 border-t border-border/35 pt-3 text-[11px] text-emerald-300/80">No compatibility warnings detected.</p>}
+          </div>;
+        })() : null}
+
+        {previewError ? <div role="alert" className="mb-4 border border-red-400/30 bg-red-400/10 px-3 py-2 text-[11px] text-red-200">{previewError}</div> : null}
+
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" type="button" className="h-9" onClick={onClose}>Cancel</Button>
-          <Button type="button" className="h-9" onClick={handleSubmit} disabled={isSubmitting || !filePath.trim()}>
-            {isSubmitting ? "Processing..." : `${modeLabel} ${scopeLabel}`}
-          </Button>
+          {mode === "import" && !importPreview ? <Button type="button" className="h-9" onClick={handlePreview} disabled={isPreviewing || !filePath.trim()}>{isPreviewing ? "Analyzing..." : "Review import"}</Button> : <Button type="button" className="h-9" onClick={handleSubmit} disabled={isSubmitting || !filePath.trim() || (mode === "import" && !importPreview)}>{isSubmitting ? "Processing..." : `${modeLabel} ${scopeLabel}`}</Button>}
         </div>
       </Card>
     </div>,
@@ -1588,12 +1636,19 @@ export function RequestsView({
     setImportExportState({ mode: "export", scope: "request", workspaceName, collectionName, requestName, targetFolderPath: "" });
   }
 
+  async function handlePreviewImportExport(payload) {
+    if (payload?.scope === "collection") {
+      return importCollectionFile(payload.filePath);
+    }
+    return importRequestFile(payload.filePath);
+  }
+
   async function handleSubmitImportExport(payload) {
     if (!importExportState) return;
     const { mode, scope, workspaceName, collectionName, requestName, targetFolderPath } = importExportState;
 
     if (mode === "import" && scope === "collection") {
-      const imported = await importCollectionFile(payload.filePath);
+      const imported = payload.imported || await importCollectionFile(payload.filePath);
       onImportCollection(workspaceName, imported.collection);
       setFeedbackMessage(`Imported collection (${imported.detectedFormat || "auto"}).`);
       setTimeout(() => setFeedbackMessage(""), 2200);
@@ -1601,7 +1656,7 @@ export function RequestsView({
     }
 
     if (mode === "import" && scope === "request") {
-      const imported = await importRequestFile(payload.filePath);
+      const imported = payload.imported || await importRequestFile(payload.filePath);
       onImportRequests(workspaceName, collectionName, imported.requests || [], targetFolderPath);
       setFeedbackMessage(`Imported ${(imported.requests || []).length} request(s).`);
       setTimeout(() => setFeedbackMessage(""), 2200);
@@ -2377,6 +2432,7 @@ export function RequestsView({
             : importExportState?.collectionName || "collection"
         }
         onClose={() => setImportExportState(null)}
+        onPreview={handlePreviewImportExport}
         onConfirm={handleSubmitImportExport}
       />
       <RequestTypeMenu
