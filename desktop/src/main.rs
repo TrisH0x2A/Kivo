@@ -20,7 +20,7 @@ use http::realtime::{
 use storage::{
     create_workspace_environment_cmd,
     delete_workspace_environment_cmd,
-    export_collection_file, export_request_file, export_response_file,
+    export_collection_file, export_request_file, export_response_file, export_reproduction_bundle,
     get_app_config, get_app_settings, get_default_storage_path, get_env_vars,
     get_or_create_auth_secret_seed,
     get_workspace_environments_cmd,
@@ -81,6 +81,7 @@ fn main() {
             export_collection_file,
             export_request_file,
             export_response_file,
+            export_reproduction_bundle,
             run_load_test,
             cancel_load_test,
             start_mock_server,

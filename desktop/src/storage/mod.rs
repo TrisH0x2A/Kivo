@@ -836,6 +836,14 @@ pub fn export_response_file(file_path: String, response: serde_json::Value) -> R
 }
 
 #[tauri::command]
+pub fn export_reproduction_bundle(file_path: String, bundle: serde_json::Value) -> Result<(), String> {
+    let content = serde_json::to_string_pretty(&bundle)
+        .map_err(|e| format!("Failed to serialize reproduction bundle: {e}"))?;
+    fs::write(&file_path, content)
+        .map_err(|e| format!("Failed to write reproduction bundle: {e}"))
+}
+
+#[tauri::command]
 pub fn save_collection_config(
     app: AppHandle,
     workspace_name: String,

@@ -565,6 +565,10 @@ export function exportResponseFile(filePath, response) {
   });
 }
 
+export function exportReproductionBundle(filePath, bundle) {
+  return invoke("export_reproduction_bundle", { filePath, bundle });
+}
+
 const REALTIME_EVENT_CHANNEL = "realtime:event";
 const realtimeListenersByStream = new Map();
 const realtimePendingEventsByStream = new Map();

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Braces, Eye, EyeOff, FileCode2, FilePlus2, FileText, Folder, FolderPlus, GitCompareArrows, RefreshCw, SendHorizontal, Trash2, TriangleAlert, Wand2, X } from "lucide-react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 
 import { CodeEditor } from "@/components/workspace/CodeEditor.jsx";
 import { RequestExplainModal } from "@/components/workspace/RequestExplainModal.jsx";
@@ -13,10 +13,11 @@ import { Input } from "@/components/ui/input.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { formatJsonText } from "@/lib/formatters.js";
 import { buildUrlWithParams, getMethodTone, requestBodyModes } from "@/lib/http-ui.js";
-import { getCollectionConfig, getEnvVars, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
+import { exportReproductionBundle, getCollectionConfig, getEnvVars, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
 import { buildRequestExplanation } from "@/lib/request-explanation.js";
 import { buildComparisonRequestPayload } from "@/lib/request-compare.js";
 import { compareResponses } from "@/lib/response-diff.js";
+import { buildReproductionBundle } from "@/lib/reproduction-bundle.js";
 import { isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
@@ -663,6 +664,7 @@ export function RequestPane({
   const [requestExplanation, setRequestExplanation] = useState(null);
   const [isExplaining, setIsExplaining] = useState(false);
   const [explainError, setExplainError] = useState("");
+  const [exportingBundle, setExportingBundle] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
   const [compareEnvironments, setCompareEnvironments] = useState([]);
   const [compareLoading, setCompareLoading] = useState(false);
@@ -1050,6 +1052,31 @@ export function RequestPane({
       setCompareError(error instanceof Error ? error.message : "Unable to load workspace environments.");
     } finally {
       setCompareLoading(false);
+    }
+  }
+
+  async function handleExportBundle() {
+    if (!requestExplanation) return;
+    setExportingBundle(true);
+    setExplainError("");
+    try {
+      const filePath = await save({
+        defaultPath: `${String(state.name || "request").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-reproduction.json`,
+        filters: [{ name: "Kivo reproduction bundle", extensions: ["json"] }],
+      });
+      if (typeof filePath !== "string") return;
+      await exportReproductionBundle(filePath, buildReproductionBundle({
+        request: state,
+        response,
+        explanation: requestExplanation,
+        envVars,
+        workspaceName,
+        collectionName,
+      }));
+    } catch (error) {
+      setExplainError(`Unable to export bundle: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setExportingBundle(false);
     }
   }
 
@@ -1764,6 +1791,8 @@ export function RequestPane({
         explanation={requestExplanation}
         loading={isExplaining}
         error={explainError}
+        exporting={exportingBundle}
+        onExport={handleExportBundle}
         onClose={() => {
           setRequestExplanation(null);
           setExplainError("");
