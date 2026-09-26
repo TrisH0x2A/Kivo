@@ -2,6 +2,7 @@ import { RequestPane } from "@/components/workspace/RequestPane.jsx";
 import { ResponsePane } from "@/components/workspace/ResponsePane.jsx";
 import { StreamResponsePanel } from "@/components/workspace/StreamResponsePanel.jsx";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
+import { appendRegressionScript } from "@/lib/response-regression.js";
 
 const STREAM_MODE_BY_REQUEST = {
   [REQUEST_MODES.WEBSOCKET]: "websocket",
@@ -76,7 +77,10 @@ export function WorkspaceView({
         />
       ) : (
         <ResponsePane
+          key={`${workspaceName}:${collectionName}:${request.name}`}
           response={response}
+          regressionScript={request.scriptAfterResponse || ""}
+          onAddRegression={(script) => onUpdateActiveRequest((current) => ({ ...current, scriptAfterResponse: appendRegressionScript(current.scriptAfterResponse, script), activeEditorTab: "Scripts", scriptActivePhase: "after-response" }))}
           isSending={isSending}
           sendStartedAt={sendStartedAt}
           onCancelSend={onCancelSend}

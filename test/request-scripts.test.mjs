@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { Worker as NodeWorker } from "node:worker_threads";
 import { resolveObjectURL } from "node:buffer";
 import { createServer } from "vite";
+import { buildRegressionScript } from "../src/lib/response-regression.js";
 
 let server;
 let runRequestScript;
@@ -63,4 +64,18 @@ test("unsafe eval remains rejected before execution", async () => {
   const result = await runRequestScript({ script: 'eval("1")' });
   assert.equal(result.ok, false);
   assert.match(result.error, /Blocked unsafe script token: eval/);
+});
+
+test("generated regression assertions pass baseline and fail changed responses in the real worker", async () => {
+  const response = { status: 200, rawBody: '{"location":"document","count":3}', headers: { "Content-Type": "application/json; charset=utf-8" } };
+  const script = buildRegressionScript(response, { fields: [
+    { id: '["location"]', mode: "value" },
+    { id: '["count"]', mode: "range", min: 1, max: 5 },
+  ] });
+  const baseline = await runRequestScript({ phase: "after-response", response, script });
+  assert.equal(baseline.ok, true, baseline.error);
+  assert.deepEqual(baseline.tests.map((entry) => entry.ok), [true, true, true, true]);
+  const changed = await runRequestScript({ phase: "after-response", response: { status: 500, rawBody: '{"location":"changed","count":10}', headers: {} }, script });
+  assert.equal(changed.ok, true, changed.error);
+  assert.deepEqual(changed.tests.map((entry) => entry.ok), [false, false, false, false]);
 });
