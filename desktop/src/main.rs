@@ -4,6 +4,7 @@ mod http;
 mod storage;
 
 use http::client::grpc::{grpc_send_message, grpc_finish_input, inspect_grpc_method};
+use http::client::diagnostics::diagnose_connection;
 
 use http::client::{
     cancel_http_request, cancel_oauth_exchange, clear_cookie_jar, delete_cookie_jar_entry,
@@ -39,6 +40,7 @@ fn main() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             send_http_request,
+            diagnose_connection,
             send_grpc_request,
             grpc_send_message,
             grpc_finish_input,

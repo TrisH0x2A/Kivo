@@ -48,6 +48,9 @@ mod tests;
 #[path = "grpc.rs"]
 pub mod grpc;
 
+#[path = "diagnostics.rs"]
+pub mod diagnostics;
+
 #[derive(Clone)]
 struct DynamicCodec {
     input: prost_reflect::MessageDescriptor,

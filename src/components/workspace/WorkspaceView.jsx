@@ -80,6 +80,7 @@ export function WorkspaceView({
           key={`${workspaceName}:${collectionName}:${request.name}`}
           response={response}
           regressionScript={request.scriptAfterResponse || ""}
+          request={request}
           onAddRegression={(script) => onUpdateActiveRequest((current) => ({ ...current, scriptAfterResponse: appendRegressionScript(current.scriptAfterResponse, script), activeEditorTab: "Scripts", scriptActivePhase: "after-response" }))}
           isSending={isSending}
           sendStartedAt={sendStartedAt}

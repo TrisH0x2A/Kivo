@@ -569,6 +569,10 @@ export function exportReproductionBundle(filePath, bundle) {
   return invoke("export_reproduction_bundle", { filePath, bundle });
 }
 
+export function diagnoseConnection(payload) {
+  return invoke("diagnose_connection", { payload });
+}
+
 const REALTIME_EVENT_CHANNEL = "realtime:event";
 const realtimeListenersByStream = new Map();
 const realtimePendingEventsByStream = new Map();

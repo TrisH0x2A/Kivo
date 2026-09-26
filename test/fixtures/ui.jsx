@@ -47,6 +47,17 @@ window.__TAURI_INTERNALS__ = {
       case "get_workspace_environments_cmd": return { activeEnvironmentId, environments };
       case "set_active_workspace_environment_cmd": activeEnvironmentId = args.environmentId; return { activeEnvironmentId, environments };
       case "get_cookie_jar": return [];
+      case "diagnose_connection": {
+        const failed = args.payload.url.includes("offline.invalid");
+        return { target: new URL(args.payload.url).origin, steps: [
+          { stage: "Proxy", status: "info", durationMs: null, detail: "Synthetic fixture: direct connection.", hint: "" },
+          { stage: "DNS", status: failed ? "failed" : "passed", durationMs: 4, detail: failed ? "Synthetic DNS lookup failure." : "2 addresses resolved.", hint: failed ? "Check the hostname, selected environment, VPN and DNS resolver." : "" },
+          { stage: "TCP", status: failed ? "skipped" : "passed", durationMs: failed ? null : 12, detail: failed ? "DNS lookup failed." : "Connected to port 443.", hint: "" },
+          { stage: "TLS", status: failed ? "skipped" : "passed", durationMs: failed ? null : 18, detail: failed ? "TCP connection unavailable." : "Synthetic TLS validation succeeded.", hint: "" },
+          { stage: "Application", status: failed ? "failed" : "passed", durationMs: failed ? 5 : 42, detail: failed ? "Synthetic HEAD failure." : "HEAD returned HTTP 200.", hint: "This is a synthetic UI fixture result." },
+          { stage: "Redirect", status: failed ? "skipped" : "passed", durationMs: null, detail: failed ? "No HTTP response was received." : "No redirect returned by HEAD.", hint: "" },
+        ] };
+      }
       case "plugin:event|listen": return ++callbackId;
       case "plugin:event|unlisten": return;
       case "plugin:app|version": return "0.4.1";

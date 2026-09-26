@@ -1,4 +1,4 @@
-import { BadgeCheck, Clock3, Cookie, Copy, Download, FileJson2, FlaskConical, ListTree, LoaderCircle, Search, Trash2, X } from "lucide-react";
+import { Activity, BadgeCheck, Clock3, Cookie, Copy, Download, FileJson2, FlaskConical, ListTree, LoaderCircle, Search, Trash2, X } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 
@@ -14,6 +14,7 @@ import { CookieManagerModal, parseSetCookieString } from "@/components/workspace
 import { JsonTree } from "@/components/ui/JsonTree.jsx";
 import { GrpcSessionControls } from "@/components/workspace/GrpcSessionControls.jsx";
 import { ResponseRegressionDialog } from "@/components/workspace/ResponseRegressionDialog.jsx";
+import { ConnectionDiagnosticsDialog } from "@/components/workspace/ConnectionDiagnosticsDialog.jsx";
 
 const responseTabs = ["Body", "Headers", "Cookies", "Meta"];
 const MAX_EDITOR_PREVIEW_CHARS = 1_000_000;
@@ -76,6 +77,7 @@ export function ResponsePane({
   onClearResponse,
   regressionScript = "",
   onAddRegression,
+  request,
 }) {
   const tone = getTone(response.status);
 
@@ -120,6 +122,7 @@ export function ResponsePane({
   const [elapsedMs, setElapsedMs] = useState(0);
   const [isManageOpen, setIsManageOpen] = useState(false);
   const [regressionOpen, setRegressionOpen] = useState(false);
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
   useEffect(() => {
     if (!isSending || !sendStartedAt) {
@@ -241,6 +244,7 @@ export function ResponsePane({
   return (
     <Card role="region" aria-label="Response inspector" className="kivo-response-pane flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
       {regressionOpen && <ResponseRegressionDialog response={response} existingScript={regressionScript} onClose={() => setRegressionOpen(false)} onAdd={(script) => { onAddRegression(script); setRegressionOpen(false); }} />}
+      {diagnosticsOpen && <ConnectionDiagnosticsDialog request={request} workspaceName={workspaceName} collectionName={collectionName} onClose={() => setDiagnosticsOpen(false)} />}
       <div className="kivo-response-metrics flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-[12px] text-muted-foreground">
         <div className="order-2 flex items-center gap-3 font-mono">
           <div className="flex items-center gap-1.5">
@@ -279,6 +283,7 @@ export function ResponsePane({
             ))}
           </div>
           <div className="ml-1 flex shrink-0 items-center gap-0.5 text-muted-foreground">
+            {request && ["http", "graphql"].includes(request.requestMode || "http") && <button type="button" title="Diagnose connection" aria-label="Diagnose connection" disabled={isSending} onClick={() => setDiagnosticsOpen(true)} className="inline-flex h-7 w-7 items-center justify-center transition-colors hover:text-foreground disabled:opacity-40"><Activity className="h-3.5 w-3.5" /></button>}
             {onAddRegression && <button type="button" title="Create regression tests" aria-label="Create regression tests" disabled={isSending || response.status <= 0 || response.badge === "Failed"} onClick={() => setRegressionOpen(true)} className="inline-flex h-7 w-7 items-center justify-center transition-colors hover:text-foreground disabled:opacity-40"><FlaskConical className="h-3.5 w-3.5" /></button>}
             <button
               type="button"
