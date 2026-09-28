@@ -2045,7 +2045,7 @@ export function RequestsView({
                       onContextMenu={(e) => openCollectionContextMenu(e, effectiveWorkspaceName, col.name)}
                       data-active={isActive}
                       className={cn(
-                        "kivo-nav-item relative group flex min-h-[32px] items-center gap-1.5 px-1.5 py-1 pr-[84px] transition-colors cursor-pointer select-none",
+                        "kivo-nav-item kivo-collection-row relative group flex min-h-[32px] items-center gap-1.5 px-1.5 py-1 transition-colors cursor-pointer select-none",
                         isActive ? "bg-primary/10 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.16)]" : "text-foreground/80 hover:bg-accent/20"
                       )}
                     >
@@ -2057,15 +2057,17 @@ export function RequestsView({
                             c.includes(col.name) ? c.filter((n) => n !== col.name) : [...c, col.name]
                           );
                         }}
-                        className="text-muted-foreground hover:text-foreground p-0.5"
+                        className="shrink-0 text-muted-foreground hover:text-foreground p-0.5"
+                        aria-label={`${isColExpanded ? "Collapse" : "Expand"} ${col.name}`}
+                        aria-expanded={isColExpanded}
                       >
                         {isColExpanded ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                       </button>
                       <Folder className="h-3.5 w-3.5 shrink-0 text-primary/80" aria-hidden="true" />
-                      <div className="truncate text-[12.5px] font-medium flex-1 text-left">
+                      <div className="min-w-0 truncate text-[12.5px] font-medium flex-1 text-left" title={col.name}>
                         {col.name}
                       </div>
-                      <span className="kivo-collection-count text-[10px] font-mono text-muted-foreground">{col.requests.length}</span>
+                      <span className="kivo-collection-count shrink-0 text-[10px] font-mono text-muted-foreground">{col.requests.length}</span>
                       <div className="kivo-sidebar-actions kivo-collection-actions" onClick={(e) => e.stopPropagation()}>
                         <button
                           type="button"

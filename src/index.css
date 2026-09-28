@@ -2061,6 +2061,12 @@
     transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease;
   }
   .kivo-collection-actions { position: absolute; right: 4px; }
+  .kivo-collection-row:hover,
+  .kivo-collection-row:focus-within { padding-right: 84px; }
+  @media (hover: none) {
+    .kivo-collection-row { padding-right: 84px; }
+    .kivo-collection-row > .kivo-collection-actions { opacity: 1; pointer-events: auto; transform: none; }
+  }
   .group:hover > .kivo-sidebar-actions,
   .group:focus-within > .kivo-sidebar-actions,
   .kivo-sidebar-actions:focus-within {
