@@ -836,6 +836,14 @@ pub fn export_response_file(file_path: String, response: serde_json::Value) -> R
 }
 
 #[tauri::command]
+pub fn read_text_file(file_path: String) -> Result<String, String> {
+    let path = PathBuf::from(file_path.trim());
+    let size = fs::metadata(&path).map_err(|e| format!("Failed to inspect file: {e}"))?.len();
+    if size > 2_000_000 { return Err("File is larger than the 2 MB import limit.".to_string()); }
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {e}"))
+}
+
+#[tauri::command]
 pub fn export_reproduction_bundle(file_path: String, bundle: serde_json::Value) -> Result<(), String> {
     let content = serde_json::to_string_pretty(&bundle)
         .map_err(|e| format!("Failed to serialize reproduction bundle: {e}"))?;

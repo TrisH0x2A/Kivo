@@ -13,11 +13,12 @@ import { Input } from "@/components/ui/input.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { formatJsonText } from "@/lib/formatters.js";
 import { buildUrlWithParams, getMethodTone, requestBodyModes } from "@/lib/http-ui.js";
-import { exportReproductionBundle, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
+import { exportReproductionBundle, getCollectionConfig, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, readTextFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
 import { buildRequestExplanation } from "@/lib/request-explanation.js";
 import { buildComparisonRequestPayload } from "@/lib/request-compare.js";
 import { compareResponsesAsync, checkComparisonContract } from "@/lib/response-comparison.js";
-import { buildReproductionBundle } from "@/lib/reproduction-bundle.js";
+import { buildReproductionBundle, prepareReproductionReplay } from "@/lib/reproduction-bundle.js";
+import { toast } from "sonner";
 import { isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
 import { cn } from "@/lib/utils.js";
@@ -1085,6 +1086,26 @@ export function RequestPane({
     }
   }
 
+  async function handleImportBundle() {
+    try {
+      const filePath = await open({ multiple: false, directory: false, filters: [{ name: "Kivo reproduction bundle", extensions: ["json"] }] });
+      if (typeof filePath !== "string") return;
+      const replay = prepareReproductionReplay(JSON.parse(await readTextFile(filePath)));
+      if (!replay.safe) {
+        toast.warning("Bundle imported for review", { description: replay.warnings.join(" ") });
+        return;
+      }
+      onChange("method", replay.request.method);
+      onChange("url", replay.request.url);
+      onChange("bodyType", replay.request.bodyType);
+      onChange("body", replay.request.body);
+      onChange("headers", replay.request.headers.map((header, index) => ({ id: `bundle-${index}`, key: header.key, value: header.value, enabled: true })));
+      toast.success("Reproduction request loaded", { description: "Review the imported request before sending." });
+    } catch (error) {
+      toast.error("Unable to import bundle", { description: error instanceof Error ? error.message : String(error) });
+    }
+  }
+
   async function handleRunCompare(leftId, rightId, rules) {
     setCompareRunning(true);
     setCompareError("");
@@ -1806,6 +1827,7 @@ export function RequestPane({
         onPreview={() => handleExplainRequest(true)}
         onExecution={response?.execution ? () => handleExplainRequest() : null}
         onExport={handleExportBundle}
+        onImport={handleImportBundle}
         onClose={() => {
           setRequestExplanation(null);
           setExplainError("");

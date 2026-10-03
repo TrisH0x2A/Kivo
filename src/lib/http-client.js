@@ -571,6 +571,10 @@ export function exportReproductionBundle(filePath, bundle) {
   return invoke("export_reproduction_bundle", { filePath, bundle });
 }
 
+export function readTextFile(filePath) {
+  return invoke("read_text_file", { filePath });
+}
+
 export function diagnoseConnection(payload) {
   return invoke("diagnose_connection", { payload });
 }

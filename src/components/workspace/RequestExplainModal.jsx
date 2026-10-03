@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { Download, Eye, X } from "lucide-react";
+import { Download, Eye, FileInput, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
@@ -12,7 +12,7 @@ function Section({ title, children }) {
   </section>;
 }
 
-export function RequestExplainModal({ explanation, loading, error, exporting, onExport, onClose, onPreview, onExecution }) {
+export function RequestExplainModal({ explanation, loading, error, exporting, onExport, onImport, onClose, onPreview, onExecution }) {
   if (!explanation && !loading && !error) return null;
 
   return createPortal(
@@ -69,7 +69,7 @@ export function RequestExplainModal({ explanation, loading, error, exporting, on
           </div> : null}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/45 px-5 py-3 text-[10px] text-muted-foreground"><span>Secrets are masked. Review bundles before sharing.</span><div className="flex gap-2"><Button type="button" variant="outline" size="sm" onClick={onExport} disabled={!explanation || exporting}><Download className="mr-2 h-3.5 w-3.5" />{exporting ? "Exporting..." : "Export bundle"}</Button><Button type="button" variant="outline" size="sm" onClick={onClose}>Close</Button></div></div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/45 px-5 py-3 text-[10px] text-muted-foreground"><span>Secrets are masked. Review bundles before sharing.</span><div className="flex gap-2"><Button type="button" variant="ghost" size="sm" onClick={onImport} disabled={exporting}><FileInput className="mr-2 h-3.5 w-3.5" />Import bundle</Button><Button type="button" variant="outline" size="sm" onClick={onExport} disabled={!explanation || exporting}><Download className="mr-2 h-3.5 w-3.5" />{exporting ? "Exporting..." : "Export bundle"}</Button><Button type="button" variant="outline" size="sm" onClick={onClose}>Close</Button></div></div>
       </Card>
     </div>,
     document.body
