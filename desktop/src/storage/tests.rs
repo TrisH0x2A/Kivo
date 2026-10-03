@@ -1208,6 +1208,7 @@ mod collection_config_tests {
                 post_response: "console.log('post')".to_string(),
             },
             mock_server: MockServerConfig::default(),
+            workflow_runs: vec![],
         };
         fs_save_collection_config(dir.path(), "ws", "api", &config).unwrap();
         let col_path = dir.path().join("ws").join("collections").join("api");
@@ -1263,6 +1264,7 @@ mod collection_config_tests {
             default_headers: vec![],
             scripts: CollectionScripts::default(),
             mock_server: MockServerConfig::default(),
+            workflow_runs: vec![],
         };
         fs_save_collection_config(dir.path(), "ws", "api", &config).unwrap();
         fs_save_workspaces(dir.path(), &workspaces).unwrap();
@@ -1296,6 +1298,7 @@ mod collection_config_tests {
             default_headers: vec![],
             scripts: CollectionScripts::default(),
             mock_server: MockServerConfig::default(),
+            workflow_runs: vec![],
         };
         fs_save_collection_config(dir.path(), "ws", "auth/user", &config).unwrap();
         let col_path = dir.path().join("ws").join("collections").join("auth_user");

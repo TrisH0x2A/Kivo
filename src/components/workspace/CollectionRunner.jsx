@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Braces, CheckCircle2, Copy, Download, FileText, ListChecks, Play, RotateCcw, Square, Table2, TimerReset, Trash2, XCircle } from "lucide-react";
+import { Braces, CheckCircle2, Copy, Download, FileText, ListChecks, Play, RotateCcw, Save, Square, Table2, TimerReset, Trash2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button.jsx";
 import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { buildRequestPayload } from "@/lib/http-ui.js";
 import { formatSavedAt } from "@/lib/workspace-store.js";
-import { cancelHttpRequest, sendHttpRequest, getCollectionConfig, exchangeOAuthToken } from "@/lib/http-client.js";
+import { cancelHttpRequest, sendHttpRequest, getCollectionConfig, saveCollectionConfig, exchangeOAuthToken } from "@/lib/http-client.js";
 import { executeWorkflowStep, inheritRunRequest, interruptibleDelay } from "@/lib/workflow-runner.js";
 import { formatResponseBody, isJsonText } from "@/lib/formatters.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
-import { applyRunnerDataRow, buildRunReport, getRunnableRequests, normalizeRunnerDelayMs, normalizeRunnerFolderPath, parseRunnerDataRows } from "@/lib/collection-runner.js";
+import { applyRunnerDataRow, buildRunReport, getRunnableRequests, normalizeRunnerDelayMs, normalizeRunnerExpectedStatus, normalizeRunnerFolderPath, parseRunnerDataRows } from "@/lib/collection-runner.js";
 import { cn } from "@/lib/utils.js";
 
 const RUNNER_ROW_RENDER_LIMIT = 800;
@@ -72,6 +72,12 @@ export function CollectionRunner({ workspace, collection }) {
   const [delayMs, setDelayMs] = useState(0);
   const [stopOnFailure, setStopOnFailure] = useState(false);
   const [dataSource, setDataSource] = useState("");
+  const [workflowName, setWorkflowName] = useState("");
+  const [savedWorkflows, setSavedWorkflows] = useState([]);
+  const [setupScript, setSetupScript] = useState("");
+  const [cleanupScript, setCleanupScript] = useState("");
+  const [expectedStatus, setExpectedStatus] = useState("");
+  const [requestOrder, setRequestOrder] = useState([]);
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState([]);
   const [runHistory, setRunHistory] = useState([]);
@@ -83,6 +89,31 @@ export function CollectionRunner({ workspace, collection }) {
   }, []);
   const runHistoryKey = useMemo(() => `kivo.runnerHistory.${workspace?.name || "workspace"}.${collection?.name || "collection"}`, [workspace?.name, collection?.name]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getCollectionConfig(workspace?.name || "", collection?.name || "").then((config) => {
+      if (cancelled) return;
+      const workflows = Array.isArray(config?.workflowRuns) ? config.workflowRuns : [];
+      setSavedWorkflows(workflows);
+      const first = workflows[0];
+      if (first) {
+        setWorkflowName(first.name || "");
+        setFolderFilter(first.folderFilter || "");
+        setRetryCount(Number(first.retryCount || 0));
+        setAllowUnsafeRetries(Boolean(first.allowUnsafeRetries));
+        setDelayMs(Number(first.delayMs || 0));
+        setStopOnFailure(Boolean(first.stopOnFailure));
+        setDataSource(String(first.dataSource || ""));
+        setExtractionRules(Array.isArray(first.extractionRules) ? first.extractionRules : []);
+        setSetupScript(String(first.setupScript || ""));
+        setCleanupScript(String(first.cleanupScript || ""));
+        setExpectedStatus(String(first.expectedStatus || ""));
+        setRequestOrder(Array.isArray(first.requestOrder) ? first.requestOrder : []);
+      }
+    }).catch(() => { if (!cancelled) setSavedWorkflows([]); });
+    return () => { cancelled = true; };
+  }, [collection?.name, workspace?.name]);
+
   const folders = useMemo(() => {
     const values = new Set();
     for (const request of collection?.requests || []) {
@@ -92,10 +123,12 @@ export function CollectionRunner({ workspace, collection }) {
     return Array.from(values).sort();
   }, [collection?.requests]);
 
-  const runnable = useMemo(
-    () => getRunnableRequests(collection, folderFilter),
-    [collection, folderFilter]
-  );
+  const runnable = useMemo(() => {
+    const base = getRunnableRequests(collection, folderFilter);
+    if (!requestOrder.length) return base;
+    const order = new Map(requestOrder.map((name, index) => [name, index]));
+    return [...base].sort((left, right) => (order.get(left.request.name) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.request.name) ?? Number.MAX_SAFE_INTEGER));
+  }, [collection, folderFilter, requestOrder]);
 
   const dataRows = useMemo(() => parseRunnerDataRows(dataSource), [dataSource]);
   const dataMeta = useMemo(() => getDataSourceMeta(dataSource, dataRows), [dataRows, dataSource]);
@@ -162,6 +195,7 @@ export function CollectionRunner({ workspace, collection }) {
     const outcome = await executeWorkflowStep({
       request: inheritRunRequest(request, collection, config), context, data: dataValues || {},
       rules: extractionRules.filter((rule) => rule.request === request.name && rule.variable.trim()),
+      expectedStatus,
       retries: retryCount, allowUnsafeRetries, stopped: () => stopRequestedRef.current,
       script: runRequestScript,
       prepare: async (draft) => {
@@ -211,6 +245,12 @@ export function CollectionRunner({ workspace, collection }) {
     try {
       const config = await getCollectionConfig(workspace?.name || "", collection?.name || "");
       const contexts = new Map();
+      const workflowContext = { vars: {} };
+      if (setupScript.trim()) {
+        const setup = await runRequestScript({ phase: "pre-request", script: setupScript, request: runItems[0]?.request || {}, response: null, context: workflowContext });
+        if (!setup.ok) throw new Error(setup.error || "Workflow setup failed");
+        workflowContext.vars = setup.context?.vars || workflowContext.vars;
+      }
       for (let itemIndex = 0; itemIndex < runItems.length; itemIndex += 1) {
         const item = runItems[itemIndex];
         if (stopRequestedRef.current) {
@@ -226,6 +266,10 @@ export function CollectionRunner({ workspace, collection }) {
         if (delayMs > 0 && itemIndex < runItems.length - 1 && !stopRequestedRef.current) {
           await interruptibleDelay(delayMs, () => stopRequestedRef.current);
         }
+      }
+      if (cleanupScript.trim()) {
+        const cleanup = await runRequestScript({ phase: "after-response", script: cleanupScript, request: runItems[0]?.request || {}, response: null, context: workflowContext });
+        if (!cleanup.ok) throw new Error(cleanup.error || "Workflow cleanup failed");
       }
     } catch (error) {
       setRunError(String(error));
@@ -248,6 +292,33 @@ export function CollectionRunner({ workspace, collection }) {
     if (currentRequestIdRef.current) {
       cancelHttpRequest(currentRequestIdRef.current).catch(() => {});
     }
+  }
+
+  function workflowDefinition(name = workflowName) {
+    return {
+      id: savedWorkflows.find((workflow) => workflow.name === name)?.id || crypto.randomUUID(),
+      name: String(name || `${collection?.name || "Collection"} workflow`).trim(),
+      folderFilter, retryCount, allowUnsafeRetries, delayMs, stopOnFailure, dataSource,
+      extractionRules, setupScript, cleanupScript, expectedStatus: normalizeRunnerExpectedStatus(expectedStatus),
+      requestOrder: runnable.map(({ request }) => request.name),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async function saveWorkflow() {
+    const definition = workflowDefinition();
+    if (!definition.name) return;
+    const config = await getCollectionConfig(workspace?.name || "", collection?.name || "");
+    const workflowRuns = [...(config?.workflowRuns || []).filter((workflow) => workflow.id !== definition.id && workflow.name !== definition.name), definition].slice(-20);
+    const saved = await saveCollectionConfig(workspace?.name || "", collection?.name || "", { ...config, workflowRuns });
+    setSavedWorkflows(Array.isArray(saved?.workflowRuns) ? saved.workflowRuns : workflowRuns);
+    setWorkflowName(definition.name);
+  }
+
+  function loadWorkflow(id) {
+    const workflow = savedWorkflows.find((entry) => entry.id === id);
+    if (!workflow) return;
+    setWorkflowName(workflow.name || ""); setFolderFilter(workflow.folderFilter || ""); setRetryCount(Number(workflow.retryCount || 0)); setAllowUnsafeRetries(Boolean(workflow.allowUnsafeRetries)); setDelayMs(Number(workflow.delayMs || 0)); setStopOnFailure(Boolean(workflow.stopOnFailure)); setDataSource(String(workflow.dataSource || "")); setExtractionRules(Array.isArray(workflow.extractionRules) ? workflow.extractionRules : []); setSetupScript(String(workflow.setupScript || "")); setCleanupScript(String(workflow.cleanupScript || "")); setExpectedStatus(String(workflow.expectedStatus || "")); setRequestOrder(Array.isArray(workflow.requestOrder) ? workflow.requestOrder : []);
   }
 
   async function copyReport() {
@@ -289,6 +360,9 @@ export function CollectionRunner({ workspace, collection }) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Input value={workflowName} onChange={(event) => setWorkflowName(event.target.value)} placeholder="Workflow name" className="kivo-field h-9 w-36 text-[12px]" />
+            <select value="" onChange={(event) => loadWorkflow(event.target.value)} className="kivo-field h-9 max-w-40 px-2 text-[12px] text-foreground"><option value="">Load workflow</option>{savedWorkflows.map((workflow) => <option key={workflow.id} value={workflow.id}>{workflow.name}</option>)}</select>
+            <Button type="button" variant="outline" className="h-9 gap-1.5" onClick={saveWorkflow} disabled={isRunning || !workflowName.trim()}><Save className="h-3.5 w-3.5" />Save</Button>
             <select
               value={folderFilter}
               onChange={(event) => setFolderFilter(event.target.value)}
@@ -354,6 +428,14 @@ export function CollectionRunner({ workspace, collection }) {
                 <Button variant="ghost" size="icon" title="Remove extraction" disabled={isRunning} onClick={() => setExtractionRules((rules) => rules.filter((entry) => entry.id !== rule.id))}><Trash2 className="h-3 w-3" /></Button>
               </div>)}
               <Button variant="ghost" size="sm" disabled={isRunning || !runnable.length} onClick={() => setExtractionRules((rules) => [...rules, { id: crypto.randomUUID(), request: runnable[0].request.name, variable: "", pointer: "" }])}>Add extraction</Button>
+            </div>
+          </details>
+          <details>
+            <summary className="cursor-pointer text-xs font-medium">Workflow lifecycle and expected outcomes</summary>
+            <div className="mt-3 grid gap-2 lg:grid-cols-3">
+              <Input value={expectedStatus} onChange={(event) => setExpectedStatus(normalizeRunnerExpectedStatus(event.target.value))} disabled={isRunning} placeholder="Expected status: 200,201,2XX" className="h-8 text-xs" />
+              <textarea value={setupScript} onChange={(event) => setSetupScript(event.target.value)} disabled={isRunning} placeholder="Setup script (optional)" className="thin-scrollbar min-h-20 resize-y border border-border bg-background/30 p-2 font-mono text-[11px] outline-none" />
+              <textarea value={cleanupScript} onChange={(event) => setCleanupScript(event.target.value)} disabled={isRunning} placeholder="Cleanup script (optional)" className="thin-scrollbar min-h-20 resize-y border border-border bg-background/30 p-2 font-mono text-[11px] outline-none" />
             </div>
           </details>
           {variableNames.length > 0 && <p className="break-all text-xs text-muted-foreground">Run variables: {variableNames.join(", ")}</p>}

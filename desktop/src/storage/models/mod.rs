@@ -114,6 +114,8 @@ pub struct CollectionConfig {
     pub scripts: CollectionScripts,
     #[serde(default)]
     pub mock_server: MockServerConfig,
+    #[serde(default)]
+    pub workflow_runs: Vec<Value>,
 }
 
 impl Default for CollectionConfig {
@@ -123,6 +125,7 @@ impl Default for CollectionConfig {
             default_auth: default_auth_record(),
             scripts: CollectionScripts::default(),
             mock_server: MockServerConfig::default(),
+            workflow_runs: vec![],
         }
     }
 }

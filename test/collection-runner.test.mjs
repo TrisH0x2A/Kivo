@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { applyRunnerDataRow, buildRunReport, getRunnableRequests, normalizeRunnerDelayMs, normalizeRunnerFolderPath, parseCsvTable, parseRunnerDataRows } from "../src/lib/collection-runner.js";
+import { applyRunnerDataRow, buildRunReport, getRunnableRequests, normalizeRunnerDelayMs, normalizeRunnerExpectedStatus, normalizeRunnerFolderPath, parseCsvTable, parseRunnerDataRows } from "../src/lib/collection-runner.js";
 
 test("parseCsvTable supports quoted commas and escaped quotes", () => {
   assert.deepEqual(parseCsvTable('name,query\n"Ada, Lovelace","say ""hi"""'), [
@@ -79,4 +79,9 @@ test("buildRunReport includes assertion and failure summary", () => {
   assert.deepEqual(report.summary.assertions, { total: 2, passed: 1, failed: 1 });
   assert.equal(report.summary.failureCount, 1);
   assert.equal(report.failures[0].name, "Create");
+});
+
+test("runner expected statuses normalize to safe workflow rules", () => {
+  assert.equal(normalizeRunnerExpectedStatus("200, 201 2XX nope 400-499"), "200,201,2XX,400-499");
+  assert.equal(normalizeRunnerExpectedStatus(""), "");
 });

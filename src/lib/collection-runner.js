@@ -162,3 +162,9 @@ export function normalizeRunnerDelayMs(value) {
   if (!Number.isFinite(number) || number < 0) return 0;
   return Math.min(number, 60_000);
 }
+
+export function normalizeRunnerExpectedStatus(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return "";
+  return text.split(/[\s,|]+/).filter((part) => /^\d{3}$/.test(part) || /^\dXX$/i.test(part) || /^\d{3}-\d{3}$/.test(part)).join(",");
+}

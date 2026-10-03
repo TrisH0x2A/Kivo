@@ -2,6 +2,19 @@ const UNSAFE_KEYS = new Set(["__proto__", "prototype", "constructor"]);
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "QUERY", "PUT", "DELETE"]);
 const TRANSIENT = new Set([408, 429, 502, 503, 504]);
 
+export function matchesExpectedStatus(status, expected = "") {
+  const code = Number(status || 0);
+  const rules = Array.isArray(expected) ? expected : String(expected || "").split(/[\s,|]+/).filter(Boolean);
+  if (!rules.length) return code >= 200 && code < 400;
+  return rules.some((rule) => {
+    const value = String(rule).trim().toUpperCase();
+    if (/^\dXX$/.test(value)) return Math.floor(code / 100) === Number(value[0]);
+    if (/^\d{3}$/.test(value)) return code === Number(value);
+    if (/^\d{3}-\d{3}$/.test(value)) { const [min, max] = value.split("-").map(Number); return code >= min && code <= max; }
+    return false;
+  });
+}
+
 export function resolveRunVariables(request, variables) {
   function visit(value) {
     if (typeof value === "string") return value.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (match, key) => {
@@ -50,7 +63,7 @@ export async function interruptibleDelay(ms, stopped, sleep = (duration) => new 
   for (let remaining = ms; remaining > 0 && !stopped(); remaining -= 50) await sleep(Math.min(50, remaining));
 }
 
-export async function executeWorkflowStep({ request, context, data = {}, rules = [], retries = 0, allowUnsafeRetries = false, stopped, send, script, prepare = async (request) => request, sleep }) {
+export async function executeWorkflowStep({ request, context, data = {}, rules = [], retries = 0, allowUnsafeRetries = false, expectedStatus = "", stopped, send, script, prepare = async (request) => request, sleep }) {
   const maxRetries = Math.min(10, Math.max(0, Number(retries) || 0));
   const retryAllowed = SAFE_METHODS.has(String(request.method || "GET").toUpperCase()) && request.requestMode !== "graphql" || allowUnsafeRetries;
   let attempts = 0;
@@ -85,12 +98,12 @@ export async function executeWorkflowStep({ request, context, data = {}, rules =
         if (!post.ok) throw new Error(post.error || "After-response script failed");
         draftContext = post.context || draftContext;
       }
-      const passed = response.status >= 200 && response.status < 400 && tests.every((test) => test.ok);
+      const passed = matchesExpectedStatus(response.status, expectedStatus) && tests.every((test) => test.ok);
       if (passed) {
         Object.assign(draftContext.vars, extractRunVariables(response.rawBody ?? response.body, rules));
         context.vars = draftContext.vars;
       }
-      return { status: passed ? "passed" : "failed", attempts, statusCode: response.status, duration: response.duration, tests, error: tests.filter((test) => !test.ok).map((test) => `${test.name}: ${test.error || "failed"}`).join("\n") || (passed ? "" : `HTTP ${response.status}`) };
+      return { status: passed ? "passed" : "failed", attempts, statusCode: response.status, duration: response.duration, tests, error: tests.filter((test) => !test.ok).map((test) => `${test.name}: ${test.error || "failed"}`).join("\n") || (passed ? "" : `Expected ${expectedStatus || "2xx/3xx"}, received HTTP ${response.status}`) };
     } catch (error) {
       lastError = error?.message || String(error);
       if (stopped()) break;

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { executeWorkflowStep, extractRunVariables, inheritRunRequest, resolveRunVariables } from "../src/lib/workflow-runner.js";
+import { executeWorkflowStep, extractRunVariables, inheritRunRequest, matchesExpectedStatus, resolveRunVariables } from "../src/lib/workflow-runner.js";
 const request = { method: "GET", requestMode: "http", url: "https://example.test/{{id}}" };
 const response = { status: 200, duration: "1 ms", rawBody: '{"data":{"id":42}}' };
 const options = { request, context: { vars: {} }, stopped: () => false, send: async () => response, script: async () => ({ ok: true }), sleep: async () => {} };
@@ -38,6 +38,13 @@ test("retry policy skips unsafe methods and assertions but retries transient saf
   calls = 0;
   await executeWorkflowStep({ ...options, request: { ...request, scriptAfterResponse: "test" }, retries: 2, send: async () => { calls++; return response; }, script: async () => ({ ok: false, error: "assertion" }) });
   assert.equal(calls, 1);
+});
+
+test("workflow expected outcomes support exact, ranges, and class codes", () => {
+  assert.equal(matchesExpectedStatus(201, "200,201"), true);
+  assert.equal(matchesExpectedStatus(204, "2XX"), true);
+  assert.equal(matchesExpectedStatus(404, "400-499"), true);
+  assert.equal(matchesExpectedStatus(500, "200,201"), false);
 });
 
 test("stop during retry and pre-script prevents another network call", async () => {

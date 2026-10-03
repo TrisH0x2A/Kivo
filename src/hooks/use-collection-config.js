@@ -8,6 +8,7 @@ const DEFAULT_CONFIG = {
   defaultAuth: createDefaultAuthState(),
   scripts: { preRequest: "", postResponse: "" },
   mockServer: { port: 0, routes: [] },
+  workflowRuns: [],
 };
 
 function equalValue(left, right) {
@@ -56,6 +57,7 @@ export function useCollectionConfig(workspaceName, collectionName) {
         defaultAuth: normalizeAuthState(result.defaultAuth),
         scripts: result.scripts ?? { preRequest: "", postResponse: "" },
         mockServer: result.mockServer ?? { port: 0, routes: [] },
+        workflowRuns: Array.isArray(result.workflowRuns) ? result.workflowRuns : [],
       };
       setConfig(normalized);
       setSavedConfig(normalized);
@@ -107,6 +109,7 @@ export function useCollectionConfig(workspaceName, collectionName) {
             defaultAuth: normalizeAuthState(snapshot.config.defaultAuth),
             scripts: snapshot.config.scripts ?? { preRequest: "", postResponse: "" },
             mockServer: snapshot.config.mockServer ?? { port: 0, routes: [] },
+            workflowRuns: Array.isArray(snapshot.config.workflowRuns) ? snapshot.config.workflowRuns : [],
           };
           const merged = mergeConfig(savedConfig, toSave, remote);
           setConflict({ local: toSave, remote, merged: merged.value, conflicts: merged.conflicts, revision: snapshot.revision });
