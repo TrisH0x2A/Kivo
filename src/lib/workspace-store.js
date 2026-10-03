@@ -438,6 +438,7 @@ export function normalizeRequestRecord(request) {
         .filter((group) => group.path)
       : [],
     tags: Array.isArray(request?.tags) ? request.tags.map((tag) => String(tag)) : [],
+    comparisonProfiles: Array.isArray(request?.comparisonProfiles) ? request.comparisonProfiles : [],
     urlEncoding: request?.urlEncoding ?? true,
     followRedirects: request?.followRedirects ?? true,
     maxRedirects: Number.isFinite(request?.maxRedirects) ? Number(request.maxRedirects) : 5,

@@ -1,4 +1,4 @@
-import { buildRequestPayload, buildResolvedRequestExport } from "@/lib/http-ui.js";
+import { buildRequestPayload } from "@/lib/http-ui.js";
 import { normalizeAuthState } from "@/lib/oauth.js";
 
 function normalizeFolderPath(path) {
@@ -12,7 +12,7 @@ function folderAncestors(path) {
   return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
 }
 
-export function buildComparisonRequestPayload(request, envVars, collectionConfig, collection, workspaceName, collectionName, requestId) {
+export function buildComparisonRequestPayload(request, collection, workspaceName, collectionName, requestId, environmentId) {
   const folderSettings = Array.isArray(collection?.folderSettings) ? collection.folderSettings : [];
   const ancestors = folderAncestors(request?.folderPath);
   const folderHeaders = ancestors.flatMap((path) => {
@@ -40,25 +40,11 @@ export function buildComparisonRequestPayload(request, envVars, collectionConfig
     ],
     auth: requestAuth.type === "inherit" && inheritedAuth.type !== "inherit" ? inheritedAuth : requestAuth,
   };
-  const resolved = buildResolvedRequestExport(effectiveRequest, { envVars, collectionConfig });
-  const headers = Object.entries(resolved.headers || {}).map(([key, value]) => ({
-    key,
-    value,
-    enabled: true,
-    fieldType: "",
-    filePath: "",
-  }));
   return {
-    ...buildRequestPayload({
-      ...request,
-      url: resolved.url,
-      queryParams: [],
-      headers,
-      auth: { type: "none" },
-      bodyType: "text",
-      body: resolved.body,
-      inheritHeaders: false,
-    }, workspaceName, collectionName),
-    requestId,
+    ...buildRequestPayload(effectiveRequest, workspaceName, collectionName),
+    urlEncoding: request.urlEncoding !== false,
+    followRedirects: request.followRedirects !== false,
+    maxRedirects: request.maxRedirects ?? 5,
+    requestId, workspaceEnvironmentId: environmentId,
   };
 }

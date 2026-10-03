@@ -1957,8 +1957,11 @@ pub async fn send_http_request(
     let environment = if payload.workspace_name.is_empty() { None } else {
         Some(crate::storage::get_workspace_environments(&storage_root, &payload.workspace_name)?)
     };
-    let environment_id = environment.as_ref().map(|value| value.active_environment_id.as_str());
-    let environment_name = environment.as_ref().and_then(|value| value.environments.iter().find(|entry| entry.id == value.active_environment_id)).map(|entry| entry.name.clone()).unwrap_or_default();
+    let environment_id = payload.workspace_environment_id.as_deref().or_else(|| environment.as_ref().map(|value| value.active_environment_id.as_str()));
+    if payload.workspace_environment_id.is_some() && !environment.as_ref().is_some_and(|value| value.environments.iter().any(|entry| Some(entry.id.as_str()) == environment_id)) {
+        return Err("The selected workspace environment no longer exists.".to_string());
+    }
+    let environment_name = environment.as_ref().and_then(|value| value.environments.iter().find(|entry| Some(entry.id.as_str()) == environment_id)).map(|entry| entry.name.clone()).unwrap_or_default();
     let variables = if payload.workspace_name.is_empty() { None } else {
         Some(crate::storage::fs_get_env_vars(&storage_root, &payload.workspace_name, if payload.collection_name.is_empty() { None } else { Some(&payload.collection_name) }, environment_id)?)
     };

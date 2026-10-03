@@ -28,6 +28,7 @@ httpFixture.lastResponse.execution = buildExecutionRecord({ original: httpFixtur
   headers: [{ key: "accept", value: "application/json" }, { key: "x-correlation-id", value: "fixture-123" }],
   environment: { id: "default", name: "Default" }, settings: { timeoutMs: 30000 }, body: "",
 } });
+httpFixture.contract = { responses: { "200": { type: "object", required: ["items"], properties: { items: { type: "array" } } } } };
 const workspace = { ...createWorkspace("UI Fixture"), collections: [collection], activeCollectionName: collection.name };
 let state = { ...createDefaultStore(), storagePath: "fixture-only", workspaces: [workspace], activeWorkspaceName: workspace.name, activeCollectionName: collection.name, activeRequestName: collection.requests[0].name };
 let config = { defaultHeaders: [], defaultAuth: { type: "none" }, scripts: { preRequest: "", postResponse: "" } };
@@ -54,6 +55,12 @@ window.__TAURI_INTERNALS__ = {
       case "get_workspace_environments_cmd": return { activeEnvironmentId, environments };
       case "set_active_workspace_environment_cmd": activeEnvironmentId = args.environmentId; return { activeEnvironmentId, environments };
       case "get_cookie_jar": return [];
+      case "send_http_request": {
+        if (!args.payload.requestId?.startsWith("compare-")) throw new Error("Only synthetic comparisons are enabled in this fixture.");
+        const staging = args.payload.workspaceEnvironmentId === "staging";
+        return { status: 200, statusText: "OK", durationMs: staging ? 51 : 42, headers: { "content-type": "application/json", date: staging ? "Tuesday" : "Monday" },
+          body: JSON.stringify({ timestamp: staging ? 2 : 1, items: staging ? [{ id: 2, price: 20.01 }, { id: 1, price: 10 }] : [{ id: 1, price: 10 }, { id: 2, price: 20 }] }) };
+      }
       case "diagnose_connection": {
         const failed = args.payload.url.includes("offline.invalid");
         return { target: new URL(args.payload.url).origin, steps: [

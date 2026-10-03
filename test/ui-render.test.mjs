@@ -150,13 +150,28 @@ test("environment compare payload keeps inherited folder headers", async () => {
     bodyType: "none",
     body: "",
     folderPath: "platform",
-  }, { merged: { base_url: "https://api.example.com" } }, { defaultAuth: { type: "none" }, defaultHeaders: [] }, {
+  }, {
     folderSettings: [{ path: "platform", defaultHeaders: [{ key: "X-Region", value: "us-east", enabled: true }] }],
-  }, "Demo", "Gateway", "compare-test");
+  }, "Demo", "Gateway", "compare-test", "staging");
 
-  assert.equal(payload.url, "https://api.example.com/health");
+  assert.equal(payload.url, "https://{{base_url}}/health");
   assert.equal(payload.headers["X-Region"], "us-east");
   assert.equal(payload.requestId, "compare-test");
+  assert.equal(payload.workspaceEnvironmentId, "staging");
+  assert.equal(payload.authType, "inherit");
+});
+
+test("comparison keeps native digest, file bodies, redirects, and folder overrides", async () => {
+  const { buildComparisonRequestPayload } = await server.ssrLoadModule("/src/lib/request-compare.js");
+  const request = { method: "POST", url: "https://api.test/upload", bodyType: "file", bodyFilePath: "C:/fixture.bin", headers: [{ key: "X-Folder", enabled: false }], auth: { type: "inherit" }, folderPath: "parent/child", followRedirects: false, maxRedirects: 2 };
+  const collection = { folderSettings: [{ path: "parent", defaultHeaders: [{ key: "X-Folder", value: "hidden", enabled: true }], defaultAuth: { type: "digest", username: "{{user}}", password: "{{pass}}" } }] };
+  const payload = buildComparisonRequestPayload(request, collection, "workspace", "collection", "run", "env");
+  assert.equal(payload.authType, "digest");
+  assert.equal(payload.authPayload.password, "{{pass}}");
+  assert.equal(payload.bodyFilePath, "C:/fixture.bin");
+  assert.equal(payload.headers["X-Folder"], undefined);
+  assert.equal(payload.followRedirects, false);
+  assert.equal(payload.maxRedirects, 2);
 });
 
 test("gRPC message view requires stream metadata and paginates large message lists", async () => {

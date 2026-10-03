@@ -51,6 +51,7 @@ fn make_request(name: &str) -> RequestRecord {
         grpc_proto_directories: vec![],
         docs: String::new(),
         contract: serde_json::Value::Null,
+        comparison_profiles: vec![],
         tags: vec![],
         url_encoding: true,
         follow_redirects: true,
@@ -1315,9 +1316,11 @@ mod save_load_tests {
             "graphqlSchema": "type Query { health: Boolean }",
             "source": {"operation": "get /health"}
         });
+        request.comparison_profiles = vec![serde_json::json!({"id": "stable", "name": "Stable fields", "rules": {"ignorePaths": ["/timestamp"], "arrayKeys": [{"path": "/items", "key": "id"}], "absoluteTolerance": 0.01}})];
         fs_save_workspaces(dir.path(), &[ws("ws", vec![col("api", vec![request.clone()])])]).unwrap();
         let loaded = fs_load_workspaces(dir.path()).unwrap();
         assert_eq!(loaded[0].collections[0].requests[0].contract, request.contract);
+        assert_eq!(loaded[0].collections[0].requests[0].comparison_profiles, request.comparison_profiles);
     }
 
     #[test]

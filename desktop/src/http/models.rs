@@ -110,6 +110,9 @@ pub struct RequestPayload {
     pub workspace_name: String,
 
     #[serde(default)]
+    pub workspace_environment_id: Option<String>,
+
+    #[serde(default)]
     pub collection_name: String,
 
     #[serde(default)]

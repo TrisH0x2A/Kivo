@@ -13,10 +13,10 @@ import { Input } from "@/components/ui/input.jsx";
 import { OAuth2Panel } from "@/components/workspace/OAuth2Panel.jsx";
 import { formatJsonText } from "@/lib/formatters.js";
 import { buildUrlWithParams, getMethodTone, requestBodyModes } from "@/lib/http-ui.js";
-import { exportReproductionBundle, getCollectionConfig, getEnvVars, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
+import { exportReproductionBundle, getWorkspaceEnvironments, listGrpcProtoFilesInDirectory, parseGrpcProtoFile, reflectGrpcServer, sendHttpRequest } from "@/lib/http-client.js";
 import { buildRequestExplanation } from "@/lib/request-explanation.js";
 import { buildComparisonRequestPayload } from "@/lib/request-compare.js";
-import { compareResponses } from "@/lib/response-diff.js";
+import { compareResponsesAsync, checkComparisonContract } from "@/lib/response-comparison.js";
 import { buildReproductionBundle } from "@/lib/reproduction-bundle.js";
 import { isDynamicTemplateVariable } from "@/lib/template-variables.js";
 import { REQUEST_MODES } from "@/lib/workspace-store.js";
@@ -1085,21 +1085,27 @@ export function RequestPane({
     }
   }
 
-  async function handleRunCompare(leftId, rightId) {
+  async function handleRunCompare(leftId, rightId, rules) {
     setCompareRunning(true);
     setCompareError("");
+    setCompareResult(null);
     try {
-      const [leftVars, rightVars, collectionConfig] = await Promise.all([
-        getEnvVars(workspaceName, collectionName, leftId),
-        getEnvVars(workspaceName, collectionName, rightId),
-        getCollectionConfig(workspaceName, collectionName),
+      const stamp = crypto.randomUUID();
+      const outcomes = await Promise.allSettled([
+        sendHttpRequest(buildComparisonRequestPayload(state, collection, workspaceName, collectionName, `compare-left-${stamp}`, leftId)),
+        sendHttpRequest(buildComparisonRequestPayload(state, collection, workspaceName, collectionName, `compare-right-${stamp}`, rightId)),
       ]);
-      const stamp = Date.now();
-      const [left, right] = await Promise.all([
-        sendHttpRequest(buildComparisonRequestPayload(state, leftVars, collectionConfig, collection, workspaceName, collectionName, `compare-left-${stamp}`)),
-        sendHttpRequest(buildComparisonRequestPayload(state, rightVars, collectionConfig, collection, workspaceName, collectionName, `compare-right-${stamp}`)),
-      ]);
-      setCompareResult({ leftId, rightId, left, right, diff: compareResponses(left, right) });
+      const [left, right] = outcomes.map((outcome) => {
+        if (outcome.status === "rejected") return { error: String(outcome.reason?.message || outcome.reason) };
+        const { execution: _privateCapture, ...response } = outcome.value;
+        return response;
+      });
+      const result = { leftId, rightId, left, right, rules };
+      setCompareResult(result);
+      if (left.error || right.error) throw new Error("One or both requests failed. Successful responses are retained below.");
+      const diff = await compareResponsesAsync(left, right, rules);
+      const contracts = rules.validateContracts ? await Promise.all([checkComparisonContract(left, state.contract), checkComparisonContract(right, state.contract)]) : null;
+      setCompareResult({ ...result, diff, contracts });
     } catch (error) {
       setCompareError(error instanceof Error ? error.message : "Environment comparison failed.");
     } finally {
@@ -1807,6 +1813,7 @@ export function RequestPane({
       />
 
       <CompareEnvironmentsModal
+        key={`${workspaceName}/${collectionName}/${state.id || state.name}`}
         open={compareOpen}
         request={state}
         environments={compareEnvironments}
@@ -1815,6 +1822,7 @@ export function RequestPane({
         result={compareResult}
         error={compareError}
         onRun={handleRunCompare}
+        onProfilesChange={(profiles) => onChange("comparisonProfiles", profiles)}
         onClose={() => {
           setCompareOpen(false);
           setCompareResult(null);
