@@ -42,7 +42,7 @@ import { formatResponseBody, isJsonText } from "@/lib/formatters.js";
 import { normalizeUrl } from "@/lib/http-ui.js";
 import { normalizeAuthState } from "@/lib/oauth.js";
 import { runRequestScript } from "@/lib/request-scripts.js";
-import { redactHistoryUrl } from "@/lib/history-utils.js";
+import { buildHistorySnapshots, redactHistoryUrl } from "@/lib/history-utils.js";
 import { loadWorkspaceStartup } from "@/lib/workspace-startup.js";
 import { applyGrpcEvent, createGrpcCapture, grpcCaptureBody } from "@/lib/grpc-session.js";
 import { attachExecutionResponse, buildExecutionRecord } from "@/lib/execution-record.js";
@@ -792,6 +792,7 @@ export function useWorkspaceStore() {
   function recordRequestHistory({ request, workspaceName, collectionName, response: savedResponse, url, error = "" }) {
     const sentAt = new Date().toISOString();
     const status = Number(savedResponse?.status || 0);
+    const snapshots = buildHistorySnapshots({ request, response: savedResponse, url, workspaceName, collectionName });
     const entry = {
       id: `hist-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       workspaceName: String(workspaceName || ""),
@@ -807,11 +808,68 @@ export function useWorkspaceStore() {
       ok: status >= 200 && status < 400 && !error,
       error: String(error || ""),
       sentAt,
+      pinned: false,
+      requestSnapshot: snapshots.request,
+      responseSnapshot: snapshots.response,
+      environment: snapshots.environment,
     };
     updateStore((current) => ({
       ...current,
-      requestHistory: [entry, ...(current.requestHistory || [])].slice(0, 500),
+      requestHistory: (() => {
+        const limit = Math.min(5000, Math.max(50, Number(current.appSettings?.requestHistoryLimit || 500)));
+        const next = [entry, ...(current.requestHistory || [])];
+        const pinned = next.filter((item) => item.pinned);
+        const recent = next.filter((item) => !item.pinned).slice(0, Math.max(0, limit - pinned.length));
+        return [...pinned, ...recent];
+      })(),
     }));
+  }
+
+  function toggleHistoryPin(historyId) {
+    updateStore((current) => ({
+      ...current,
+      requestHistory: (current.requestHistory || []).map((entry) => entry.id === historyId ? { ...entry, pinned: !entry.pinned } : entry),
+    }));
+  }
+
+  function deleteHistoryEntry(historyId) {
+    updateStore((current) => ({ ...current, requestHistory: (current.requestHistory || []).filter((entry) => entry.id !== historyId) }));
+  }
+
+  function replayHistoryEntry(entry) {
+    const snapshot = entry?.requestSnapshot;
+    if (!snapshot) return false;
+    updateStore((current) => {
+      const workspace = current.workspaces.find((item) => item.name === entry.workspaceName) || current.workspaces.find((item) => item.name === current.activeWorkspaceName);
+      const collection = workspace?.collections.find((item) => item.name === entry.collectionName) || workspace?.collections.find((item) => item.name === current.activeCollectionName);
+      const request = collection?.requests.find((item) => item.name === entry.requestName) || collection?.requests.find((item) => item.name === current.activeRequestName);
+      if (!workspace || !collection || !request) return current;
+      const nextRequest = {
+        ...request,
+        requestMode: snapshot.requestMode || request.requestMode,
+        method: snapshot.method || request.method,
+        url: snapshot.url || request.url,
+        queryParams: Array.isArray(snapshot.queryParams) ? snapshot.queryParams : request.queryParams,
+        headers: Array.isArray(snapshot.headers) ? snapshot.headers.map((header, index) => ({ id: `history-${index}`, key: header.key, value: header.value, enabled: header.enabled !== false })) : request.headers,
+        bodyType: snapshot.bodyType || request.bodyType,
+        body: snapshot.body || "",
+      };
+      return {
+        ...current,
+        activeWorkspaceName: workspace.name,
+        activeCollectionName: collection.name,
+        activeRequestName: request.name,
+        workspaces: current.workspaces.map((item) => item.name !== workspace.name ? item : {
+          ...item,
+          collections: item.collections.map((candidate) => candidate.name !== collection.name ? candidate : {
+            ...candidate,
+            openRequestNames: [...new Set([...(candidate.openRequestNames || []), request.name])],
+            requests: candidate.requests.map((candidateRequest) => candidateRequest.name === request.name ? nextRequest : candidateRequest),
+          }),
+        }),
+      };
+    });
+    return true;
   }
 
   function handleSidebarTabChange(sidebarTab) {
@@ -2948,6 +3006,9 @@ export function useWorkspaceStore() {
     sendActiveSocketIoMessage,
     streamMessages,
     clearStreamMessagesForKey,
+    toggleHistoryPin,
+    deleteHistoryEntry,
+    replayHistoryEntry,
     cancelSend,
     checkSetup: () => setLoadAttempt((attempt) => attempt + 1),
   };

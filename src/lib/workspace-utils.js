@@ -79,7 +79,11 @@ export function normalizeStore(store) {
         size: String(entry?.size || ""),
         ok: Boolean(entry?.ok),
         error: String(entry?.error || ""),
-        sentAt: String(entry?.sentAt || "")
+        sentAt: String(entry?.sentAt || ""),
+        pinned: Boolean(entry?.pinned),
+        requestSnapshot: entry?.requestSnapshot && typeof entry.requestSnapshot === "object" ? entry.requestSnapshot : null,
+        responseSnapshot: entry?.responseSnapshot && typeof entry.responseSnapshot === "object" ? entry.responseSnapshot : null,
+        environment: entry?.environment && typeof entry.environment === "object" ? entry.environment : { name: "Default" },
       }))
       .filter((entry) => entry.id || entry.sentAt)
       .slice(0, 500)

@@ -30,6 +30,7 @@ export function createDefaultAppSettings() {
     customCaCertificatePath: "",
     keepDefaultCaCertificates: true,
     storeLastResponseByDefault: false,
+    requestHistoryLimit: 500,
     storeCookiesAutomatically: true,
     sendCookiesAutomatically: true,
     useSystemBrowserForOauth2Authorization: true,

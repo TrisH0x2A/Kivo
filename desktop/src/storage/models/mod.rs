@@ -101,6 +101,7 @@ impl Default for MockServerConfig {
 fn default_mock_method() -> String { "GET".to_string() }
 fn default_mock_path() -> String { "/".to_string() }
 fn default_mock_status() -> u16 { 200 }
+fn default_history_limit() -> u32 { 500 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -150,6 +151,8 @@ pub struct AppSettings {
     pub keep_default_ca_certificates: bool,
     #[serde(default)]
     pub store_last_response_by_default: bool,
+    #[serde(default = "default_history_limit")]
+    pub request_history_limit: u32,
     #[serde(default = "default_true")]
     pub store_cookies_automatically: bool,
     #[serde(default = "default_true")]
@@ -190,6 +193,7 @@ impl Default for AppSettings {
             custom_ca_certificate_path: String::new(),
             keep_default_ca_certificates: true,
             store_last_response_by_default: false,
+            request_history_limit: 500,
             store_cookies_automatically: true,
             send_cookies_automatically: true,
             use_system_browser_for_oauth2_authorization: true,

@@ -426,7 +426,7 @@ export async function saveAppState(payload) {
   const persistLastResponse = Boolean(payload?.appSettings?.storeLastResponseByDefault);
   const cleanPayload = {
     ...payload,
-    requestHistory: Array.isArray(payload.requestHistory) ? payload.requestHistory.slice(0, 500) : [],
+    requestHistory: Array.isArray(payload.requestHistory) ? payload.requestHistory.slice(0, 5000) : [],
     workspaces: payload.workspaces?.map((workspace) => ({
       ...workspace,
       collections: workspace.collections?.map((collection) => ({

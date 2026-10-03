@@ -50,6 +50,7 @@ const DEFAULT_APP_SETTINGS = {
   customCaCertificatePath: "",
   keepDefaultCaCertificates: true,
   storeLastResponseByDefault: false,
+  requestHistoryLimit: 500,
   storeCookiesAutomatically: true,
   sendCookiesAutomatically: true,
   useSystemBrowserForOauth2Authorization: true,
@@ -78,6 +79,7 @@ function normalizeAppSettingsInput(settings) {
     customCaCertificatePath: String(source.customCaCertificatePath ?? DEFAULT_APP_SETTINGS.customCaCertificatePath),
     keepDefaultCaCertificates: true,
     storeLastResponseByDefault: Boolean(source.storeLastResponseByDefault ?? DEFAULT_APP_SETTINGS.storeLastResponseByDefault),
+    requestHistoryLimit: Number.isFinite(source.requestHistoryLimit) ? Math.min(5000, Math.max(50, Number(source.requestHistoryLimit))) : DEFAULT_APP_SETTINGS.requestHistoryLimit,
     storeCookiesAutomatically: Boolean(source.storeCookiesAutomatically ?? DEFAULT_APP_SETTINGS.storeCookiesAutomatically),
     sendCookiesAutomatically: Boolean(source.sendCookiesAutomatically ?? DEFAULT_APP_SETTINGS.sendCookiesAutomatically),
     useSystemBrowserForOauth2Authorization: Boolean(source.useSystemBrowserForOauth2Authorization ?? DEFAULT_APP_SETTINGS.useSystemBrowserForOauth2Authorization),
@@ -1050,7 +1052,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
       ) : null}
 
         {activeSettingsTab === "History" ? (
-          <HistorySettingsPanel requestHistory={requestHistory} onClearHistory={onClearHistory} />
+          <HistorySettingsPanel requestHistory={requestHistory} onClearHistory={onClearHistory} historyLimit={appSettings.requestHistoryLimit} onHistoryLimitChange={(requestHistoryLimit) => updateSettingsPatch({ requestHistoryLimit })} />
         ) : null}
 
         {activeSettingsTab === "Security" ? (

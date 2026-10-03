@@ -175,6 +175,9 @@ export default function App() {
     duplicateCollectionRecord,
     importCollectionRecord,
     importRequestRecords,
+    toggleHistoryPin,
+    deleteHistoryEntry,
+    replayHistoryEntry,
   } = useWorkspaceStore();
 
   useEffect(() => {
@@ -573,6 +576,9 @@ export default function App() {
                 }}
                 requestHistory={store.requestHistory || []}
                 onClearHistory={() => updateStore((current) => ({ ...current, requestHistory: [] }))}
+                onToggleHistoryPin={toggleHistoryPin}
+                onDeleteHistory={deleteHistoryEntry}
+                onReplayHistory={(entry) => { replayHistoryEntry(entry); setShowAppSettings(false); }}
               />
             </Suspense>
           ) : showNoWorkspaceState ? (
