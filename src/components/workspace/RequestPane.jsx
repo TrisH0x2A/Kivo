@@ -1024,7 +1024,12 @@ export function RequestPane({
     });
   }, [debouncedState, envVars]);
 
-  async function handleExplainRequest() {
+  async function handleExplainRequest(previewOnly = false) {
+    if (previewOnly !== true && response?.execution?.kind === "execution") {
+      setRequestExplanation(response.execution);
+      setExplainError("");
+      return;
+    }
     setIsExplaining(true);
     setExplainError("");
     try {
@@ -1792,6 +1797,8 @@ export function RequestPane({
         loading={isExplaining}
         error={explainError}
         exporting={exportingBundle}
+        onPreview={() => handleExplainRequest(true)}
+        onExecution={response?.execution ? () => handleExplainRequest() : null}
         onExport={handleExportBundle}
         onClose={() => {
           setRequestExplanation(null);

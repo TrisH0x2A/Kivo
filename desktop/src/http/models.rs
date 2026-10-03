@@ -230,6 +230,8 @@ pub struct OAuthTokenExchangeResult {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponsePayload {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub execution: Option<serde_json::Value>,
     pub status: u16,
     pub status_text: String,
     pub headers: HashMap<String, String>,

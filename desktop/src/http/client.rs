@@ -737,7 +737,11 @@ async fn send_oauth_form(
 async fn send_http_request_with_cancel(
     request: reqwest::RequestBuilder,
     cancel_rx: &mut Option<watch::Receiver<bool>>,
+    capture: &mut Value,
 ) -> Result<reqwest::Response, String> {
+    let (client, request) = request.build_split();
+    let request = request.map_err(|error| error.to_string())?;
+    *capture = capture_http_request(&request);
     fn format_reqwest_error(err: &reqwest::Error) -> String {
         let mut message = err.to_string();
         let mut causes = Vec::new();
@@ -765,13 +769,13 @@ async fn send_http_request_with_cancel(
                     Err(_) => Err("Request cancelled by user.".to_string()),
                 }
             }
-            response = request.send() => {
+            response = client.execute(request) => {
                 response.map_err(|err| format_reqwest_error(&err))
             }
         }
     } else {
-        request
-            .send()
+        client
+            .execute(request)
             .await
             .map_err(|err| format_reqwest_error(&err))
     }
@@ -1675,6 +1679,21 @@ pub async fn send_grpc_request(
     grpc::run(app, payload).await
 }
 
+fn capture_http_request(request: &reqwest::Request) -> Value {
+    let bytes = request.body().and_then(|body| body.as_bytes());
+    let text = bytes.and_then(|body| std::str::from_utf8(body).ok());
+    serde_json::json!({
+        "method": request.method().as_str(),
+        "url": request.url().as_str(),
+        "headers": request.headers().iter().map(|(key, value)| serde_json::json!({
+            "key": key.as_str(), "value": value.to_str().unwrap_or("[binary]")
+        })).collect::<Vec<_>>(),
+        "body": text.map(|value| value.chars().take(100_000).collect::<String>()).unwrap_or_default(),
+        "bodyOmitted": request.body().is_some() && text.is_none(),
+        "bodyTruncated": text.is_some_and(|value| value.chars().count() > 100_000),
+    })
+}
+
 fn get_expiry_iso(expires_in: Option<u64>) -> String {
     expires_in
         .map(|seconds| {
@@ -1935,7 +1954,15 @@ pub async fn send_http_request(
         )
     };
 
-    let env_vars = get_env_context(&app, &payload.workspace_name, &payload.collection_name)?;
+    let environment = if payload.workspace_name.is_empty() { None } else {
+        Some(crate::storage::get_workspace_environments(&storage_root, &payload.workspace_name)?)
+    };
+    let environment_id = environment.as_ref().map(|value| value.active_environment_id.as_str());
+    let environment_name = environment.as_ref().and_then(|value| value.environments.iter().find(|entry| entry.id == value.active_environment_id)).map(|entry| entry.name.clone()).unwrap_or_default();
+    let variables = if payload.workspace_name.is_empty() { None } else {
+        Some(crate::storage::fs_get_env_vars(&storage_root, &payload.workspace_name, if payload.collection_name.is_empty() { None } else { Some(&payload.collection_name) }, environment_id)?)
+    };
+    let env_vars = variables.as_ref().map(|vars| vars.merged.clone()).unwrap_or_default();
     let app_settings = get_app_config(app.clone())
         .map(|state| state.app_settings)
         .unwrap_or_default();
@@ -2215,7 +2242,9 @@ pub async fn send_http_request(
     .await?;
 
     let started_at = Instant::now();
-    let mut response = send_http_request_with_cancel(request, &mut cancel_rx).await?;
+    let mut capture = Value::Null;
+    let mut response = send_http_request_with_cancel(request, &mut cancel_rx, &mut capture).await?;
+    let mut attempts = 1;
     if response.status().as_u16() == 401 {
         if let Some((username, password, fallback_qop)) = digest_retry_credentials.as_ref() {
             let digest_challenge = response
@@ -2252,13 +2281,36 @@ pub async fn send_http_request(
                             resolved_body.as_deref(),
                         )
                         .await?;
-                        response = send_http_request_with_cancel(retry_request, &mut cancel_rx).await?;
+                        response = send_http_request_with_cancel(retry_request, &mut cancel_rx, &mut capture).await?;
+                        attempts += 1;
                     }
                 }
             }
         }
     }
     let duration_ms = started_at.elapsed().as_millis();
+
+    capture["id"] = serde_json::json!(request_id);
+    capture["capturedAt"] = serde_json::json!(Utc::now().to_rfc3339());
+    capture["environment"] = serde_json::json!({ "id": environment_id, "name": environment_name });
+    capture["variables"] = serde_json::json!(variables);
+    capture["collectionHeaders"] = serde_json::json!(if payload.inherit_headers.unwrap_or(true) { col_config.default_headers.clone() } else { vec![] });
+    capture["authType"] = serde_json::json!(if payload.auth_type == "inherit" { &col_config.default_auth.auth_type } else { &payload.auth_type });
+    capture["attempts"] = serde_json::json!(attempts);
+    capture["finalUrl"] = serde_json::json!(response.url().as_str());
+    capture["settings"] = serde_json::json!({ "timeoutMs": effective_timeout_ms, "followRedirects": effective_follow_redirects, "cookieJar": use_cookie_jar });
+    if resolved_body_file_path.is_some() || has_multipart_file_rows {
+        capture["body"] = serde_json::json!("");
+        capture["bodyOmitted"] = serde_json::json!(true);
+    }
+    // These values are consumed by the renderer redactor, never stored in execution records.
+    let auth = &col_config.default_auth;
+    let mut private_values = vec![auth.token.clone(), auth.password.clone(), auth.username.clone(), auth.jwt_token.clone(), auth.api_key_value.clone(), auth.oauth2.access_token.clone(), auth.oauth2.refresh_token.clone(), auth.oauth2.client_secret.clone()];
+    if let Some(auth) = &payload.auth_payload {
+        private_values.extend([auth.token.clone(), auth.password.clone(), auth.username.clone(), auth.jwt_token.clone(), auth.api_key_value.clone()]);
+        if let Some(oauth) = &auth.oauth2 { private_values.extend([oauth.access_token.clone(), oauth.refresh_token.clone(), oauth.client_secret.clone()]); }
+    }
+    capture["privateValues"] = serde_json::json!(private_values);
 
     let status = response.status();
     let status_text = status.canonical_reason().unwrap_or("Unknown").to_string();
@@ -2306,6 +2358,7 @@ pub async fn send_http_request(
     let is_binary = !is_textual || (body.is_empty() && !body_base64.is_empty());
 
     Ok(ResponsePayload {
+        execution: Some(capture),
         status: status.as_u16(),
         status_text,
         headers,

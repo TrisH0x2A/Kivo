@@ -657,6 +657,8 @@ pub struct AuthRecord {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SavedResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<Value>,
     #[serde(default)]
     pub status: u16,
     #[serde(default)]

@@ -168,6 +168,7 @@ function sanitizeLastResponseForSave(lastResponse) {
     isJson: Boolean(lastResponse.isJson),
     meta,
     savedAt: String(lastResponse.savedAt ?? ""),
+    execution: lastResponse.execution?.kind === "execution" ? lastResponse.execution : null,
   };
 }
 

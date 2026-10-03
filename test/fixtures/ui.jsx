@@ -2,6 +2,7 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { createCollection, createDefaultStore, createEmptyResponse, createRequest, createWorkspace, REQUEST_MODES } from "../../src/lib/workspace-store.js";
 import "../../src/index.css";
+import { buildExecutionRecord } from "../../src/lib/execution-record.js";
 
 // This standalone Vite fixture never connects to native storage or transports.
 if (!import.meta.env.DEV || window.__TAURI_INTERNALS__) throw new Error("UI fixture requires a development browser");
@@ -21,6 +22,12 @@ collection.requests = Object.values(REQUEST_MODES).map((mode) => ({
   headers: [{ id: "accept", key: "Accept", value: "application/json", enabled: true }, { id: "trace", key: "X-Correlation-Id", value: "fixture-123", enabled: true }],
 }));
 collection.openRequestNames = collection.requests.slice(0, 3).map((request) => request.name);
+const httpFixture = collection.requests.find((request) => request.requestMode === REQUEST_MODES.HTTP);
+httpFixture.lastResponse.execution = buildExecutionRecord({ original: httpFixture, collection, workspaceName: "UI Fixture", capture: {
+  id: "fixture-execution", capturedAt: "2026-10-04T09:00:00Z", method: "GET", url: httpFixture.url, finalUrl: httpFixture.url,
+  headers: [{ key: "accept", value: "application/json" }, { key: "x-correlation-id", value: "fixture-123" }],
+  environment: { id: "default", name: "Default" }, settings: { timeoutMs: 30000 }, body: "",
+} });
 const workspace = { ...createWorkspace("UI Fixture"), collections: [collection], activeCollectionName: collection.name };
 let state = { ...createDefaultStore(), storagePath: "fixture-only", workspaces: [workspace], activeWorkspaceName: workspace.name, activeCollectionName: collection.name, activeRequestName: collection.requests[0].name };
 let config = { defaultHeaders: [], defaultAuth: { type: "none" }, scripts: { preRequest: "", postResponse: "" } };

@@ -429,6 +429,7 @@ mod protocol_and_import_export_tests {
 fn make_request_with_response(name: &str) -> RequestRecord {
     let mut r = make_request(name);
     r.last_response = Some(SavedResponse {
+        execution: None,
         status: 200,
         badge: "200 OK".to_string(),
         status_text: "200 OK".to_string(),

@@ -571,3 +571,14 @@ fn sample_cookie(id: &str, name: &str, value: &str) -> CookieJarEntry {
         last_accessed_at: now,
     }
 }
+#[test]
+fn execution_capture_uses_built_request_and_bounds_text() {
+    let request = reqwest::Client::new().post("https://example.test/path")
+        .header("X-Trace", "test").body("x".repeat(100_001)).build().unwrap();
+    let capture = super::capture_http_request(&request);
+    assert_eq!(capture["method"], "POST");
+    assert_eq!(capture["url"], "https://example.test/path");
+    assert_eq!(capture["body"].as_str().unwrap().len(), 100_000);
+    assert_eq!(capture["bodyTruncated"], true);
+    assert_eq!(capture["headers"][0]["key"], "x-trace");
+}

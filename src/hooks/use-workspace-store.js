@@ -45,6 +45,7 @@ import { runRequestScript } from "@/lib/request-scripts.js";
 import { redactHistoryUrl } from "@/lib/history-utils.js";
 import { loadWorkspaceStartup } from "@/lib/workspace-startup.js";
 import { applyGrpcEvent, createGrpcCapture, grpcCaptureBody } from "@/lib/grpc-session.js";
+import { attachExecutionResponse, buildExecutionRecord } from "@/lib/execution-record.js";
 
 const SIDEBAR_COLLAPSED_WIDTH = 52;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -2538,6 +2539,9 @@ export function useWorkspaceStore() {
     const activeWorkspaceName = activeWorkspace?.name ?? "";
     const activeCollectionName = activeCollection?.name ?? "";
     const activeRequestName = activeRequest.name;
+    const executionIdentity = { workspaceId: activeWorkspace?.id, workspaceName: activeWorkspaceName,
+      collectionId: activeCollection?.id, collectionName: activeCollectionName,
+      requestId: activeRequest.id, requestName: activeRequestName };
     const supportsScripts = activeRequest.requestMode === REQUEST_MODES.HTTP || activeRequest.requestMode === REQUEST_MODES.GRAPHQL;
     let scriptedRequest = activeRequest;
     let scriptContext = { vars: {} };
@@ -2767,6 +2771,8 @@ export function useWorkspaceStore() {
       const savedAt = formatSavedAt();
       const savedResponse = {
         status: result.status,
+        execution: buildExecutionRecord({ capture: result.execution, original: activeRequest,
+          scripted: scriptedRequest, prepared: requestForSend, collection: activeCollection, workspaceName: activeWorkspaceName, scriptVars: scriptContext.vars }),
         badge: `${result.status} ${result.statusText}`,
         statusText: `${result.status} ${result.statusText}`,
         duration: `${result.durationMs} ms`,
@@ -2786,31 +2792,7 @@ export function useWorkspaceStore() {
         savedAt
       };
 
-      updateStore((current) => ({
-        ...current,
-        workspaces: current.workspaces.map((workspace) => {
-          if (workspace.name !== current.activeWorkspaceName) return workspace;
-          return {
-            ...workspace,
-            collections: workspace.collections.map((collection) => {
-              if (collection.name !== current.activeCollectionName) return collection;
-              return {
-                ...collection,
-                requests: collection.requests.map((request) =>
-                  request.name === activeRequest.name
-                    ? {
-                      ...request,
-                      url: normalizeUrl(request.url),
-                      responseBodyView: responseIsJson ? "JSON" : "Raw",
-                      lastResponse: savedResponse
-                    }
-                    : request
-                )
-              };
-            })
-          };
-        })
-      }));
+      updateStore((current) => attachExecutionResponse(current, executionIdentity, savedResponse, responseIsJson ? "JSON" : "Raw"));
       recordRequestHistory({
         request: scriptedRequest,
         workspaceName: activeWorkspaceName,
@@ -2829,7 +2811,7 @@ export function useWorkspaceStore() {
 
       const savedAt = formatSavedAt();
       const savedResponse = {
-        status: 500,
+        status: 0,
         badge: "Failed",
         statusText: "Request failed",
         duration: "-",
@@ -2846,26 +2828,7 @@ export function useWorkspaceStore() {
         savedAt
       };
 
-      updateStore((current) => ({
-        ...current,
-        workspaces: current.workspaces.map((workspace) => {
-          if (workspace.name !== current.activeWorkspaceName) return workspace;
-          return {
-            ...workspace,
-            collections: workspace.collections.map((collection) => {
-              if (collection.name !== current.activeCollectionName) return collection;
-              return {
-                ...collection,
-                requests: collection.requests.map((request) =>
-                  request.name === activeRequest.name
-                    ? { ...request, responseBodyView: "Raw", lastResponse: savedResponse }
-                    : request
-                )
-              };
-            })
-          };
-        })
-      }));
+      updateStore((current) => attachExecutionResponse(current, executionIdentity, savedResponse));
       recordRequestHistory({
         request: activeRequest,
         workspaceName: activeWorkspaceName,

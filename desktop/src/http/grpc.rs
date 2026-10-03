@@ -220,7 +220,7 @@ pub async fn run(app: AppHandle, payload: GrpcRequestPayload) -> Result<Response
     emit("status", serde_json::json!({"code": code, "message": status.message(), "dropped": capture.dropped}));
     let streamed = matches!(headers.get("x-kivo-grpc-mode").map(String::as_str), Some("server_stream" | "bidi"));
     let body = if streamed { serde_json::to_string_pretty(&capture.messages) } else { serde_json::to_string_pretty(&capture.messages.front().cloned().unwrap_or(Value::Null)) }.map_err(|e| e.to_string())?;
-    Ok(ResponsePayload { status: if code == 0 { 200 } else { 500 }, status_text, headers, cookies: vec![], body, body_base64: String::new(), is_binary: false, content_type: "application/json".into(), duration_ms: started.elapsed().as_millis() })
+    Ok(ResponsePayload { execution: None, status: if code == 0 { 200 } else { 500 }, status_text, headers, cookies: vec![], body, body_base64: String::new(), is_binary: false, content_type: "application/json".into(), duration_ms: started.elapsed().as_millis() })
 }
 
 #[cfg(test)]

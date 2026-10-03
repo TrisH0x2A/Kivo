@@ -6,13 +6,13 @@ import { Card } from "@/components/ui/card.jsx";
 import { cn } from "@/lib/utils.js";
 
 function Section({ title, children }) {
-  return <section className="border border-border/45 bg-background/25 p-3">
+  return <section className="min-w-0 border-b border-border/45 py-3">
     <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{title}</h3>
     {children}
   </section>;
 }
 
-export function RequestExplainModal({ explanation, loading, error, exporting, onExport, onClose }) {
+export function RequestExplainModal({ explanation, loading, error, exporting, onExport, onClose, onPreview, onExecution }) {
   if (!explanation && !loading && !error) return null;
 
   return createPortal(
@@ -23,7 +23,7 @@ export function RequestExplainModal({ explanation, loading, error, exporting, on
             <div className="border border-primary/35 bg-primary/10 p-2 text-primary"><Eye className="h-4 w-4" /></div>
             <div className="min-w-0">
               <h2 className="truncate text-[16px] font-semibold text-foreground">Explain this request</h2>
-              <p className="mt-1 text-[11px] text-muted-foreground">Resolved preview only. Nothing is sent or changed.</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{explanation?.kind === "execution" ? `${explanation.environment?.name || "Default"} / ${explanation.capturedAt} / ${explanation.id}` : "Editor preview / Not an execution record"}</p>
             </div>
           </div>
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={onClose} aria-label="Close request explanation"><X className="h-4 w-4" /></Button>
@@ -33,8 +33,13 @@ export function RequestExplainModal({ explanation, loading, error, exporting, on
           {loading ? <div className="flex h-full items-center justify-center text-[12px] text-muted-foreground">Resolving request...</div> : null}
           {error ? <div role="alert" className="border border-red-400/30 bg-red-400/10 px-3 py-2 text-[12px] text-red-200">{error}</div> : null}
           {explanation ? <div className="grid gap-3">
+            <div className="flex gap-2" role="group" aria-label="Explanation source">
+              <Button size="sm" variant={explanation.kind === "execution" ? "secondary" : "ghost"} disabled={!onExecution} onClick={onExecution} aria-pressed={explanation.kind === "execution"}>Last execution</Button>
+              <Button size="sm" variant={explanation.kind !== "execution" ? "secondary" : "ghost"} onClick={onPreview} aria-pressed={explanation.kind !== "execution"}>Editor preview</Button>
+            </div>
             <Section title="Outgoing request">
-              <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground"><span className="text-primary">{explanation.method}</span><span className="text-muted-foreground">{explanation.url}</span></div>
+              <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground"><span className="text-primary">{explanation.method}</span><span className="min-w-0 break-all text-muted-foreground">{explanation.url}</span></div>
+              {explanation.kind === "execution" && <p className="mt-2 text-[11px] text-muted-foreground">Native request capture / {explanation.attempts} authentication attempt(s). Automatic redirect headers are not captured.</p>}
               <div className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-muted-foreground sm:grid-cols-4">
                 <span>Auth: <b className="font-medium text-foreground">{explanation.authSource}</b></span>
                 <span>Body: <b className="font-medium text-foreground">{explanation.bodyType}</b></span>
@@ -46,7 +51,7 @@ export function RequestExplainModal({ explanation, loading, error, exporting, on
             <div className="grid gap-3 lg:grid-cols-2">
               <Section title={`Headers (${explanation.headers.length})`}>
                 <div className="grid gap-1.5">
-                  {explanation.headers.length ? explanation.headers.map((header) => <div key={`${header.key}-${header.source}`} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_auto] gap-2 text-[11px]"><span className="truncate text-foreground">{header.key}</span><span className="truncate font-mono text-muted-foreground">{header.value}</span><span className="text-[9px] uppercase tracking-[0.12em] text-muted-foreground/70">{header.source}</span></div>) : <span className="text-[11px] text-muted-foreground">No headers.</span>}
+                  {explanation.headers.length ? explanation.headers.map((header, index) => <div key={`${header.key}-${index}`} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 border-b border-border/20 py-1 text-[11px]"><span className="break-all text-foreground">{header.key}<span className="mt-1 block text-[10px] text-muted-foreground" title={header.configuredSources?.join(" > ")}>{header.source}{header.configuredSources?.length > 1 ? ` (${header.configuredSources.length} configured layers)` : ""}</span></span><span className="break-all font-mono text-muted-foreground">{header.value}</span></div>) : <span className="text-[11px] text-muted-foreground">No headers.</span>}
                 </div>
               </Section>
               <Section title={`Variables (${explanation.variables.length})`}>
@@ -58,7 +63,9 @@ export function RequestExplainModal({ explanation, loading, error, exporting, on
 
             <Section title="Body preview">
               <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-5 text-foreground/90">{String(explanation.body || "(empty body)").slice(0, 12000)}</pre>
+              {explanation.bodyTruncated && <p className="text-xs text-muted-foreground">Capture truncated.</p>}
             </Section>
+            {explanation.kind === "execution" && <Section title="Pre-request changes"><div className="text-xs text-muted-foreground">{explanation.scriptChanges?.length ? explanation.scriptChanges.join(", ") : "No request fields changed"}</div><div className="mt-2 text-xs text-muted-foreground">Runtime variables: {explanation.scriptVariableNames?.join(", ") || "None"}</div></Section>}
           </div> : null}
         </div>
 
