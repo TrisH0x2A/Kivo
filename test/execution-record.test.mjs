@@ -7,7 +7,8 @@ test("execution records use native values and never retain private transport inp
   const scripted = { ...original, method: "POST", headers: [{ key: "X-Version", value: "2", enabled: true }] };
   const capture = { id: "exec-1", capturedAt: "2026-10-04T00:00:00Z", method: "POST", url: "https://api.test/login", finalUrl: "https://api.test/login", environment: { id: "staging", name: "Staging" },
     headers: [{ key: "authorization", value: "Bearer fixture-secret" }, { key: "x-version", value: "2" }, { key: "content-type", value: "application/x-www-form-urlencoded" }],
-    body: "password=fixture-pass&session=fixture-session", privateValues: ["fixture-secret"], variables: { merged: { host: "https://api.test" }, workspace: [{ key: "host", value: "https://old.test" }], collection: [{ key: "host", value: "https://api.test" }] } };
+    body: "password=fixture-pass&session=fixture-session", privateValues: ["fixture-secret"], variables: { merged: { host: "https://api.test" }, workspace: [{ key: "host", value: "https://old.test" }], collection: [{ key: "host", value: "https://api.test" }] },
+    settings: { proxyMode: "custom", proxyConfigured: true }, response: { status: 200, statusText: "OK", durationMs: 42, protocol: "HTTP_2", contentType: "application/json", sizeBytes: 128, redirected: true, finalUrl: "https://api.test/login?token=fixture-secret" } };
   const record = buildExecutionRecord({ capture, original, scripted });
   assert.equal(record.id, "exec-1");
   assert.equal(record.environment.name, "Staging");
@@ -16,6 +17,8 @@ test("execution records use native values and never retain private transport inp
   assert.deepEqual(record.headers[1].configuredSources, ["Request", "Pre-request script"]);
   assert.equal(record.variables[0].source, "Collection");
   assert.equal(record.variables[0].overrides, "Workspace");
+  assert.deepEqual(record.actual, { status: 200, statusText: "OK", durationMs: 42, protocol: "HTTP_2", contentType: "application/json", sizeBytes: 128, redirected: true, finalUrl: "[redacted]/login?token=%5Bredacted%5D" });
+  assert.deepEqual(record.settings, { timeoutMs: 0, followRedirects: true, cookieJar: true, proxyMode: "custom", proxyConfigured: true });
   assert.doesNotMatch(JSON.stringify(record), /fixture-secret|fixture-pass|fixture-session|privateValues|https:\/\/api.test/);
   capture.method = "DELETE";
   original.name = "Edited";

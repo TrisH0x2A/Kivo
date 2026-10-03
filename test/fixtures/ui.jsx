@@ -63,7 +63,9 @@ window.__TAURI_INTERNALS__ = {
       }
       case "diagnose_connection": {
         const failed = args.payload.url.includes("offline.invalid");
-        return { target: new URL(args.payload.url).origin, steps: [
+        return { target: new URL(args.payload.url).origin, actual: args.payload.actual ? {
+          ...args.payload.actual, status: 200, statusText: "OK", durationMs: 42, protocol: "HTTP_2", sizeBytes: 96,
+        } : null, steps: [
           { stage: "Proxy", status: "info", durationMs: null, detail: "Synthetic fixture: direct connection.", hint: "" },
           { stage: "DNS", status: failed ? "failed" : "passed", durationMs: 4, detail: failed ? "Synthetic DNS lookup failure." : "2 addresses resolved.", hint: failed ? "Check the hostname, selected environment, VPN and DNS resolver." : "" },
           { stage: "TCP", status: failed ? "skipped" : "passed", durationMs: failed ? null : 12, detail: failed ? "DNS lookup failed." : "Connected to port 443.", hint: "" },

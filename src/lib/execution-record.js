@@ -87,6 +87,7 @@ export function buildExecutionRecord({ capture, original, scripted = original, p
   const scriptChanges = ["method", "url", "queryParams", "headers", "body", "graphqlVariables", "auth"]
     .filter((key) => JSON.stringify(original[key]) !== JSON.stringify(scripted[key]));
   const contentType = capture.headers?.find(({ key }) => key.toLowerCase() === "content-type")?.value || "";
+  const actualResponse = capture.response && typeof capture.response === "object" ? capture.response : null;
   return {
     schemaVersion: 1, kind: "execution", id: capture.id, capturedAt: capture.capturedAt,
     requestId: original.id || "", requestName: original.name || "", workspaceName, collectionName: collection.name || "",
@@ -96,7 +97,23 @@ export function buildExecutionRecord({ capture, original, scripted = original, p
     bodyOmitted: Boolean(capture.bodyOmitted), bodyTruncated: Boolean(capture.bodyTruncated),
     headers, variables, authSource, authType: capture.authType || "none", scriptChanges,
     scriptVariableNames: Object.keys(scriptVars), attempts: capture.attempts || 1,
-    settings: { timeoutMs: capture.settings?.timeoutMs || 0, followRedirects: capture.settings?.followRedirects !== false, cookieJar: capture.settings?.cookieJar !== false },
+    settings: {
+      timeoutMs: capture.settings?.timeoutMs || 0,
+      followRedirects: capture.settings?.followRedirects !== false,
+      cookieJar: capture.settings?.cookieJar !== false,
+      proxyMode: capture.settings?.proxyMode || "inherit",
+      proxyConfigured: Boolean(capture.settings?.proxyConfigured),
+    },
+    actual: actualResponse ? {
+      status: Number(actualResponse.status) || 0,
+      statusText: String(actualResponse.statusText || ""),
+      durationMs: Number(actualResponse.durationMs) || 0,
+      protocol: String(actualResponse.protocol || ""),
+      contentType: redact.text(actualResponse.contentType || ""),
+      sizeBytes: Number(actualResponse.sizeBytes) || 0,
+      redirected: Boolean(actualResponse.redirected),
+      finalUrl: redact.url(actualResponse.finalUrl || capture.finalUrl),
+    } : null,
   };
 }
 

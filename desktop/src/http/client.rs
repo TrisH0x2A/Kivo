@@ -2301,7 +2301,15 @@ pub async fn send_http_request(
     capture["authType"] = serde_json::json!(if payload.auth_type == "inherit" { &col_config.default_auth.auth_type } else { &payload.auth_type });
     capture["attempts"] = serde_json::json!(attempts);
     capture["finalUrl"] = serde_json::json!(response.url().as_str());
-    capture["settings"] = serde_json::json!({ "timeoutMs": effective_timeout_ms, "followRedirects": effective_follow_redirects, "cookieJar": use_cookie_jar });
+    capture["settings"] = serde_json::json!({
+        "timeoutMs": effective_timeout_ms,
+        "followRedirects": effective_follow_redirects,
+        "cookieJar": use_cookie_jar,
+        "proxyMode": request_network.proxy_mode,
+        "proxyConfigured": app_settings.proxy_enabled
+            || !request_network.proxy_http.trim().is_empty()
+            || !request_network.proxy_https.trim().is_empty(),
+    });
     if resolved_body_file_path.is_some() || has_multipart_file_rows {
         capture["body"] = serde_json::json!("");
         capture["bodyOmitted"] = serde_json::json!(true);
@@ -2347,9 +2355,22 @@ pub async fn send_http_request(
         .find(|(key, _)| key.eq_ignore_ascii_case("content-type"))
         .map(|(_, value)| value.clone())
         .unwrap_or_default();
+    let captured_url = capture["url"].as_str().unwrap_or_default().to_string();
+    let response_url = response.url().as_str().to_string();
+    let response_protocol = format!("{:?}", response.version());
     let bytes = response.bytes().await.map_err(|err| err.to_string())?;
     let body_base64 = BASE64_STANDARD.encode(&bytes);
     let body = String::from_utf8(bytes.to_vec()).unwrap_or_default();
+    capture["response"] = serde_json::json!({
+        "status": status.as_u16(),
+        "statusText": status_text.clone(),
+        "durationMs": duration_ms,
+        "protocol": response_protocol,
+        "contentType": content_type.clone(),
+        "sizeBytes": bytes.len(),
+        "redirected": captured_url != response_url,
+        "finalUrl": response_url,
+    });
     let lower_content_type = content_type.to_ascii_lowercase();
     let is_textual = lower_content_type.starts_with("text/")
         || lower_content_type.contains("json")

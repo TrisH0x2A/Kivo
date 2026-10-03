@@ -21,6 +21,43 @@ pub struct DiagnosticInput {
     no_proxy: String,
     client_certificate_path: String,
     client_key_path: String,
+    actual: Option<ActualRequest>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+struct ActualRequest {
+    method: String,
+    url: String,
+    final_url: String,
+    status: u16,
+    status_text: String,
+    duration_ms: u128,
+    protocol: String,
+    content_type: String,
+    size_bytes: u64,
+    redirected: bool,
+    follow_redirects: bool,
+    proxy_mode: String,
+    proxy_configured: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ActualDiagnostic {
+    method: String,
+    target: String,
+    final_target: String,
+    status: u16,
+    status_text: String,
+    duration_ms: u128,
+    protocol: String,
+    content_type: String,
+    size_bytes: u64,
+    redirected: bool,
+    follow_redirects: bool,
+    proxy_mode: String,
+    proxy_configured: bool,
 }
 
 #[derive(Serialize)]
@@ -37,6 +74,7 @@ pub struct DiagnosticStep {
 #[serde(rename_all = "camelCase")]
 pub struct DiagnosticReport {
     target: String,
+    actual: Option<ActualDiagnostic>,
     steps: Vec<DiagnosticStep>,
 }
 
@@ -62,10 +100,38 @@ pub async fn diagnose_connection(app: AppHandle, payload: DiagnosticInput) -> Re
         client_certificate_path: resolve_payload_value(&payload.client_certificate_path, &env),
         client_key_path: resolve_payload_value(&payload.client_key_path, &env),
     };
-    diagnose(&url, &settings, &network).await
+    diagnose(&url, &settings, &network, payload.actual.as_ref()).await
 }
 
-async fn diagnose(raw_url: &str, settings: &AppSettings, network: &RequestNetworkOptions) -> Result<DiagnosticReport, String> {
+fn safe_origin(raw_url: &str) -> String {
+    let Ok(mut url) = url::Url::parse(raw_url) else { return "-".into(); };
+    url.set_username("").ok();
+    url.set_password(None).ok();
+    url.set_path("");
+    url.set_query(None);
+    url.set_fragment(None);
+    url.origin().ascii_serialization()
+}
+
+fn actual_diagnostic(actual: &ActualRequest) -> ActualDiagnostic {
+    ActualDiagnostic {
+        method: actual.method.clone(),
+        target: safe_origin(&actual.url),
+        final_target: safe_origin(&actual.final_url),
+        status: actual.status,
+        status_text: actual.status_text.clone(),
+        duration_ms: actual.duration_ms,
+        protocol: actual.protocol.clone(),
+        content_type: actual.content_type.clone(),
+        size_bytes: actual.size_bytes,
+        redirected: actual.redirected,
+        follow_redirects: actual.follow_redirects,
+        proxy_mode: actual.proxy_mode.clone(),
+        proxy_configured: actual.proxy_configured,
+    }
+}
+
+async fn diagnose(raw_url: &str, settings: &AppSettings, network: &RequestNetworkOptions, actual: Option<&ActualRequest>) -> Result<DiagnosticReport, String> {
     let mut url = url::Url::parse(raw_url).map_err(|_| "Enter a valid HTTP or HTTPS URL.")?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() || raw_url.contains("{{") {
         return Err("Diagnostics require a resolved HTTP or HTTPS URL.".into());
@@ -73,7 +139,7 @@ async fn diagnose(raw_url: &str, settings: &AppSettings, network: &RequestNetwor
     url.set_username("").map_err(|_| "Invalid URL authority")?;
     url.set_password(None).map_err(|_| "Invalid URL authority")?;
     url.set_fragment(None);
-    let mut report = DiagnosticReport { target: url.origin().ascii_serialization(), steps: Vec::new() };
+    let mut report = DiagnosticReport { target: url.origin().ascii_serialization(), actual: actual.map(actual_diagnostic), steps: Vec::new() };
     // Do not probe the origin directly when the request may use a proxy.
     let proxy_possible = settings.proxy_enabled || network.proxy_mode == "custom" ||
         ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"].iter().any(|key| std::env::var(key).is_ok_and(|value| !value.is_empty()));
@@ -216,7 +282,7 @@ mod tests {
                 });
             }
         });
-        let report = diagnose(&format!("http://{address}/?token=private-input"), &AppSettings::default(), &RequestNetworkOptions::default()).await.unwrap();
+        let report = diagnose(&format!("http://{address}/?token=private-input"), &AppSettings::default(), &RequestNetworkOptions::default(), None).await.unwrap();
         server.abort();
         assert!(report.steps.iter().any(|step| step.stage == "Application" && step.detail.contains("302") && step.duration_ms.is_some()));
         assert!(report.steps.iter().any(|step| step.stage == "Redirect" && step.status == "warning"));
@@ -226,7 +292,7 @@ mod tests {
     #[tokio::test]
     async fn rejects_unresolved_and_non_http_targets() {
         for url in ["file:///secret", "https://example.com/{{missing}}"] {
-            assert!(diagnose(url, &AppSettings::default(), &RequestNetworkOptions::default()).await.is_err());
+            assert!(diagnose(url, &AppSettings::default(), &RequestNetworkOptions::default(), None).await.is_err());
         }
     }
 
@@ -235,7 +301,7 @@ mod tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         drop(listener);
-        let report = diagnose(&format!("http://{address}"), &AppSettings::default(), &RequestNetworkOptions::default()).await.unwrap();
+        let report = diagnose(&format!("http://{address}"), &AppSettings::default(), &RequestNetworkOptions::default(), None).await.unwrap();
         assert!(report.steps.iter().any(|step| step.stage == "Application" && step.status == "failed" && step.duration_ms.is_some()));
         assert!(report.steps.iter().any(|step| step.stage == "Redirect" && step.status == "skipped"));
     }
@@ -250,11 +316,36 @@ mod tests {
             let _ = stream.read(&mut bytes).await;
             let _ = stream.write_all(b"HTTP/1.1 400 Bad Request\r\n\r\n").await;
         });
-        let mut report = DiagnosticReport { target: url.origin().ascii_serialization(), steps: Vec::new() };
+        let mut report = DiagnosticReport { target: url.origin().ascii_serialization(), actual: None, steps: Vec::new() };
         direct_checks(&url, &AppSettings::default(), &RequestNetworkOptions::default(), &mut report).await;
         server.await.unwrap();
         assert!(report.steps.iter().any(|step| step.stage == "DNS" && step.status == "passed"));
         assert!(report.steps.iter().any(|step| step.stage == "TCP" && step.status == "passed"));
         assert!(report.steps.iter().any(|step| step.stage == "TLS" && step.status == "failed" && step.duration_ms.is_some()));
+    }
+
+    #[test]
+    fn actual_request_report_keeps_only_origins() {
+        let actual = ActualRequest {
+            method: "GET".into(),
+            url: "https://user:secret@example.test/users?token=private".into(),
+            final_url: "https://api.example.test/login?code=private".into(),
+            status: 200,
+            status_text: "OK".into(),
+            duration_ms: 42,
+            protocol: "HTTP_2".into(),
+            content_type: "application/json".into(),
+            size_bytes: 16,
+            redirected: true,
+            follow_redirects: true,
+            proxy_mode: "inherit".into(),
+            proxy_configured: false,
+        };
+        let report = actual_diagnostic(&actual);
+        assert_eq!(report.target, "https://example.test");
+        assert_eq!(report.final_target, "https://api.example.test");
+        let encoded = serde_json::to_string(&report).unwrap();
+        assert!(!encoded.contains("secret"));
+        assert!(!encoded.contains("private"));
     }
 }
