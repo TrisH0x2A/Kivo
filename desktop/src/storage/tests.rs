@@ -52,6 +52,7 @@ fn make_request(name: &str) -> RequestRecord {
         docs: String::new(),
         contract: serde_json::Value::Null,
         comparison_profiles: vec![],
+        regression_baselines: vec![],
         tags: vec![],
         url_encoding: true,
         follow_redirects: true,

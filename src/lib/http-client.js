@@ -190,6 +190,7 @@ function sanitizeRequestForSave(request, options = {}) {
     docs: String(request?.docs ?? ""),
     contract: request?.contract ?? null,
     comparisonProfiles: Array.isArray(request?.comparisonProfiles) ? request.comparisonProfiles : [],
+    regressionBaselines: Array.isArray(request?.regressionBaselines) ? request.regressionBaselines : [],
     activeEditorTab: String(request?.activeEditorTab ?? "Params"),
     activeResponseTab: String(request?.activeResponseTab ?? "Body"),
     responseBodyView: String(request?.responseBodyView ?? "JSON"),

@@ -429,6 +429,8 @@ pub struct RequestRecord {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub comparison_profiles: Vec<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regression_baselines: Vec<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
     #[serde(default = "default_true")]
     pub url_encoding: bool,

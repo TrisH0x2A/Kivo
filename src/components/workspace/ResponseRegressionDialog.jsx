@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { FlaskConical, X } from "lucide-react";
+import { FlaskConical, Save, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button.jsx";
 import { appendRegressionScript, buildRegressionScript, getRegressionFields } from "@/lib/response-regression.js";
+import { buildRegressionBaseline, compareRegressionBaseline, upsertRegressionBaseline } from "@/lib/regression-baselines.js";
 
-export function ResponseRegressionDialog({ response, existingScript, onAdd, onClose }) {
+export function ResponseRegressionDialog({ response, existingScript, baselines = [], onBaselinesChange, onAdd, onClose }) {
   const dialog = useRef(null);
   const fields = useMemo(() => getRegressionFields(response), [response]);
   const [status, setStatus] = useState(true);
   const [contentType, setContentType] = useState(true);
   const [selected, setSelected] = useState({});
+  const [baselineId, setBaselineId] = useState("");
+  const [baselineName, setBaselineName] = useState("");
+  const [baselineMessage, setBaselineMessage] = useState("");
   useEffect(() => {
     const node = dialog.current;
     node.showModal();
@@ -22,6 +26,19 @@ export function ResponseRegressionDialog({ response, existingScript, onAdd, onCl
     } catch (error) { return { script: "", error: error.message }; }
   }, [response, status, contentType, selected, existingScript]);
   function update(id, patch) { setSelected((current) => ({ ...current, [id]: { ...current[id], ...patch } })); }
+  function saveBaseline() {
+    try {
+      const current = baselines.find((entry) => entry.id === baselineId);
+      const baseline = buildRegressionBaseline(response, baselineName, current?.id);
+      onBaselinesChange(upsertRegressionBaseline(baselines, baseline));
+      setBaselineId(baseline.id); setBaselineName(baseline.name); setBaselineMessage("Baseline saved");
+    } catch (error) { setBaselineMessage(error.message); }
+  }
+  let baselineDiff = null;
+  if (baselineId) {
+    try { baselineDiff = compareRegressionBaseline(baselines.find((entry) => entry.id === baselineId), response); }
+    catch (error) { baselineDiff = { error: error.message }; }
+  }
   return <dialog ref={dialog} aria-labelledby="regression-title" onCancel={onClose} className="m-auto w-[min(900px,94vw)] max-w-none rounded border border-border bg-background p-0 text-foreground shadow-xl backdrop:bg-black/50">
     <div className="flex max-h-[88dvh] min-h-0 flex-col">
       <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
@@ -29,6 +46,13 @@ export function ResponseRegressionDialog({ response, existingScript, onAdd, onCl
         <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close regression tests"><X className="h-4 w-4" /></Button>
       </header>
       <div className="thin-scrollbar min-h-0 overflow-auto p-5">
+        <section className="mb-5 border-b border-border/40 pb-4">
+          <div className="mb-2 flex items-center justify-between gap-3"><div><h3 className="text-xs font-medium">Regression baselines</h3><p className="mt-1 text-xs text-muted-foreground">Version a response before accepting new assertions.</p></div><span className="text-[10px] text-muted-foreground">{baselines.length}/20</span></div>
+          <div className="flex flex-wrap items-center gap-2"><select aria-label="Regression baseline" className="h-8 min-w-0 flex-1 rounded-sm border border-border bg-background px-2 text-xs" value={baselineId} onChange={(event) => { setBaselineId(event.target.value); setBaselineMessage(""); }}><option value="">No baseline selected</option>{baselines.map((baseline) => <option key={baseline.id} value={baseline.id}>{baseline.name}</option>)}</select><input aria-label="Baseline name" className="h-8 min-w-0 flex-1 rounded-sm border border-border bg-background px-2 text-xs" maxLength={80} placeholder="Baseline name" value={baselineName} onChange={(event) => { setBaselineName(event.target.value); setBaselineMessage(""); }} /><Button size="icon" variant="ghost" title="Save response baseline" aria-label="Save response baseline" onClick={saveBaseline}><Save className="h-4 w-4" /></Button><Button size="icon" variant="ghost" title="Delete response baseline" aria-label="Delete response baseline" disabled={!baselineId} onClick={() => { onBaselinesChange(baselines.filter((entry) => entry.id !== baselineId)); setBaselineId(""); setBaselineName(""); setBaselineMessage("Baseline deleted"); }}><Trash2 className="h-4 w-4" /></Button></div>
+          {baselineMessage && <p role="status" className="mt-2 text-xs text-muted-foreground">{baselineMessage}</p>}
+          {baselineDiff && !baselineDiff.error && <p className="mt-2 text-xs">Current response {baselineDiff.statusChanged || baselineDiff.body.changed ? "differs from" : "matches"} baseline{baselineDiff.body.entries.length ? ` (${baselineDiff.body.entries.length} body change${baselineDiff.body.entries.length === 1 ? "" : "s"})` : ""}.</p>}
+          {baselineDiff?.error && <p role="alert" className="mt-2 text-xs text-destructive">{baselineDiff.error}</p>}
+        </section>
         <div className="mb-4 flex flex-wrap gap-5 text-xs">
           <label className="flex items-center gap-2"><input type="checkbox" checked={status} onChange={(event) => setStatus(event.target.checked)} />Status {response.status}</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={contentType} onChange={(event) => setContentType(event.target.checked)} />Content type</label>

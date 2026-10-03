@@ -82,6 +82,7 @@ export function WorkspaceView({
           regressionScript={request.scriptAfterResponse || ""}
           request={request}
           onAddRegression={(script) => onUpdateActiveRequest((current) => ({ ...current, scriptAfterResponse: appendRegressionScript(current.scriptAfterResponse, script), activeEditorTab: "Scripts", scriptActivePhase: "after-response" }))}
+          onBaselinesChange={(regressionBaselines) => onUpdateActiveRequest((current) => ({ ...current, regressionBaselines }))}
           isSending={isSending}
           sendStartedAt={sendStartedAt}
           onCancelSend={onCancelSend}

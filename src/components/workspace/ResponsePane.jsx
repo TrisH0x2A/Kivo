@@ -77,6 +77,7 @@ export function ResponsePane({
   onClearResponse,
   regressionScript = "",
   onAddRegression,
+  onBaselinesChange,
   request,
 }) {
   const tone = getTone(response.status);
@@ -243,7 +244,7 @@ export function ResponsePane({
 
   return (
     <Card role="region" aria-label="Response inspector" className="kivo-response-pane flex h-full min-h-0 flex-col gap-0 overflow-hidden p-0">
-      {regressionOpen && <ResponseRegressionDialog response={response} existingScript={regressionScript} onClose={() => setRegressionOpen(false)} onAdd={(script) => { onAddRegression(script); setRegressionOpen(false); }} />}
+      {regressionOpen && <ResponseRegressionDialog response={response} existingScript={regressionScript} baselines={request?.regressionBaselines || []} onBaselinesChange={onBaselinesChange} onClose={() => setRegressionOpen(false)} onAdd={(script) => { onAddRegression(script); setRegressionOpen(false); }} />}
       {diagnosticsOpen && <ConnectionDiagnosticsDialog request={request} workspaceName={workspaceName} collectionName={collectionName} onClose={() => setDiagnosticsOpen(false)} />}
       <div className="kivo-response-metrics flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 border-b px-4 py-3 text-[12px] text-muted-foreground">
         <div className="order-2 flex items-center gap-3 font-mono">

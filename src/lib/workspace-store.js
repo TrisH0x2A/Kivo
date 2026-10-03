@@ -439,6 +439,7 @@ export function normalizeRequestRecord(request) {
       : [],
     tags: Array.isArray(request?.tags) ? request.tags.map((tag) => String(tag)) : [],
     comparisonProfiles: Array.isArray(request?.comparisonProfiles) ? request.comparisonProfiles : [],
+    regressionBaselines: Array.isArray(request?.regressionBaselines) ? request.regressionBaselines : [],
     urlEncoding: request?.urlEncoding ?? true,
     followRedirects: request?.followRedirects ?? true,
     maxRedirects: Number.isFinite(request?.maxRedirects) ? Number(request.maxRedirects) : 5,
