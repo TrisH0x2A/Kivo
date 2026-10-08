@@ -586,6 +586,38 @@ mod rename_tests {
     }
 }
 
+#[test]
+fn external_request_changes_block_stale_saves() {
+    let dir = TempDir::new().unwrap();
+    let workspace = WorkspaceRecord { id: "ws".into(), name: "Demo".into(), description: None, collections: vec![CollectionRecord { id: "col".into(), name: "API".into(), folders: vec![], folder_settings: vec![], requests: vec![make_request("Health")] }] };
+    fs_save_workspaces(dir.path(), &[workspace.clone()]).unwrap();
+    let (_, revision) = super::io::fs_load_workspaces_snapshot(dir.path()).unwrap();
+    let path = dir.path().join("Demo/collections/API/Health.json");
+    let mut changed = make_request("Health");
+    changed.url = "https://external.example/health".into();
+    fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
+    assert!(super::io::fs_save_workspaces_checked(dir.path(), &[workspace], Some(&revision)).unwrap_err().starts_with("KIVO_EXTERNAL_CHANGE:"));
+    let (loaded, fresh) = super::io::fs_load_workspaces_snapshot(dir.path()).unwrap();
+    assert_eq!(loaded[0].collections[0].requests[0].url, changed.url);
+    assert_ne!(fresh, revision);
+    super::io::fs_save_workspaces_checked(dir.path(), &loaded, Some(&fresh)).unwrap();
+}
+
+#[test]
+fn external_environment_changes_block_stale_saves() {
+    let dir = TempDir::new().unwrap();
+    let workspace = WorkspaceRecord { id: "ws".into(), name: "Demo".into(), description: None, collections: vec![] };
+    fs_save_workspaces(dir.path(), &[workspace]).unwrap();
+    let before = fs_get_env_vars(dir.path(), "Demo", None, None).unwrap();
+    fs::write(dir.path().join("Demo/.env"), "URL=external\n").unwrap();
+    let local = vec![EnvVar { key: "URL".into(), value: "local".into() }];
+    assert!(super::io::fs_save_env_vars_checked(dir.path(), "Demo", None, None, &local, Some(&before.workspace_revision)).unwrap_err().starts_with("KIVO_EXTERNAL_CHANGE:"));
+    let after = fs_get_env_vars(dir.path(), "Demo", None, None).unwrap();
+    assert_eq!(after.workspace[0].value, "external");
+    super::io::fs_save_env_vars_checked(dir.path(), "Demo", None, None, &local, Some(&after.workspace_revision)).unwrap();
+    assert_eq!(fs_get_env_vars(dir.path(), "Demo", None, None).unwrap().workspace[0].value, "local");
+}
+
 #[cfg(test)]
 mod path_safety_tests {
     use super::*;

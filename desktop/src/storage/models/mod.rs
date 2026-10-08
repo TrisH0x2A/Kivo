@@ -37,6 +37,10 @@ pub struct EnvVarsResult {
     pub workspace: Vec<EnvVar>,
     pub collection: Vec<EnvVar>,
     pub merged: HashMap<String, String>,
+    #[serde(default)]
+    pub workspace_revision: String,
+    #[serde(default)]
+    pub collection_revision: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -218,6 +222,8 @@ impl Default for AppSettings {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PersistedAppState {
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub storage_revision: String,
     #[serde(default)]
     pub version: u8,
     pub storage_path: Option<std::path::PathBuf>,
@@ -825,6 +831,7 @@ pub fn default_inherit_auth_record() -> AuthRecord {
 
 pub fn default_state() -> PersistedAppState {
     PersistedAppState {
+        storage_revision: String::new(),
         version: 1,
         storage_path: None,
         active_workspace_name: String::new(),

@@ -758,6 +758,7 @@ export function CollectionSettingsPage({
             />
             <Card className="kivo-panel mt-2 flex min-h-0 flex-1 flex-col overflow-hidden">
               <EnvEditor
+                key={`${workspace?.name}/${collection?.name}/${activeWorkspaceEnvironmentId}`}
                 workspaceName={workspace?.name}
                 collectionName={collection?.name}
                 workspaceEnvironmentId={activeWorkspaceEnvironmentId}

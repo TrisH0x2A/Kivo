@@ -32,7 +32,8 @@ httpFixture.contract = { responses: { "200": { type: "object", required: ["items
 const workspace = { ...createWorkspace("UI Fixture"), collections: [collection], activeCollectionName: collection.name };
 let state = { ...createDefaultStore(), storagePath: "fixture-only", workspaces: [workspace], activeWorkspaceName: workspace.name, activeCollectionName: collection.name, activeRequestName: collection.requests[0].name };
 let config = { defaultHeaders: [], defaultAuth: { type: "none" }, scripts: { preRequest: "", postResponse: "" } };
-const env = { workspace: [{ key: "baseUrl", value: "https://api.example.com" }], collection: [], merged: { baseUrl: "https://api.example.com" } };
+const env = { workspaceRevision: "fixture-env-1", collectionRevision: "fixture-env-1", workspace: [{ key: "baseUrl", value: "https://api.example.com" }], collection: [], merged: { baseUrl: "https://api.example.com" } };
+let storageRevision = 1;
 let callbackId = 0;
 let activeEnvironmentId = "default";
 const environments = [{ id: "default", name: "Default" }, { id: "staging", name: "Staging" }];
@@ -43,13 +44,21 @@ window.__TAURI_INTERNALS__ = {
   async invoke(command, args = {}) {
     switch (command) {
       case "get_app_config": return { storagePath: "fixture-only" };
-      case "load_app_state": return structuredClone(state);
-      case "save_app_state": state = structuredClone(args.payload); return;
+      case "load_app_state": return { ...structuredClone(state), storageRevision: String(storageRevision) };
+      case "get_workspace_revision": return String(storageRevision);
+      case "save_app_state": state = structuredClone(args.payload); return String(++storageRevision);
       case "get_or_create_auth_secret_seed": return "synthetic-ui-fixture-seed";
       case "get_resolved_storage_path": return "fixture-only";
       case "get_app_settings": return state.appSettings;
       case "set_app_settings": state.appSettings = args.settings; return args.settings;
       case "get_env_vars": return structuredClone(env);
+      case "save_env_vars": {
+        const scope = args.collectionName ? "collection" : "workspace";
+        env[scope] = structuredClone(args.vars);
+        env[`${scope}Revision`] += "1";
+        env.merged = Object.fromEntries([...env.workspace, ...env.collection].map((row) => [row.key, row.value]));
+        return env[`${scope}Revision`];
+      }
       case "get_collection_config": return structuredClone(config);
       case "save_collection_config": config = structuredClone(args.config); return;
       case "get_workspace_environments_cmd": return { activeEnvironmentId, environments };

@@ -15,6 +15,8 @@ import {
   realtimeEmitSocketIo,
   realtimeSend,
   saveAppState,
+  acceptWorkspaceRevision,
+  workspaceHasExternalChanges,
   saveCollectionConfig,
   sendGrpcRequest,
   subscribeGrpc,
@@ -46,6 +48,7 @@ import { buildHistorySnapshots, redactHistoryUrl } from "@/lib/history-utils.js"
 import { loadWorkspaceStartup } from "@/lib/workspace-startup.js";
 import { applyGrpcEvent, createGrpcCapture, grpcCaptureBody } from "@/lib/grpc-session.js";
 import { attachExecutionResponse, buildExecutionRecord } from "@/lib/execution-record.js";
+import { mergeStorage } from "@/lib/storage-merge.js";
 
 const SIDEBAR_COLLAPSED_WIDTH = 52;
 const SIDEBAR_MIN_WIDTH = 220;
@@ -575,6 +578,11 @@ export function useWorkspaceStore() {
   const renamePendingRef = useRef(false);
   const saveTimerRef = useRef(null);
   const saveFingerprintRef = useRef("");
+  const savedStoreRef = useRef(null);
+  const currentStoreRef = useRef(store);
+  currentStoreRef.current = store;
+  const conflictPendingRef = useRef(false);
+  const [storageConflict, setStorageConflict] = useState(null);
   const resizeRef = useRef({ active: false, startX: 0, startWidth: 304 });
   const activeHttpRequestIdRef = useRef("");
   const wsConnectionsRef = useRef(new Map());
@@ -651,6 +659,9 @@ export function useWorkspaceStore() {
         };
 
         if (!cancelled) {
+          savedStoreRef.current = normalized;
+          conflictPendingRef.current = false;
+          setStorageConflict(null);
           setStore(normalized);
           setIsHydrated(true);
         }
@@ -709,7 +720,7 @@ export function useWorkspaceStore() {
   }, []);
 
   useEffect(() => {
-    if (!isHydrated || isRenaming) {
+    if (!isHydrated || isRenaming || conflictPendingRef.current) {
       return undefined;
     }
 
@@ -729,8 +740,10 @@ export function useWorkspaceStore() {
       saveAppState(store)
         .then(() => {
           saveFingerprintRef.current = fingerprint;
+          savedStoreRef.current = store;
         })
         .catch((error) => {
+          if (toErrorText(error).startsWith("KIVO_EXTERNAL_CHANGE:")) { reviewExternalChanges(); return; }
           toast.error("Changes not saved", { id: "workspace-save-error", description: toErrorText(error), duration: 10000 });
         });
     }, 300);
@@ -738,7 +751,49 @@ export function useWorkspaceStore() {
     return () => {
       window.clearTimeout(saveTimerRef.current);
     };
-  }, [isHydrated, isRenaming, store]);
+  }, [isHydrated, isRenaming, store, storageConflict]);
+
+  async function reviewExternalChanges() {
+    if (conflictPendingRef.current) return;
+    conflictPendingRef.current = true;
+    window.clearTimeout(saveTimerRef.current);
+    try {
+      const remote = await loadAppState({ acceptRevision: false });
+      setStorageConflict({ remote: normalizeStore(remote), revision: remote.storageRevision, base: savedStoreRef.current?.workspaces || [] });
+    } catch (error) {
+      conflictPendingRef.current = false;
+      toast.error("Cannot review external changes", { description: toErrorText(error) });
+    }
+  }
+
+  useEffect(() => {
+    if (!isHydrated || isRenaming) return;
+    let checking = false;
+    let cancelled = false;
+    const check = async () => {
+      if (checking || conflictPendingRef.current || document.hidden) return;
+      checking = true;
+      try { if (await workspaceHasExternalChanges() && !cancelled) await reviewExternalChanges(); }
+      catch (error) { if (!cancelled) toast.error("Cannot check external edits", { id: "storage-watch-error", description: toErrorText(error) }); }
+      finally { checking = false; }
+    };
+    const timer = window.setInterval(check, 8000);
+    window.addEventListener("focus", check);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", check); };
+  }, [isHydrated, isRenaming]);
+
+  const storageReview = storageConflict ? mergeStorage(storageConflict.base, store.workspaces, storageConflict.remote.workspaces) : null;
+  function resolveStorageConflict(choice, choices = {}) {
+    if (!storageConflict) return;
+    const local = currentStoreRef.current;
+    const workspaces = choice === "remote" ? storageConflict.remote.workspaces : choice === "local" ? local.workspaces : mergeStorage(storageConflict.base, local.workspaces, storageConflict.remote.workspaces, choices).value;
+    savedStoreRef.current = { ...local, workspaces: storageConflict.remote.workspaces };
+    acceptWorkspaceRevision(storageConflict.revision);
+    saveFingerprintRef.current = "";
+    conflictPendingRef.current = false;
+    setStorageConflict(null);
+    setStore(normalizeStore({ ...local, workspaces }));
+  }
 
   useEffect(() => {
     function handleAppSettingsUpdated(event) {
@@ -1675,7 +1730,7 @@ export function useWorkspaceStore() {
   }
 
   async function persistRename(transform) {
-    if (!isHydrated || renamePendingRef.current) return;
+    if (!isHydrated || renamePendingRef.current || conflictPendingRef.current) return;
     const next = transform(store);
     if (next === store) return;
     renamePendingRef.current = true;
@@ -1684,8 +1739,10 @@ export function useWorkspaceStore() {
     try {
       // Publish new names only after their files and configuration are available.
       await saveAppState(next);
+      savedStoreRef.current = next;
       updateStore(transform);
     } catch (error) {
+      if (toErrorText(error).startsWith("KIVO_EXTERNAL_CHANGE:")) reviewExternalChanges();
       toast.error("Rename failed", { description: toErrorText(error) });
     } finally {
       renamePendingRef.current = false;
@@ -2926,6 +2983,8 @@ export function useWorkspaceStore() {
 
   return {
     store,
+    storageReview,
+    resolveStorageConflict,
     isSending,
     sendStartedAt,
     isHydrated,

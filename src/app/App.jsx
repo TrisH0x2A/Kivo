@@ -8,6 +8,7 @@ import { RequestTabs } from "@/components/workspace/RequestTabs.jsx";
 import { SidebarResizer } from "@/components/workspace/SidebarResizer.jsx";
 import { Updater } from "@/components/Updater.jsx";
 import { WorkspaceModal } from "@/components/workspace/WorkspaceModal.jsx";
+import { StorageConflictReview } from "@/components/workspace/StorageConflictReview.jsx";
 import { Button } from "@/components/ui/button.jsx";
 import { useTheme } from "@/hooks/use-theme.js";
 import { useWorkspaceStore } from "@/hooks/use-workspace-store.js";
@@ -124,6 +125,8 @@ export default function App() {
 
   const {
     store,
+    storageReview,
+    resolveStorageConflict,
     isSending,
     sendStartedAt,
     isSetupComplete,
@@ -483,6 +486,7 @@ export default function App() {
         </div>
       )}
       <div inert={isRenaming || undefined} aria-busy={isRenaming} className="kivo-app-shell flex h-full min-h-0 flex-col overflow-hidden border border-border/10">
+        {storageReview && <StorageConflictReview review={storageReview} onResolve={resolveStorageConflict} />}
         <WorkbenchHeader
           key={activeWorkspace?.name}
           workspaces={store.workspaces}

@@ -455,10 +455,15 @@ pub fn load_collection_config_from_path(collection_path: &Path) -> CollectionCon
 }
 
 pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
+    fs_load_workspaces_snapshot(root).map(|(workspaces, _)| workspaces)
+}
+
+pub fn fs_load_workspaces_snapshot(root: &Path) -> Result<(Vec<WorkspaceRecord>, String), String> {
     let _guard = durable::storage_lock()?;
     durable::recover(root)?;
+    let revision = workspaces_revision(root)?;
     if !root.exists() {
-        return Ok(vec![]);
+        return Ok((vec![], revision));
     }
     let mut workspaces = Vec::new();
     let entries = fs::read_dir(root).map_err(|e| format!("Failed to read storage root: {e}"))?;
@@ -536,12 +541,19 @@ pub fn fs_load_workspaces(root: &Path) -> Result<Vec<WorkspaceRecord>, String> {
             collections,
         });
     }
-    Ok(workspaces)
+    if revision != workspaces_revision(root)? { return Err("Storage changed while loading. Try again.".to_string()); }
+    Ok((workspaces, revision))
 }
 
 pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result<(), String> {
+    fs_save_workspaces_checked(root, workspaces, None).map(|_| ())
+}
+
+pub fn fs_save_workspaces_checked(root: &Path, workspaces: &[WorkspaceRecord], expected: Option<&str>) -> Result<String, String> {
     let _guard = durable::storage_lock()?;
     durable::recover(root)?;
+    let revision = workspaces_revision(root)?;
+    if expected.is_some_and(|expected| expected != revision) { return Err("KIVO_EXTERNAL_CHANGE:requests".to_string()); }
     let mut plan = SavePlan::default();
     super::paths::validate_snapshot(root, workspaces)?;
     validate_identities(root, workspaces)?;
@@ -666,6 +678,7 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
     }
     plan.removals.sort();
     plan.removals.dedup();
+    if revision != workspaces_revision(root)? { return Err("KIVO_EXTERNAL_CHANGE:requests".to_string()); }
     durable::commit(root, plan)?;
     for workspace in workspaces {
         for collection in &workspace.collections {
@@ -676,7 +689,47 @@ pub fn fs_save_workspaces(root: &Path, workspaces: &[WorkspaceRecord]) -> Result
             }
         }
     }
-    Ok(())
+    workspaces_revision(root)
+}
+
+pub fn workspaces_revision(root: &Path) -> Result<String, String> {
+    let mut files = Vec::new();
+    if root.exists() {
+        for entry in fs::read_dir(root).map_err(|e| e.to_string())? {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            let manifest = path.join(WORKSPACE_FILE_NAME);
+            if !manifest.is_file() { continue; }
+            durable::relative_path(root, &manifest)?;
+            let workspace: WorkspaceFile = serde_json::from_slice(&fs::read(&manifest).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            files.push(manifest);
+            for collection in workspace.collections {
+                let directory = super::paths::metadata_collection_dir(root, &path, &collection.path)?;
+                if directory.is_dir() { files.extend(collect_request_json_files(&directory)?); }
+            }
+        }
+    }
+    files.sort();
+    let mut hash = Sha256::new();
+    hash.update(root.to_string_lossy().as_bytes());
+    for path in files {
+        let relative = durable::relative_path(root, &path)?;
+        let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+        hash.update(relative.to_string_lossy().as_bytes());
+        hash.update((bytes.len() as u64).to_le_bytes());
+        hash.update(bytes);
+    }
+    Ok(hex::encode(hash.finalize()))
+}
+
+fn file_revision(path: &Path) -> Result<String, String> {
+    let mut hash = Sha256::new();
+    hash.update(path.to_string_lossy().as_bytes());
+    match fs::read(path) {
+        Ok(bytes) => { hash.update([1]); hash.update(bytes); }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => hash.update([0]),
+        Err(error) => return Err(error.to_string()),
+    };
+    Ok(hex::encode(hash.finalize()))
 }
 
 pub fn collection_config_revision(collection_path: &Path) -> String {
@@ -692,14 +745,18 @@ pub fn fs_get_env_vars(
     collection_name: Option<&str>,
     workspace_environment_id: Option<&str>,
 ) -> Result<EnvVarsResult, String> {
+    let _guard = durable::storage_lock()?;
     let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     let effective_env_id = resolve_effective_environment_id(&ws_path, workspace_environment_id);
     let workspace_env_path = workspace_env_file_path(&ws_path, &effective_env_id);
+    let workspace_revision = file_revision(&workspace_env_path)?;
     let workspace_vars = parse_env_file_ordered(&workspace_env_path);
+    let mut collection_revision = String::new();
     let collection_vars = match collection_name {
         Some(col) => {
             let col_path = super::paths::collection_dir(root, workspace_name, col)?;
             let collection_env_path = collection_env_file_path(&col_path, &effective_env_id);
+            collection_revision = file_revision(&collection_env_path)?;
             parse_env_file_ordered(&collection_env_path)
         }
         None => vec![],
@@ -715,6 +772,8 @@ pub fn fs_get_env_vars(
         workspace: workspace_vars,
         collection: collection_vars,
         merged,
+        workspace_revision,
+        collection_revision,
     })
 }
 
@@ -725,6 +784,11 @@ pub fn fs_save_env_vars(
     workspace_environment_id: Option<&str>,
     vars: &[EnvVar],
 ) -> Result<(), String> {
+    fs_save_env_vars_checked(root, workspace_name, collection_name, workspace_environment_id, vars, None).map(|_| ())
+}
+
+pub fn fs_save_env_vars_checked(root: &Path, workspace_name: &str, collection_name: Option<&str>, workspace_environment_id: Option<&str>, vars: &[EnvVar], expected: Option<&str>) -> Result<String, String> {
+    let _guard = durable::storage_lock()?;
     let ws_path = super::paths::workspace_dir(root, workspace_name)?;
     let effective_env_id = resolve_effective_environment_id(&ws_path, workspace_environment_id);
     let env_path = match collection_name {
@@ -743,7 +807,10 @@ pub fn fs_save_env_vars(
             workspace_env_file_path(&ws_path, &effective_env_id)
         }
     };
-    write_env_file(&env_path, vars)
+    let actual = file_revision(&env_path)?;
+    if expected.is_some_and(|expected| actual != expected) { return Err("KIVO_EXTERNAL_CHANGE:environment".to_string()); }
+    write_env_file(&env_path, vars)?;
+    file_revision(&env_path)
 }
 
 pub fn fs_save_collection_config(

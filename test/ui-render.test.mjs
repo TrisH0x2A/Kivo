@@ -112,6 +112,14 @@ test("collection config merges independent edits and reports conflicts", async (
   assert.deepEqual(conflict.conflicts, ["scripts.preRequest"]);
 });
 
+test("external change review is accessible and keeps secret values collapsed", async () => {
+  const { StorageConflictReview } = await server.ssrLoadModule("/src/components/workspace/StorageConflictReview.jsx");
+  const html = render(StorageConflictReview, { review: { changes: [{ path: "/url", kind: "changed" }], conflicts: [{ path: "/auth/token", local: "private", remote: "other" }] } });
+  assert.match(html, /aria-label="External changes detected"/);
+  assert.match(html, /Saving paused/);
+  assert.doesNotMatch(html, /private|other/);
+});
+
 test("request explanation resolves provenance while masking authorization", async () => {
   const { buildRequestExplanation } = await server.ssrLoadModule("/src/lib/request-explanation.js");
   const explanation = buildRequestExplanation({

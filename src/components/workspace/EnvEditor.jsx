@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { useEnv } from "@/hooks/use-env.js";
 import { cn } from "@/lib/utils.js";
+import { getEnvVars, saveEnvVars } from "@/lib/http-client.js";
+import { mergeStorage } from "@/lib/storage-merge.js";
+import { StorageConflictReview } from "./StorageConflictReview.jsx";
 
 function createRow(key = "", value = "") {
   return { id: `env-${Math.random().toString(36).slice(2, 8)}`, key, value, secret: false };
@@ -136,7 +139,7 @@ export function EnvEditor({
   initialTab = "workspace",
   onSave: onSaveProp,
 }) {
-  const { vars, isLoading, saveVars } = useEnv(workspaceName, collectionName, workspaceEnvironmentId);
+  const { vars, isLoading } = useEnv(workspaceName, collectionName, workspaceEnvironmentId);
 
   const [activeTab, setActiveTab] = useState(initialTab);
   const [workspaceDraft, setWorkspaceDraft] = useState([]);
@@ -146,6 +149,9 @@ export function EnvEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [savedFeedback, setSavedFeedback] = useState(false);
   const hasHydratedRef = useRef(false);
+  const revisionsRef = useRef({});
+  const [conflict, setConflict] = useState(null);
+  const [error, setError] = useState("");
 
   const isDirty = useMemo(() => {
     if (!hasHydratedRef.current) return false;
@@ -172,6 +178,8 @@ export function EnvEditor({
   const activeIssues = activeTab === "workspace" ? workspaceIssues : collectionIssues;
 
   useLayoutEffect(() => {
+    if (typeof vars.workspaceRevision !== "string") return;
+    if (hasHydratedRef.current && isDirty) return;
     const nextWorkspace = vars.workspace || [];
     const nextCollection = vars.collection || [];
     setWorkspaceDraft(rowsFromVars(nextWorkspace));
@@ -179,31 +187,77 @@ export function EnvEditor({
     setBaselineWorkspace(nextWorkspace);
     setBaselineCollection(nextCollection);
     hasHydratedRef.current = true;
+    revisionsRef.current = { workspace: vars.workspaceRevision, collection: vars.collectionRevision };
   }, [vars.workspace, vars.collection]);
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
 
-  async function handleSave(overrideDrafts) {
-    setIsSaving(true);
-    try {
-      if (overrideDrafts) {
-        if (activeTab === "workspace") {
-          await saveVars("workspace", overrideDrafts.workspace.filter((r) => r.key.trim()));
-        } else {
-          await saveVars("collection", overrideDrafts.collection.filter((r) => r.key.trim()));
+  const cleanRows = (rows) => rows.filter((row) => row.key.trim()).map(({ key, value }) => ({ key, value }));
+  useEffect(() => {
+    if (isLoading || isSaving || conflict || !hasHydratedRef.current) return;
+    let cancelled = false;
+    let checking = false;
+    const check = async () => {
+      if (checking || document.hidden) return;
+      checking = true;
+      try {
+        const remote = await getEnvVars(workspaceName, collectionName, workspaceEnvironmentId);
+        if (cancelled) return;
+        for (const scope of collectionName ? ["workspace", "collection"] : ["workspace"]) {
+          if (revisionsRef.current[scope] && remote[`${scope}Revision`] !== revisionsRef.current[scope]) {
+            setConflict({ scope, base: cleanRows(scope === "workspace" ? baselineWorkspace : baselineCollection), remote: remote[scope], revision: remote[`${scope}Revision`] });
+            break;
+          }
         }
-      } else {
-        await saveVars("workspace", workspaceDraft.filter((r) => r.key.trim()));
-        await saveVars("collection", collectionDraft.filter((r) => r.key.trim()));
+      } catch (error) { if (!cancelled) setError(String(error?.message || error)); }
+      finally { checking = false; }
+    };
+    const timer = window.setInterval(check, 8000);
+    window.addEventListener("focus", check);
+    return () => { cancelled = true; window.clearInterval(timer); window.removeEventListener("focus", check); };
+  }, [workspaceName, collectionName, workspaceEnvironmentId, isLoading, isSaving, conflict, baselineWorkspace, baselineCollection]);
+
+  async function handleSave() {
+    setIsSaving(true);
+    setError("");
+    try {
+      for (const scope of collectionName ? ["workspace", "collection"] : ["workspace"]) {
+        const local = cleanRows(scope === "workspace" ? workspaceDraft : collectionDraft);
+        const base = cleanRows(scope === "workspace" ? baselineWorkspace : baselineCollection);
+        if (JSON.stringify(local) === JSON.stringify(base)) continue;
+        if (!revisionsRef.current[scope]) throw new Error("Reload the environment before saving.");
+        try {
+          const revision = await saveEnvVars(workspaceName, scope === "collection" ? collectionName : null, local, workspaceEnvironmentId, revisionsRef.current[scope]);
+          revisionsRef.current[scope] = revision;
+          (scope === "workspace" ? setBaselineWorkspace : setBaselineCollection)(local);
+        } catch (error) {
+          if (String(error?.message || error).startsWith("KIVO_EXTERNAL_CHANGE:")) {
+            const remote = await getEnvVars(workspaceName, collectionName, workspaceEnvironmentId);
+            setConflict({ scope, base, remote: remote[scope], revision: remote[`${scope}Revision`] });
+            return;
+          }
+          throw error;
+        }
       }
       onSaveProp?.();
       setSavedFeedback(true);
       window.setTimeout(() => setSavedFeedback(false), 1800);
-    } finally {
+    } catch (error) { setError(String(error?.message || error)); }
+    finally {
       setIsSaving(false);
     }
+  }
+
+  const localConflictRows = conflict ? cleanRows(conflict.scope === "workspace" ? workspaceDraft : collectionDraft) : [];
+  const review = conflict ? mergeStorage(conflict.base, localConflictRows, conflict.remote) : null;
+  function resolveConflict(choice, choices) {
+    const rows = choice === "remote" ? conflict.remote : choice === "local" ? localConflictRows : mergeStorage(conflict.base, localConflictRows, conflict.remote, choices).value;
+    (conflict.scope === "workspace" ? setWorkspaceDraft : setCollectionDraft)(rowsFromVars(rows));
+    (conflict.scope === "workspace" ? setBaselineWorkspace : setBaselineCollection)(conflict.remote);
+    revisionsRef.current[conflict.scope] = conflict.revision;
+    setConflict(null);
   }
 
   const workspaceKeys = vars.workspace.map((v) => v.key);
@@ -218,6 +272,8 @@ export function EnvEditor({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      {review && <StorageConflictReview key={conflict.revision} title="Environment changed on disk" review={review} onResolve={resolveConflict} />}
+      {error && <p role="alert" className="p-3 text-xs text-destructive">{error}</p>}
       <div className="flex items-center justify-between border-b border-border/25 bg-transparent px-4 pt-1">
         <div className="flex items-center gap-1">
           {[
@@ -283,7 +339,7 @@ export function EnvEditor({
             size="sm"
             className="h-8 gap-2 px-6 text-[12px] shadow-md transition-transform active:scale-95"
             onClick={() => handleSave()}
-            disabled={isSaving || !isDirty || activeIssues.length > 0}
+            disabled={isSaving || isLoading || !isDirty || Boolean(conflict) || workspaceIssues.length > 0 || collectionIssues.length > 0}
           >
             <Save className="h-3.5 w-3.5" />
             {isSaving ? "Saving..." : savedFeedback ? "Saved!" : "Save"}

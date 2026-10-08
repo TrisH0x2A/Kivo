@@ -554,7 +554,7 @@ fn apply_request_runtime_state(request: &mut RequestRecord, runtime: &RequestRun
 #[tauri::command]
 pub fn load_app_state(app: AppHandle) -> Result<PersistedAppState, String> {
     let root = get_storage_root(&app)?;
-    let mut workspaces = fs_load_workspaces(&root)?;
+    let (mut workspaces, revision) = io::fs_load_workspaces_snapshot(&root)?;
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -581,11 +581,12 @@ pub fn load_app_state(app: AppHandle) -> Result<PersistedAppState, String> {
     }
 
     state.workspaces = workspaces;
+    state.storage_revision = revision;
     Ok(state)
 }
 
 #[tauri::command]
-pub fn save_app_state(app: AppHandle, payload: PersistedAppState) -> Result<(), String> {
+pub fn save_app_state(app: AppHandle, payload: PersistedAppState, expected_revision: Option<String>) -> Result<String, String> {
     let root = get_storage_root(&app)?;
     let app_data_dir = app
         .path()
@@ -608,6 +609,7 @@ pub fn save_app_state(app: AppHandle, payload: PersistedAppState) -> Result<(), 
     }
 
     let mut state_to_save = payload.clone();
+    state_to_save.storage_revision.clear();
     state_to_save.request_runtime_state = runtime_state_map;
     state_to_save.workspaces = vec![];
     if state_to_save.storage_path.is_none() {
@@ -617,8 +619,15 @@ pub fn save_app_state(app: AppHandle, payload: PersistedAppState) -> Result<(), 
     }
     let state_json = serde_json::to_string_pretty(&state_to_save)
         .map_err(|e| format!("Failed to serialize state.json: {e}"))?;
-    fs_save_workspaces(&root, &clean_workspaces)?;
-    durable::atomic_write(&state_file_path, state_json)
+    let revision = io::fs_save_workspaces_checked(&root, &clean_workspaces, expected_revision.as_deref())?;
+    durable::atomic_write(&state_file_path, state_json)?;
+    Ok(revision)
+}
+
+#[tauri::command]
+pub fn get_workspace_revision(app: AppHandle) -> Result<String, String> {
+    let _guard = durable::storage_lock()?;
+    io::workspaces_revision(&get_storage_root(&app)?)
 }
 
 #[tauri::command]
@@ -644,14 +653,16 @@ pub fn save_env_vars(
     collection_name: Option<String>,
     workspace_environment_id: Option<String>,
     vars: Vec<EnvVar>,
-) -> Result<(), String> {
+    expected_revision: Option<String>,
+) -> Result<String, String> {
     let root = get_storage_root(&app)?;
-    fs_save_env_vars(
+    io::fs_save_env_vars_checked(
         &root,
         &workspace_name,
         collection_name.as_deref(),
         workspace_environment_id.as_deref(),
         &vars,
+        expected_revision.as_deref(),
     )
 }
 

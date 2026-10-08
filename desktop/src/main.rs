@@ -55,6 +55,7 @@ fn main() {
             wait_for_oauth_callback,
             cancel_oauth_exchange,
             load_app_state,
+            storage::get_workspace_revision,
             save_app_state,
             open_config_directory,
             reveal_item,

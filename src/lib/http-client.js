@@ -302,8 +302,26 @@ export function cancelOAuthExchange(requestId) {
   return invoke("cancel_oauth_exchange", { requestId });
 }
 
-export async function loadAppState() {
+let workspaceRevision = null;
+let workspaceSaveBlocked = false;
+
+export function acceptWorkspaceRevision(revision) {
+  workspaceRevision = revision || null;
+  workspaceSaveBlocked = false;
+}
+
+export async function workspaceHasExternalChanges() {
+  return stateSaveQueue.enqueue(async () => {
+    if (!workspaceRevision) return false;
+    const changed = (await invoke("get_workspace_revision")) !== workspaceRevision;
+    if (changed) workspaceSaveBlocked = true;
+    return changed;
+  });
+}
+
+export async function loadAppState({ acceptRevision = true } = {}) {
   const state = await invoke("load_app_state");
+  if (acceptRevision) acceptWorkspaceRevision(state.storageRevision);
   return transformStateAuth(state, "decrypt");
 }
 
@@ -437,8 +455,16 @@ export async function saveAppState(payload) {
   };
 
   return stateSaveQueue.enqueue(async () => {
+    if (workspaceSaveBlocked) throw new Error("KIVO_EXTERNAL_CHANGE:requests");
     const encryptedPayload = await transformStateAuth(cleanPayload, "encrypt");
-    return invoke("save_app_state", { payload: encryptedPayload });
+    try {
+      const revision = await invoke("save_app_state", { payload: encryptedPayload, expectedRevision: workspaceRevision });
+      workspaceRevision = revision || workspaceRevision;
+      return revision;
+    } catch (error) {
+      if (String(error?.message || error).startsWith("KIVO_EXTERNAL_CHANGE:")) workspaceSaveBlocked = true;
+      throw error;
+    }
   });
 }
 
@@ -458,12 +484,13 @@ export function listGrpcProtoFilesInDirectory(dirPath) {
   return invoke("list_grpc_proto_files_in_directory", { dirPath });
 }
 
-export function saveEnvVars(workspaceName, collectionName, vars, workspaceEnvironmentId = null) {
+export function saveEnvVars(workspaceName, collectionName, vars, workspaceEnvironmentId = null, expectedRevision = null) {
   return invoke("save_env_vars", {
     workspaceName,
     collectionName: collectionName || null,
     workspaceEnvironmentId: workspaceEnvironmentId || null,
     vars,
+    expectedRevision,
   });
 }
 

@@ -61,7 +61,7 @@ export function useEnv(workspaceName, collectionName, workspaceEnvironmentId = n
 
   async function saveVars(scope, orderedVars) {
     const colName = scope === "collection" ? (collectionName || null) : null;
-    await saveEnvVars(workspaceName, colName, orderedVars, workspaceEnvironmentId || null);
+    await saveEnvVars(workspaceName, colName, orderedVars, workspaceEnvironmentId || null, scope === "collection" ? vars.collectionRevision : vars.workspaceRevision);
     await refresh();
   }
 
