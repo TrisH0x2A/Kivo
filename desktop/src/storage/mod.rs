@@ -14,6 +14,7 @@ mod tests;
 
 pub mod export;
 pub mod durable;
+pub mod backup;
 pub mod import;
 pub mod io;
 pub mod models;

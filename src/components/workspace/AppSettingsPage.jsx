@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card.jsx";
 import { Input } from "@/components/ui/input.jsx";
 import { clearCookieJar, deleteCookieJarEntry, getAppSettings, getCookieJar, setAppSettings, switchStoragePath, upsertCookieJarEntry, validateStoragePath } from "@/lib/http-client.js";
 import { HistorySettingsPanel } from "@/components/workspace/HistorySettingsPanel.jsx";
+import { BackupRecoveryPanel } from "@/components/workspace/BackupRecoveryPanel.jsx";
 import { createDefaultKeybindings, keyboardEventToShortcut, KEYBINDING_ACTIONS, normalizeKeybindingMap, shortcutToDisplay } from "@/lib/keybindings.js";
 import { THEME_OPTIONS } from "@/lib/themes.js";
 
@@ -30,6 +31,7 @@ const EMPTY_COOKIE_DRAFT = {
 
 const SETTINGS_SECTIONS = [
   { id: "Storage", label: "Storage", description: "Data root and migration", icon: HardDrive },
+  { id: "Recovery", label: "Recovery", description: "Backups and retained files", icon: RefreshCw },
   { id: "Theme", label: "Theme", description: "Appearance and editor skin", icon: Palette },
   { id: "Security", label: "Security", description: "TLS, OAuth, and certificates", icon: ShieldCheck },
   { id: "Keybindings", label: "Keybindings", description: "Command shortcuts", icon: Keyboard },
@@ -1051,6 +1053,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
           </Card>
       ) : null}
 
+        {activeSettingsTab === "Recovery" ? <BackupRecoveryPanel /> : null}
         {activeSettingsTab === "History" ? (
           <HistorySettingsPanel requestHistory={requestHistory} onClearHistory={onClearHistory} historyLimit={appSettings.requestHistoryLimit} onHistoryLimitChange={(requestHistoryLimit) => updateSettingsPatch({ requestHistoryLimit })} />
         ) : null}

@@ -64,6 +64,7 @@ window.__TAURI_INTERNALS__ = {
       case "get_workspace_environments_cmd": return { activeEnvironmentId, environments };
       case "set_active_workspace_environment_cmd": activeEnvironmentId = args.environmentId; return { activeEnvironmentId, environments };
       case "get_cookie_jar": return [];
+      case "list_recovery_snapshots": return [];
       case "send_http_request": {
         if (!args.payload.requestId?.startsWith("compare-")) throw new Error("Only synthetic comparisons are enabled in this fixture.");
         const staging = args.payload.workspaceEnvironmentId === "staging";

@@ -225,7 +225,7 @@ test("collection sections retain their content in the flat settings layout", asy
 
 test("all app settings sections render directly without a Storage flash", async () => {
   const { AppSettingsPage } = await server.ssrLoadModule("/src/components/workspace/AppSettingsPage.jsx");
-  for (const initialTab of ["Storage", "Theme", "Security", "Keybindings", "Proxy", "Cookie Jar", "History", "Updates", "Resources"]) {
+  for (const initialTab of ["Storage", "Recovery", "Theme", "Security", "Keybindings", "Proxy", "Cookie Jar", "History", "Updates", "Resources"]) {
     const html = render(AppSettingsPage, { initialTab });
     assert.match(html, /kivo-settings-layout/, initialTab);
     assert.ok(html.includes(`>${initialTab}</h2>`), initialTab);

@@ -5,6 +5,21 @@ import { createSaveQueue } from "./save-queue.js";
 import { deriveAuthKey, encryptSensitiveText, decryptSensitiveText } from "./auth-crypto.js";
 
 const stateSaveQueue = createSaveQueue();
+let restoringStorage = false;
+
+export function restoreStorageSnapshot(kind, args) {
+  if (kind !== "backup" && kind !== "snapshot") return Promise.reject(new Error("Unknown restore type"));
+  return stateSaveQueue.enqueue(async () => {
+    restoringStorage = true;
+    try {
+      return await invoke(kind === "backup" ? "restore_workspace_backup" : "restore_recovery_snapshot", args);
+    } catch (error) {
+      restoringStorage = false;
+      throw error;
+    }
+    // Successful restoration stays read-only until the caller reloads from disk.
+  });
+}
 
 const AUTH_SENSITIVE_KEYS = new Set([
   "token",
@@ -455,6 +470,7 @@ export async function saveAppState(payload) {
   };
 
   return stateSaveQueue.enqueue(async () => {
+    if (restoringStorage) throw new Error("Storage was restored. Reload Kivo before saving.");
     if (workspaceSaveBlocked) throw new Error("KIVO_EXTERNAL_CHANGE:requests");
     const encryptedPayload = await transformStateAuth(cleanPayload, "encrypt");
     try {
