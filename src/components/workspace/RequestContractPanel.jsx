@@ -6,7 +6,9 @@ import { SelectMenu } from "./SelectMenu.jsx";
 import { CodeEditor } from "./CodeEditor.jsx";
 import { buildResponseJsonSchema } from "@/lib/api-design.js";
 import { validateContract } from "@/lib/contract-client.js";
-import { openApiOperations, parseOpenApi, planOpenApiSync } from "@/lib/openapi-contract.js";
+import { applyOpenApiSync, openApiOperations, parseOpenApi, planOpenApiSync } from "@/lib/openapi-contract.js";
+
+const syncFields = { method: "Method", url: "URL", queryParams: "Query parameters", headers: "Headers", contract: "Response schemas", body: "Request body and content type", auth: "Authentication" };
 
 export function RequestContractPanel({ request, onChange, response }) {
   const contract = request.contract || {};
@@ -22,6 +24,9 @@ export function RequestContractPanel({ request, onChange, response }) {
   const [spec, setSpec] = useState(null);
   const [operation, setOperation] = useState("");
   const [plan, setPlan] = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [removeObsolete, setRemoveObsolete] = useState(false);
+  const [securityChoice, setSecurityChoice] = useState("");
   const fileRef = useRef(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -61,11 +66,34 @@ export function RequestContractPanel({ request, onChange, response }) {
       if (file.size > 2_000_000) throw new Error("OpenAPI documents must be smaller than 2 MB.");
       const parsed = parseOpenApi(await file.text());
       const operations = openApiOperations(parsed);
-      if (!operations.length) throw new Error("No operations found.");
-      if (mounted.current) { setSpec(parsed); setOperation(operations.some((item) => item.value === contract.source?.operation) ? contract.source.operation : operations[0].value); }
+      if (mounted.current) { setSpec(parsed); setOperation(operations.some((item) => item.value === contract.source?.operation) ? contract.source.operation : operations[0]?.value || ""); }
     } catch (error) { if (mounted.current) setError(error.message); }
   }
   const editDraft = (text) => { setDraft(text); setResult(null); };
+  const operationRemoved = spec && contract.source?.operation && !openApiOperations(spec).some((item) => item.value === contract.source.operation);
+  function previewSync() {
+    try {
+      const next = planOpenApiSync(spec, operation, request);
+      setPlan({ ...next, requestSnapshot: JSON.stringify(request) });
+      setSelected(next.changes);
+      setRemoveObsolete(false);
+      setSecurityChoice(next.security[0]?.value || "");
+      setError("");
+    } catch (error) { setError(error.message); }
+  }
+  function applySync() {
+    try {
+      if (JSON.stringify(request) !== plan.requestSnapshot) throw new Error("The request changed. Preview synchronization again before applying.");
+      const patch = applyOpenApiSync(plan, request, selected, { removeObsolete, securityChoice });
+      for (const [key, value] of Object.entries(patch)) onChange(key, value);
+      if (selected.includes("contract")) {
+        const first = Object.keys(patch.contract.responses)[0] || "default";
+        setStatus(first); editDraft(JSON.stringify(patch.contract.responses[first] ?? {}, null, 2));
+      }
+      setPlan(null); setError("");
+      setResult({ ok: true, errors: [], label: "Selected specification changes applied" });
+    } catch (error) { setError(error.message); }
+  }
   return <div className="flex h-full min-h-0 flex-col overflow-auto thin-scrollbar">
     <div className="flex flex-wrap items-center gap-2 border-b border-border/30 px-3 py-3">
       <label className="text-xs text-muted-foreground" htmlFor="contract-status">Response</label>
@@ -82,8 +110,24 @@ export function RequestContractPanel({ request, onChange, response }) {
     {(error || result) && <div role="status" className="max-h-36 shrink-0 overflow-auto border-t border-border/30 p-3 text-xs"><span className={error || !result?.ok ? "text-destructive" : "text-foreground"}>{error || result.label}</span>{result?.errors.map((message, index) => <div className="mt-1 break-words text-muted-foreground" key={index}>{message}</div>)}</div>}
     {(!request.requestMode || request.requestMode === "http") && <section className="shrink-0 space-y-3 border-t border-border/30 p-3">
       <div className="flex flex-wrap items-center gap-3"><h3 className="text-xs font-medium">OpenAPI synchronization</h3><span className="min-w-0 flex-1 truncate text-xs text-muted-foreground" title={contract.source?.operation}>{contract.source?.title} {contract.source?.operation}</span><Button className="gap-2" size="sm" variant="outline" onClick={() => fileRef.current?.click()}><FileUp className="h-3.5 w-3.5" />Load specification</Button><input ref={fileRef} type="file" accept=".json,.yaml,.yml" className="hidden" onChange={loadSpec} /></div>
-      {spec && <div className="flex flex-wrap gap-2"><SelectMenu className="min-w-0 flex-1" value={operation} options={openApiOperations(spec)} onChange={(value) => { setOperation(value); setPlan(null); }} /><Button className="gap-2" size="sm" variant="outline" onClick={() => { try { setPlan(planOpenApiSync(spec, operation, request)); setError(""); } catch (error) { setError(error.message); } }}><RefreshCw className="h-3.5 w-3.5" />Preview changes</Button></div>}
-      {plan && <div className="space-y-2 border-t border-border/30 pt-3 text-xs"><div className="break-all font-mono">{plan.patch.method} {plan.patch.url}</div><div className="text-muted-foreground">Changed: {plan.changes.join(", ") || "none"}</div><div className="text-muted-foreground">Body, authentication, scripts, and existing parameter values remain unchanged.</div>{plan.warnings.map((warning) => <div key={warning} className="text-muted-foreground">{warning}</div>)}<Button className="gap-2" size="sm" onClick={() => { const fresh = planOpenApiSync(spec, operation, request); for (const [key, value] of Object.entries(fresh.patch)) onChange(key, value); const first = Object.keys(fresh.patch.contract.responses)[0] || "default"; setStatus(first); editDraft(JSON.stringify(fresh.patch.contract.responses[first] ?? {}, null, 2)); setPlan(null); }}><Check className="h-3.5 w-3.5" />Apply synchronization</Button></div>}
+      {operationRemoved && <div role="status" className="space-y-2 border-l-2 border-destructive pl-3 text-xs"><p className="break-words">{contract.source.operation} was removed from this specification. The saved request is retained.</p><Button size="sm" variant="outline" onClick={() => { const next = { ...contract }; delete next.source; onChange("contract", next); setPlan(null); }}>Detach specification</Button></div>}
+      {spec && <div className="flex flex-wrap gap-2"><SelectMenu className="min-w-0 flex-1" value={operation} options={openApiOperations(spec)} onChange={(value) => { setOperation(value); setPlan(null); }} /><Button className="gap-2" size="sm" variant="outline" disabled={!operation} onClick={previewSync}><RefreshCw className="h-3.5 w-3.5" />Preview changes</Button></div>}
+      {plan && <div className="space-y-3 border-t border-border/30 pt-3 text-xs">
+        <div className="break-all font-mono">{plan.patch.method} {plan.patch.url}</div>
+        <div className="divide-y divide-border/30">
+          {Object.entries(syncFields).filter(([key]) => key === "body" ? plan.body : key === "auth" ? plan.security.length : true).map(([key, label]) => <div key={key} className="py-2">
+            <label className="flex items-center gap-2"><input type="checkbox" className="accent-primary" checked={selected.includes(key)} onChange={(event) => setSelected((prev) => event.target.checked ? [...prev, key] : prev.filter((field) => field !== key))} /><span>{label}</span><span className="ml-auto text-muted-foreground">{key === "body" || key === "auth" ? "Replace" : plan.changes.includes(key) ? "Changed" : "Unchanged"}</span></label>
+            <details className="mt-2 pl-5 text-muted-foreground"><summary className="cursor-pointer">Proposed value</summary><pre className="mt-2 max-h-44 overflow-auto whitespace-pre-wrap break-all font-mono">{JSON.stringify(key === "body" ? plan.body : key === "auth" ? plan.security.find((item) => item.value === securityChoice)?.auth : key === "contract" ? plan.patch.contract.responses : plan.patch[key], null, 2)}</pre></details>
+          </div>)}
+        </div>
+        {selected.includes("auth") && <div className="space-y-2"><SelectMenu value={securityChoice} options={plan.security} onChange={setSecurityChoice} /><p className="text-muted-foreground">Authentication will be replaced. Configure credentials in Auth after applying.</p></div>}
+        {Object.values(plan.removed).some((items) => items.length) && <div className="space-y-2 border-l-2 border-destructive pl-3">
+          {Object.entries(plan.removed).filter(([, names]) => names.length).map(([key, names]) => <p className="break-words" key={key}>Removed {key === "responses" ? "response schemas" : syncFields[key].toLowerCase()}: {names.join(", ")}</p>)}
+          <label className="flex items-center gap-2"><input type="checkbox" className="accent-primary" checked={removeObsolete} onChange={(event) => setRemoveObsolete(event.target.checked)} />Remove obsolete imported fields in selected sections</label>
+        </div>}
+        {plan.warnings.map((warning) => <p key={warning} className="text-muted-foreground">{warning}</p>)}
+        <Button className="gap-2" size="sm" disabled={!selected.length} onClick={applySync}><Check className="h-3.5 w-3.5" />Apply selected changes</Button>
+      </div>}
     </section>}
   </div>;
 }

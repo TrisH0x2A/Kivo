@@ -107,7 +107,6 @@ export function planOpenApiSync(spec, operationKey, request) {
     else warnings.push(`${status}: no JSON response schema`);
   }
   if ([...parameters.values()].some((parameter) => ["cookie", "path"].includes(parameter.in))) warnings.push("Path and cookie values need explicit configuration.");
-  if (operation.security || spec.security) warnings.push("Existing authentication is preserved; security requirements are not imported.");
   const patch = {
     method: method.toUpperCase(),
     url: `${base.replace(/\/$/, "")}${path.replace(/\{([^{}]+)\}/g, "{{$1}}")}`,
@@ -115,5 +114,119 @@ export function planOpenApiSync(spec, operationKey, request) {
     headers: rows("header", request.headers),
     contract: { ...request.contract, responses, source: { title: spec.info?.title || "OpenAPI", version: spec.info?.version || "", operation: operationKey } }
   };
-  return { patch, warnings, changes: Object.keys(patch).filter((key) => JSON.stringify(patch[key]) !== JSON.stringify(request[key])) };
+  const sameOperation = request.contract?.source?.operation === operationKey;
+  const previous = sameOperation ? request.contract.source.managed || {} : {};
+  const managed = {
+    queryParams: [...parameters.values()].filter((p) => p.in === "query").map((p) => p.name),
+    headers: [...parameters.values()].filter((p) => p.in === "header").map((p) => p.name),
+    responses: Object.keys(responses)
+  };
+  const removed = Object.fromEntries(Object.keys(managed).map((key) => [key, (previous[key] || []).filter((name) => !managed[key].some((next) => key === "headers" ? next.toLowerCase() === name.toLowerCase() : next === name))]));
+  const body = mapRequestBody(spec, operation.requestBody, warnings);
+  const security = mapSecurity(spec, operation.security ?? spec.security ?? [], warnings);
+  return { patch, warnings, managed, removed, body, security, previous, changes: Object.keys(patch).filter((key) => JSON.stringify(patch[key]) !== JSON.stringify(request[key])) };
+}
+
+function sampleSchema(spec, raw, seen = new Set(), budget = { nodes: 0 }) {
+  if (++budget.nodes > 2000 || seen.size > 30) throw new Error("Request schema is too complex to sample.");
+  if (raw?.$ref && seen.has(raw.$ref)) return null;
+  const next = new Set(seen);
+  if (raw?.$ref) next.add(raw.$ref);
+  const schema = dereference(spec, raw);
+  if (!schema || typeof schema !== "object") return null;
+  for (const key of ["example", "default", "const"]) if (own(schema, key)) return schema[key];
+  if (schema.enum?.length) return schema.enum[0];
+  if (schema.examples?.length) return schema.examples[0];
+  if (schema.oneOf || schema.anyOf) return sampleSchema(spec, (schema.oneOf || schema.anyOf)[0], next, budget);
+  if (schema.allOf) {
+    const values = schema.allOf.map((part) => sampleSchema(spec, part, next, budget));
+    return Object.assign(Object.create(null), ...values.filter((value) => value && typeof value === "object" && !Array.isArray(value)));
+  }
+  const type = Array.isArray(schema.type) ? schema.type.find((type) => type !== "null") : schema.type;
+  if (type === "object" || schema.properties) return Object.fromEntries(Object.entries(schema.properties || {}).filter(([, child]) => !dereference(spec, child)?.readOnly).map(([key, child]) => [key, sampleSchema(spec, child, next, budget)]));
+  if (type === "array") return [sampleSchema(spec, schema.items, next, budget)];
+  if (type === "integer" || type === "number") return schema.minimum ?? 0;
+  if (type === "boolean") return false;
+  return "";
+}
+
+function mapRequestBody(spec, raw, warnings) {
+  if (!raw) return null;
+  const content = dereference(spec, raw)?.content || {};
+  const entries = Object.entries(content);
+  const entry = entries.find(([type]) => type === "application/json") || entries.find(([type]) => type.endsWith("+json")) || entries[0];
+  if (!entry) return null;
+  const [contentType, media] = entry;
+  const json = contentType === "application/json" || contentType.endsWith("+json");
+  const form = ["application/x-www-form-urlencoded", "multipart/form-data"].includes(contentType);
+  if (!json && !form && !contentType.startsWith("text/") && !contentType.includes("xml")) {
+    warnings.push(`${contentType}: configure the request body manually.`);
+    return null;
+  }
+  const example = Object.values(media.examples || {})[0];
+  const value = own(media, "example") ? media.example : example ? dereference(spec, example)?.value : sampleSchema(spec, media.schema);
+  if (example && !own(dereference(spec, example), "value")) warnings.push("External body examples are not loaded.");
+  if (!own(media, "example") && !example) warnings.push("The generated body is a starting example; review required fields and constraints.");
+  if (entries.length > 1) warnings.push(`Using ${contentType}; ${entries.length - 1} other body formats are available in the specification.`);
+  const patch = form ? {
+    bodyType: contentType === "multipart/form-data" ? "form-data" : "form-urlencoded",
+    bodyRows: Object.entries(value && typeof value === "object" ? value : {}).map(([key, item]) => ({ key, value: typeof item === "object" ? JSON.stringify(item) : String(item ?? ""), enabled: true, fieldType: "text" })), body: ""
+  } : { bodyType: json ? "json" : contentType.includes("xml") ? "xml" : "text", body: json ? JSON.stringify(value, null, 2) : typeof value === "string" ? value : "" };
+  return { contentType, patch };
+}
+
+function mapSecurity(spec, requirements, warnings) {
+  if (!requirements.length) return [{ value: "none", label: "No authentication", auth: { type: "none" } }];
+  return requirements.flatMap((requirement, index) => {
+    const entries = Object.entries(requirement);
+    if (!entries.length) return [{ value: String(index), label: "No authentication (optional)", auth: { type: "none" } }];
+    if (entries.length > 1) {
+      warnings.push(`Combined security (${entries.map(([name]) => name).join(" + ")}) requires manual configuration.`);
+      return [];
+    }
+    const [name, scopes] = entries[0];
+    const scheme = dereference(spec, spec.components?.securitySchemes?.[name]);
+    let auth;
+    if (scheme?.type === "http" && ["basic", "bearer", "digest"].includes(scheme.scheme?.toLowerCase())) auth = { type: scheme.scheme.toLowerCase() };
+    if (scheme?.type === "apiKey" && ["header", "query"].includes(scheme.in)) auth = { type: "apikey", apiKeyName: scheme.name, apiKeyIn: scheme.in, apiKeyValue: "" };
+    if (scheme?.type === "oauth2") {
+      const grants = { authorizationCode: "authorization_code", clientCredentials: "client_credentials", password: "password" };
+      return Object.entries(scheme.flows || {}).flatMap(([flow, value]) => {
+        if (!grants[flow]) { warnings.push(`${name}: ${flow} requires manual configuration.`); return []; }
+        return [{ value: `${index}:${flow}`, label: `${name} / ${grants[flow]}`, auth: { type: "oauth2", oauth2: { grantType: grants[flow], authUrl: value.authorizationUrl || "", tokenUrl: value.tokenUrl || "", scope: scopes.join(" ") } } }];
+      });
+    }
+    if (!auth) { warnings.push(`${name}: ${scheme?.type || "unknown security scheme"} requires manual configuration.`); return []; }
+    return [{ value: String(index), label: name, auth }];
+  });
+}
+
+// Only fields explicitly selected by the user are changed; metadata tracks accepted imports.
+export function applyOpenApiSync(plan, request, selected, { removeObsolete = false, securityChoice = "" } = {}) {
+  const patch = {};
+  const selectedSet = new Set(selected);
+  for (const key of ["method", "url", "queryParams", "headers"]) if (selectedSet.has(key)) patch[key] = plan.patch[key];
+  const responses = { ...request.contract?.responses };
+  if (selectedSet.has("contract")) Object.assign(responses, plan.patch.contract.responses);
+  for (const key of ["queryParams", "headers", "responses"]) {
+    if (!removeObsolete || !selectedSet.has(key === "responses" ? "contract" : key)) continue;
+    if (key === "responses") for (const name of plan.removed.responses) delete responses[name];
+    else patch[key] = patch[key].filter((row) => !plan.removed[key].some((name) => key === "headers" ? name.toLowerCase() === row.key.toLowerCase() : name === row.key));
+  }
+  if (selectedSet.has("body") && plan.body) {
+    Object.assign(patch, plan.body.patch);
+    const headers = (patch.headers || request.headers || []).filter((row) => row.key.toLowerCase() !== "content-type");
+    patch.headers = plan.body.contentType === "multipart/form-data" ? headers : [...headers, { key: "Content-Type", value: plan.body.contentType, enabled: true }];
+  }
+  if (selectedSet.has("auth")) {
+    const choice = plan.security.find((item) => item.value === securityChoice);
+    if (!choice) throw new Error("Select an authentication requirement.");
+    patch.auth = choice.auth;
+  }
+  const managed = { ...plan.previous };
+  for (const key of ["queryParams", "headers", "responses"]) {
+    if (selectedSet.has(key === "responses" ? "contract" : key)) managed[key] = [...new Set([...plan.managed[key], ...(removeObsolete ? [] : plan.removed[key])])];
+  }
+  patch.contract = { ...request.contract, responses, source: { ...plan.patch.contract.source, managed } };
+  return patch;
 }
