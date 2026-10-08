@@ -24,7 +24,7 @@ function boundText(value, limit = MAX_HISTORY_TEXT) {
 }
 
 function redactBody(value) {
-  const raw = String(value ?? "");
+  const raw = typeof value === "object" && value !== null ? JSON.stringify(value) : String(value ?? "");
   try {
     return JSON.stringify(JSON.parse(raw), (key, entry) => SENSITIVE_HISTORY_FIELD.test(key) ? "[redacted]" : entry, 2);
   } catch {
@@ -55,31 +55,42 @@ export function buildHistorySnapshots({ request = {}, response = {}, url = "", w
     environment: execution.environment,
     scriptChanges: execution.scriptChanges,
   } : null;
-  const rawBody = executionRequest?.body ?? redactBody(response?.rawBody ?? response?.body ?? request?.body ?? "");
-  const boundedBody = boundText(rawBody);
+  const rawBody = executionRequest?.body ?? request?.body ?? "";
   const responseBody = boundText(response?.isBinary ? "[binary response body omitted from preview]" : redactBody(response?.rawBody ?? response?.body ?? ""));
-  const responseBase64 = boundText(response?.bodyBase64 ?? "");
-  const requestBody = boundText(boundedBody.value);
+  const responseBase64 = boundText(response?.isBinary ? response?.bodyBase64 ?? "" : "");
+  const requestBody = boundText(redactBody(rawBody));
   const requestSnapshot = {
     version: 1,
     requestMode: String(request.requestMode || "http"),
     method: String(executionRequest?.method || request.method || "GET"),
-    url: String(executionRequest?.url || redactHistoryUrl(url || request.url || "")),
-    finalUrl: String(executionRequest?.finalUrl || executionRequest?.url || redactHistoryUrl(url || request.url || "")),
-    queryParams: Array.isArray(request.queryParams) ? request.queryParams.map((row) => ({ key: String(row?.key || ""), value: redactHistoryUrl(String(row?.value || "")), enabled: row?.enabled !== false })) : [],
-    headers: executionRequest?.headers || snapshotHeaders(request.headers),
+    url: redactHistoryUrl(executionRequest?.url || url || request.url || ""),
+    finalUrl: redactHistoryUrl(executionRequest?.finalUrl || executionRequest?.url || url || request.url || ""),
+    queryParams: executionRequest ? [] : Array.isArray(request.queryParams) ? request.queryParams.map((row) => ({ key: String(row?.key || ""), value: SENSITIVE_HISTORY_FIELD.test(row?.key || "") ? "[redacted]" : redactHistoryUrl(String(row?.value || "")), enabled: row?.enabled !== false })) : [],
+    headers: snapshotHeaders(executionRequest?.headers || request.headers),
     bodyType: String(request.bodyType || "none"),
     body: requestBody.value,
     bodyOmitted: Boolean(executionRequest?.bodyOmitted),
     bodyTruncated: Boolean(executionRequest?.bodyTruncated || requestBody.truncated),
+    graphqlVariables: boundText(redactBody(request.graphqlVariables || "{}")).value,
+    grpcMethodPath: String(request.grpcMethodPath || ""),
+    grpcProtoFilePath: String(request.grpcProtoFilePath || ""),
+    grpcStreamingMode: String(request.grpcStreamingMode || "bidi"),
     environment: executionRequest?.environment || { name: "Default" },
     scriptChanges: Array.isArray(executionRequest?.scriptChanges) ? executionRequest.scriptChanges : [],
-    replayWarning: executionRequest?.bodyOmitted || requestBody.value.includes("[redacted]") || snapshotHeaders(request.headers).some((header) => header.value.includes("[redacted]"))
-      ? "Review redacted or omitted values before replaying."
-      : "",
+    replayWarning: "Review captured values, authentication, scripts, and file dependencies before sending this copy.",
     workspaceName: String(workspaceName || ""),
     collectionName: String(collectionName || ""),
   };
+  // Native GraphQL captures contain the serialized HTTP envelope, not the query editor text.
+  if (request.bodyType === "graphql" && executionRequest && !requestSnapshot.bodyTruncated) {
+    try {
+      const payload = JSON.parse(requestBody.value);
+      if (typeof payload.query === "string") {
+        requestSnapshot.body = payload.query;
+        requestSnapshot.graphqlVariables = JSON.stringify(payload.variables || {}, null, 2);
+      }
+    } catch { /* Keep incomplete captures visible for manual review. */ }
+  }
   const responseSnapshot = {
     version: 1,
     status: Number(response?.status || 0),
@@ -103,6 +114,8 @@ export function redactHistoryUrl(value) {
   if (!raw.trim()) return raw;
   try {
     const parsed = new URL(raw);
+    if (parsed.username) parsed.username = "[redacted]";
+    if (parsed.password) parsed.password = "[redacted]";
     for (const key of Array.from(parsed.searchParams.keys())) {
       const normalized = key.trim().toLowerCase();
       if (
@@ -135,4 +148,10 @@ export function filterRequestHistory(requestHistory = [], query = "") {
     entry?.status,
     entry?.error,
   ].some((value) => String(value ?? "").toLowerCase().includes(normalized)));
+}
+
+export function retainHistoryEntries(entries, limit = 500) {
+  const count = Number.isFinite(Number(limit)) ? Math.min(5000, Math.max(50, Number(limit))) : 500;
+  const pinned = entries.filter((entry) => entry.pinned).slice(0, 5000);
+  return [...pinned, ...entries.filter((entry) => !entry.pinned).slice(0, Math.max(0, count - pinned.length))];
 }

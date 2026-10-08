@@ -582,7 +582,7 @@ export default function App() {
                 onClearHistory={() => updateStore((current) => ({ ...current, requestHistory: [] }))}
                 onToggleHistoryPin={toggleHistoryPin}
                 onDeleteHistory={deleteHistoryEntry}
-                onReplayHistory={(entry) => { replayHistoryEntry(entry); setShowAppSettings(false); }}
+                onReplayHistory={(entry) => { if (replayHistoryEntry(entry)) { setForcedView(null); handleSidebarTabChange("requests"); } }}
               />
             </Suspense>
           ) : showNoWorkspaceState ? (

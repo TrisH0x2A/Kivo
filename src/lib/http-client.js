@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { redactHistoryUrl } from "@/lib/history-utils.js";
 import { createSaveQueue } from "./save-queue.js";
 import { deriveAuthKey, encryptSensitiveText, decryptSensitiveText } from "./auth-crypto.js";
+import { transformHistorySnapshots } from "./history-crypto.js";
 
 const stateSaveQueue = createSaveQueue();
 let restoringStorage = false;
@@ -96,6 +97,7 @@ async function transformStateAuth(payload, mode) {
 
   return {
     ...payload,
+    requestHistory: await transformHistorySnapshots(payload.requestHistory, key, mode),
     appSettings: payload.appSettings
       ? await transformAuthNode(payload.appSettings, key, mode)
       : payload.appSettings,

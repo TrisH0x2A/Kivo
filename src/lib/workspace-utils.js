@@ -1,4 +1,5 @@
-import { createDefaultAppSettings, createDefaultStore, normalizeRequestRecord, orderRequests } from "./workspace-store.js";
+import { createDefaultAppSettings, createDefaultStore, createRequest, getUniqueName, normalizeRequestRecord, orderRequests } from "./workspace-store.js";
+import { retainHistoryEntries } from "./history-utils.js";
 import { normalizeAuthState } from "./oauth.js";
 export { parseCookies, splitSetCookieHeader } from "./cookie-utils.js";
 
@@ -8,6 +9,35 @@ export const SIDEBAR_REOPEN_WIDTH = 260;
 
 export function clampSidebarWidth(value) {
   return Math.min(420, Math.max(SIDEBAR_MIN_WIDTH, value));
+}
+
+export function replayHistoryIntoStore(current, entry) {
+  const snapshot = entry?.requestSnapshot;
+  if (!snapshot || typeof snapshot !== "object") return current;
+  const workspace = current.workspaces.find((item) => item.name === entry.workspaceName) || current.workspaces.find((item) => item.name === current.activeWorkspaceName);
+  const collection = workspace?.collections.find((item) => item.name === entry.collectionName) || workspace?.collections.find((item) => item.name === current.activeCollectionName) || workspace?.collections[0];
+  if (!workspace || !collection) return current;
+  const name = getUniqueName(`${entry.requestName || "Request"} (history)`, collection.requests.map((item) => item.name));
+  const request = {
+    ...createRequest(name, snapshot.requestMode),
+    method: snapshot.method || "GET", url: snapshot.url || "",
+    queryParams: (snapshot.queryParams || []).map((row, index) => ({ ...row, id: `history-param-${index}` })),
+    headers: (snapshot.headers || []).map((row, index) => ({ ...row, id: `history-header-${index}`, enabled: row.enabled !== false })),
+    bodyType: snapshot.bodyType || "none", body: snapshot.body || "",
+    graphqlVariables: snapshot.graphqlVariables || "{}",
+    grpcMethodPath: snapshot.grpcMethodPath || "", grpcProtoFilePath: snapshot.grpcProtoFilePath || "",
+    grpcStreamingMode: snapshot.grpcStreamingMode || "bidi",
+    auth: { type: "none" }, useCookieJar: false,
+    docs: snapshot.replayWarning || "Review this historical copy before sending.",
+  };
+  return {
+    ...current, activeWorkspaceName: workspace.name, activeCollectionName: collection.name, activeRequestName: name,
+    workspaces: current.workspaces.map((item) => item !== workspace ? item : {
+      ...item, collections: item.collections.map((candidate) => candidate !== collection ? candidate : {
+        ...candidate, requests: [...candidate.requests, request], openRequestNames: [...(candidate.openRequestNames || []), name],
+      }),
+    }),
+  };
 }
 
 export function normalizeStore(store) {
@@ -86,7 +116,6 @@ export function normalizeStore(store) {
         environment: entry?.environment && typeof entry.environment === "object" ? entry.environment : { name: "Default" },
       }))
       .filter((entry) => entry.id || entry.sentAt)
-      .slice(0, 500)
     : [];
 
   return {
@@ -104,6 +133,6 @@ export function normalizeStore(store) {
     activeRequestName: activeRequest?.name ?? "",
     sidebarWidth: clampSidebarWidth(Number(nextStore.sidebarWidth || fallback.sidebarWidth)),
     workspaces: normalizedWorkspaces,
-    requestHistory
+    requestHistory: retainHistoryEntries(requestHistory, nextStore.appSettings?.requestHistoryLimit)
   };
 }

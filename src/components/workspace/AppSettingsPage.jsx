@@ -116,7 +116,7 @@ function resolveKivoStoragePath(base) {
   return `${baseWithoutTrailing}${sep}Kivo`;
 }
 
-export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab = "Storage", theme = "dark", onThemeChange, requestHistory = [], onClearHistory }) {
+export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab = "Storage", theme = "dark", onThemeChange, requestHistory = [], onClearHistory, onToggleHistoryPin, onDeleteHistory, onReplayHistory }) {
   const [pathInput, setPathInput] = useState(storagePath ?? "");
   const [mode, setMode] = useState("copy");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1055,7 +1055,7 @@ export function AppSettingsPage({ storagePath, onStoragePathChanged, initialTab 
 
         {activeSettingsTab === "Recovery" ? <BackupRecoveryPanel /> : null}
         {activeSettingsTab === "History" ? (
-          <HistorySettingsPanel requestHistory={requestHistory} onClearHistory={onClearHistory} historyLimit={appSettings.requestHistoryLimit} onHistoryLimitChange={(requestHistoryLimit) => updateSettingsPatch({ requestHistoryLimit })} />
+          <HistorySettingsPanel requestHistory={requestHistory} onClearHistory={onClearHistory} onToggleHistoryPin={onToggleHistoryPin} onDeleteHistory={onDeleteHistory} onReplayHistory={onReplayHistory} historyLimit={appSettings.requestHistoryLimit} onHistoryLimitChange={(requestHistoryLimit) => updateSettingsPatch({ requestHistoryLimit })} />
         ) : null}
 
         {activeSettingsTab === "Security" ? (

@@ -231,3 +231,25 @@ test("all app settings sections render directly without a Storage flash", async 
     assert.ok(html.includes(`>${initialTab}</h2>`), initialTab);
   }
 });
+
+test("history replay creates an isolated copy and reload respects retention", async () => {
+  const { replayHistoryIntoStore, normalizeStore } = await server.ssrLoadModule("/src/lib/workspace-utils.js");
+  const original = { ...model.createRequest("Create"), url: "https://api.test/current", body: "current", auth: { type: "bearer", token: "private" }, scriptPreRequest: "throw Error('current script')" };
+  const store = { ...model.createDefaultStore(), activeWorkspaceName: "Demo", activeCollectionName: "Users", activeRequestName: "Create", workspaces: [{ name: "Demo", collections: [{ name: "Users", requests: [original], openRequestNames: ["Create"] }] }] };
+  const entry = { workspaceName: "Demo", collectionName: "Users", requestName: "Create", requestSnapshot: { requestMode: "http", method: "POST", url: "https://api.test/old", bodyType: "json", body: "{}", headers: [] } };
+  const replay = replayHistoryIntoStore(store, entry);
+  assert.equal(replay.activeRequestName, "Create (history)");
+  const requests = replay.workspaces[0].collections[0].requests;
+  assert.equal(requests[0], original);
+  assert.equal(store.workspaces[0].collections[0].requests.length, 1);
+  assert.equal(requests[1].body, "{}");
+  assert.equal(requests[1].scriptPreRequest, "");
+  assert.equal(requests[1].auth.type, "none");
+  assert.equal(requests[1].useCookieJar, false);
+  assert.equal(replayHistoryIntoStore(replay, entry).activeRequestName, "Create (history) (1)");
+  assert.equal(replayHistoryIntoStore(store, {}), store);
+  const reloaded = normalizeStore({ ...store, appSettings: { requestHistoryLimit: 1000 }, requestHistory: Array.from({ length: 1200 }, (_, i) => ({ id: String(i), pinned: i === 1199, requestSnapshot: { body: "old" } })) });
+  assert.equal(reloaded.requestHistory.length, 1000);
+  assert.equal(reloaded.requestHistory[0].id, "1199");
+  assert.deepEqual(reloaded.requestHistory[0].requestSnapshot, { body: "old" });
+});

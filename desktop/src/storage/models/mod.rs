@@ -278,6 +278,14 @@ pub struct RequestHistoryEntry {
     pub error: String,
     #[serde(default)]
     pub sent_at: String,
+    #[serde(default)]
+    pub pinned: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_snapshot: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub response_snapshot: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -856,4 +864,30 @@ pub fn is_default_oauth_config(value: &OAuthConfig) -> bool {
 
 pub fn is_default_api_key_in(value: &String) -> bool {
     value.is_empty() || value == "header"
+}
+
+#[cfg(test)]
+mod history_tests {
+    use super::*;
+
+    #[test]
+    fn history_snapshots_and_pins_survive_native_state_roundtrip() {
+        let entry: RequestHistoryEntry = serde_json::from_value(serde_json::json!({
+            "id": "execution-1", "pinned": true,
+            "requestSnapshot": "enc:v1:encrypted-request",
+            "responseSnapshot": {"status": 201, "body": "legacy snapshot"},
+            "environment": {"id": "staging", "name": "Staging"}
+        })).unwrap();
+        let mut state = default_state();
+        state.request_history.push(entry);
+        let restored: PersistedAppState = serde_json::from_slice(&serde_json::to_vec(&state).unwrap()).unwrap();
+        let saved = &restored.request_history[0];
+        assert!(saved.pinned);
+        assert_eq!(saved.request_snapshot.as_ref().unwrap(), "enc:v1:encrypted-request");
+        assert_eq!(saved.response_snapshot.as_ref().unwrap()["status"], 201);
+        assert_eq!(saved.environment.as_ref().unwrap()["id"], "staging");
+        let legacy: RequestHistoryEntry = serde_json::from_str(r#"{"id":"old"}"#).unwrap();
+        assert!(!legacy.pinned);
+        assert!(legacy.request_snapshot.is_none());
+    }
 }
