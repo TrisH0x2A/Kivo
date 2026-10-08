@@ -3,6 +3,14 @@ use std::fs;
 use std::path::Path;
 use tempfile::TempDir;
 
+#[test]
+fn csv_response_export_writes_csv_without_json_wrapping() {
+    let directory = TempDir::new().unwrap();
+    let path = directory.path().join("response.csv");
+    super::export_response_file(path.to_string_lossy().to_string(), serde_json::json!({"format":"csv", "body":"id,name\r\n1,Ada"})).unwrap();
+    assert_eq!(fs::read_to_string(path).unwrap(), "id,name\r\n1,Ada");
+}
+
 use super::{
     build_export_value, create_workspace_environment, delete_workspace_environment, fs_get_env_vars,
     fs_load_workspaces, fs_save_collection_config,

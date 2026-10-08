@@ -1,4 +1,4 @@
-import { Activity, BadgeCheck, Clock3, Cookie, Copy, Download, FileJson2, FlaskConical, ListTree, LoaderCircle, Search, Trash2, X } from "lucide-react";
+import { Activity, BadgeCheck, Clock3, Cookie, Copy, Download, FileJson2, FlaskConical, ListTree, LoaderCircle, Pin, Search, Trash2, X } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
 
@@ -15,6 +15,8 @@ import { JsonTree } from "@/components/ui/JsonTree.jsx";
 import { GrpcSessionControls } from "@/components/workspace/GrpcSessionControls.jsx";
 import { ResponseRegressionDialog } from "@/components/workspace/ResponseRegressionDialog.jsx";
 import { ConnectionDiagnosticsDialog } from "@/components/workspace/ConnectionDiagnosticsDialog.jsx";
+import { ResponseInspection } from "@/components/workspace/ResponseInspection.jsx";
+import { compareResponseHeaders } from "@/lib/response-diff.js";
 
 const responseTabs = ["Body", "Headers", "Cookies", "Meta"];
 const MAX_EDITOR_PREVIEW_CHARS = 1_000_000;
@@ -105,12 +107,12 @@ export function ResponsePane({
   const [messageLimit, setMessageLimit] = useState(50);
   useEffect(() => { setMessageLimit(50); }, [response.body]);
 
-  let bodyViews = ["Raw"];
+  let bodyViews = isBinary ? ["Hex"] : ["Raw", "Search", "Hex"];
   if (isJson) {
-    bodyViews = ["Tree", "JSON", "Raw"];
+    bodyViews = ["Tree", "JSON", "Table", "Raw", "Search", "Hex"];
     if (grpcMessages) bodyViews.unshift("Messages");
   } else if (isHtml) {
-    bodyViews = ["Preview", "Raw"];
+    bodyViews = ["Preview", "Raw", "Search", "Hex"];
   }
 
   let currentView = bodyView;
@@ -124,6 +126,8 @@ export function ResponsePane({
   const [isManageOpen, setIsManageOpen] = useState(false);
   const [regressionOpen, setRegressionOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
+  const [headerBaseline, setHeaderBaseline] = useState(null);
+  const headerComparison = useMemo(() => headerBaseline ? compareResponseHeaders(headerBaseline, response.headers) : null, [headerBaseline, response.headers]);
 
   useEffect(() => {
     if (!isSending || !sendStartedAt) {
@@ -359,7 +363,7 @@ export function ResponsePane({
                 ))}
               </div>
             </div>
-            {currentView === "Messages" && grpcMessages ? (
+            {["Table", "Search", "Hex"].includes(currentView) ? <ResponseInspection key={currentView} response={response} mode={currentView} /> : currentView === "Messages" && grpcMessages ? (
               <div className="thin-scrollbar min-h-0 overflow-auto" aria-label="Received gRPC messages">
                 {grpcMessages.slice(0, messageLimit).map((message, index) => (
                   <article key={index} className="kivo-grpc-message">
@@ -431,13 +435,14 @@ export function ResponsePane({
         ) : null}
         {activeTab === "Headers" && !isGrpc ? (
           <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-3">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Headers</div>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>Headers</span><div className="flex gap-2"><Button size="sm" variant="ghost" className="gap-2" disabled={!response.status} onClick={() => setHeaderBaseline(structuredClone(response.headers))}><Pin className="h-3.5 w-3.5" />{headerBaseline ? "Update baseline" : "Pin baseline"}</Button>{headerBaseline && <Button size="icon" variant="ghost" title="Clear header baseline" aria-label="Clear header baseline" onClick={() => setHeaderBaseline(null)}><X className="h-3.5 w-3.5" /></Button>}</div></div>
             <div className="thin-scrollbar min-h-0 overflow-auto bg-transparent">
+              {headerComparison && <div className="mb-3 space-y-2 border-b border-border/30 pb-3" aria-label="Header comparison"><p className="text-xs text-muted-foreground">{headerComparison.entries.length} header changes since pinned baseline{headerComparison.truncated ? " (first 80 shown)" : ""}</p>{headerComparison.entries.map((entry) => <div key={entry.path} className="grid gap-1 border-l-2 border-primary/40 pl-3 text-xs"><strong className="break-all">{entry.path}</strong><span className="break-all text-muted-foreground">Before: {entry.left}</span><span className="break-all">Now: {entry.right}</span></div>)}</div>}
               {Object.entries(response.headers).length ? (
                 Object.entries(response.headers).map(([key, value]) => (
-                  <div key={key} className="kivo-row-hover kivo-quiet-divider grid grid-cols-[220px_minmax(0,1fr)] border-b text-[12px]">
-                    <div className="px-3 py-2 text-muted-foreground">{key}</div>
-                    <div className="px-3 py-2 text-foreground">{String(value)}</div>
+                  <div key={key} className="kivo-row-hover kivo-quiet-divider grid grid-cols-[minmax(100px,1fr)_minmax(0,2fr)] border-b text-[12px]">
+                    <div className="break-all px-3 py-2 text-muted-foreground">{key}</div>
+                    <div className="break-all px-3 py-2 text-foreground">{String(value)}</div>
                   </div>
                 ))
               ) : (

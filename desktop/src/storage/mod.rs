@@ -829,6 +829,10 @@ pub fn export_request_file(
 
 #[tauri::command]
 pub fn export_response_file(file_path: String, response: serde_json::Value) -> Result<(), String> {
+    if response.get("format").and_then(|value| value.as_str()) == Some("csv") {
+        let content = response.get("body").and_then(|value| value.as_str()).ok_or("Missing CSV body")?;
+        return durable::atomic_write(Path::new(&file_path), content);
+    }
     if response
         .get("isBinary")
         .and_then(|value| value.as_bool())
